@@ -18,6 +18,15 @@ class ClientType(models.Model):
 
 
 class ClientProfile(models.Model):
+    # Cuenta de usuario
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="client_profile",
+    )
+
     # Identificación
     nombre_cliente = models.CharField(max_length=200)
     cliente_id = models.CharField(max_length=50, unique=True)
@@ -42,6 +51,12 @@ class ClientProfile(models.Model):
     contrato_firmado = models.BooleanField(default=False)
     contrato = models.FileField(upload_to="contratos/clientes/", null=True, blank=True)
 
+    # Agencia / Marca
+    es_agencia = models.BooleanField(
+        default=False,
+        help_text="Si es agencia, puede tener múltiples marcas asociadas.",
+    )
+
     # Metadatos
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -60,3 +75,25 @@ class ClientProfile(models.Model):
 
     def __str__(self):
         return f"{self.cliente_id} — {self.nombre_cliente}"
+
+
+class Brand(models.Model):
+    """Marca asociada a un cliente (agencia). Si el cliente es marca propia, se crea una marca con su mismo nombre."""
+    client = models.ForeignKey(
+        ClientProfile,
+        on_delete=models.CASCADE,
+        related_name="brands",
+    )
+    nombre = models.CharField(max_length=200)
+    descripcion = models.TextField(blank=True)
+    activo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Marca"
+        verbose_name_plural = "Marcas"
+        ordering = ["nombre"]
+        unique_together = ["client", "nombre"]
+
+    def __str__(self):
+        return f"{self.nombre} ({self.client.nombre_cliente})"

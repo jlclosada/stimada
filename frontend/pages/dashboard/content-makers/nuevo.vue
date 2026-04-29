@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useContentMakersStore } from "~/stores/contentMakers";
 import { useAuthStore } from "~/stores/auth";
+import { useContentMakersStore } from "~/stores/contentMakers";
 
 definePageMeta({ middleware: ["auth", "role"] });
 
@@ -12,6 +12,7 @@ const router = useRouter();
 // --- Next ID ---
 const nextId = ref("");
 onMounted(async () => {
+  store.fetchFilters();
   try {
     const data = await $fetch<{ next_id: string }>(
       `${config.public.apiBase}/content-makers/next_id/`,
@@ -39,9 +40,9 @@ const form = reactive({
   stimada_id: "",
   nombre: "",
   apellidos: "",
-  tipo_cm: "Content Maker",
+  tipo_cm: "",
   sexo: "",
-  status: "Alta",
+  status: "",
   email: "",
   // Redes
   instagram_handle: "",
@@ -81,13 +82,6 @@ const form = reactive({
 
 const isLoading = ref(false);
 const errors = ref<Record<string, string>>({});
-
-const TIPO_CM_OPTIONS = ["Content Maker", "Colaborador/a", "Potencial"];
-const SEXO_OPTIONS = ["Mujer", "Hombre", "Otro"];
-const STATUS_OPTIONS = ["Alta", "Contactada", "Aceptada", "Mail Alta enviado", "Entrevista hecha", "Agendada", "Encontrada", "Out", "Potencial"];
-const CALIDAD_OPTIONS = ["5. Alto", "4. Medio Alto", "3. Medio", "2. Medio Bajo", "1. Bajo", "0. TBC"];
-const APARIENCIA_OPTIONS = ["Alto", "Medio", "Joven", "Mayor +28"];
-const CATEGORIA_IG_OPTIONS = ["<1k", "1k – 4k", "4k – 10k", "10k – 20k", "20k – 50k", "50k – 100k", "+100k"];
 
 function boolField(key: keyof typeof form) {
   return {
@@ -150,19 +144,19 @@ function fieldError(field: string) {
   <div class="max-w-2xl animate-fade-up">
     <!-- Header -->
     <div class="flex items-center gap-3 mb-7">
-      <NuxtLink to="/dashboard/content-makers" class="flex items-center gap-1.5 text-xs text-muted hover:text-cream transition-colors">
+      <NuxtLink to="/dashboard/content-makers" class="flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
         </svg>
         Content Makers
       </NuxtLink>
       <span class="text-border">/</span>
-      <span class="text-xs text-cream">Nueva content maker</span>
+      <span class="text-xs text-ink">Nueva content maker</span>
     </div>
 
     <div class="mb-6">
       <p class="text-xs font-medium uppercase tracking-widest text-gold/60 mb-0.5">Alta</p>
-      <h1 class="text-3xl font-semibold tracking-tight text-cream">Nueva content maker</h1>
+      <h1 class="text-3xl font-semibold tracking-tight text-ink">Nueva content maker</h1>
       <p class="text-xs text-muted mt-1">
         ID asignado: <span class="font-mono text-gold">{{ nextId || '…' }}</span>
         · No se creará cuenta de acceso hasta que se active manualmente.
@@ -175,7 +169,7 @@ function fieldError(field: string) {
         <button
           type="button"
           class="flex items-center gap-1.5 text-xs transition-colors"
-          :class="i === currentStep ? 'text-cream font-medium' : i < currentStep ? 'text-gold' : 'text-muted'"
+          :class="i === currentStep ? 'text-ink font-medium' : i < currentStep ? 'text-gold' : 'text-muted'"
           @click="currentStep = i"
         >
           <span
@@ -196,7 +190,7 @@ function fieldError(field: string) {
     <form @submit.prevent="handleSubmit">
 
       <!-- STEP 1: Datos básicos -->
-      <div v-show="currentStep === 0" class="rounded-2xl border border-border p-6 space-y-4" style="background:#141417">
+      <div v-show="currentStep === 0" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-4" >
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5">ID Stimada *</label>
@@ -205,8 +199,9 @@ function fieldError(field: string) {
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5">Tipo de CM *</label>
-            <select v-model="form.tipo_cm" required class="input-field">
-              <option v-for="t in TIPO_CM_OPTIONS" :key="t" :value="t">{{ t }}</option>
+            <select v-model="form.tipo_cm" required class="select-field">
+              <option value="" disabled>Selecciona tipo</option>
+              <option v-for="t in store.filterOptions.tipos" :key="t" :value="t">{{ t }}</option>
             </select>
           </div>
           <div>
@@ -220,15 +215,16 @@ function fieldError(field: string) {
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5">Sexo</label>
-            <select v-model="form.sexo" class="input-field">
+            <select v-model="form.sexo" class="select-field">
               <option value="">Sin especificar</option>
-              <option v-for="s in SEXO_OPTIONS" :key="s" :value="s">{{ s }}</option>
+              <option v-for="s in store.filterOptions.sexos" :key="s" :value="s">{{ s }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5">Status</label>
-            <select v-model="form.status" class="input-field">
-              <option v-for="s in STATUS_OPTIONS" :key="s" :value="s">{{ s }}</option>
+            <select v-model="form.status" class="select-field">
+              <option value="" disabled>Selecciona estado</option>
+              <option v-for="s in store.filterOptions.statuses" :key="s" :value="s">{{ s }}</option>
             </select>
           </div>
           <div class="col-span-2">
@@ -240,14 +236,14 @@ function fieldError(field: string) {
       </div>
 
       <!-- STEP 2: Redes sociales -->
-      <div v-show="currentStep === 1" class="rounded-2xl border border-border p-6 space-y-5" style="background:#141417">
+      <div v-show="currentStep === 1" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-5" >
         <!-- Instagram -->
         <div>
           <div class="flex items-center gap-2 mb-3">
             <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
               <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
             </div>
-            <span class="text-sm font-medium text-cream">Instagram</span>
+            <span class="text-sm font-medium text-ink">Instagram</span>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
@@ -260,9 +256,9 @@ function fieldError(field: string) {
             </div>
             <div>
               <label class="block text-xs text-muted mb-1">Categoría seguidores</label>
-              <select v-model="form.categoria_seguidores_ig" class="input-field">
+              <select v-model="form.categoria_seguidores_ig" class="select-field">
                 <option value="">—</option>
-                <option v-for="c in CATEGORIA_IG_OPTIONS" :key="c" :value="c">{{ c }}</option>
+                <option v-for="c in store.filterOptions.categoria_seguidores_ig" :key="c" :value="c">{{ c }}</option>
               </select>
             </div>
             <div>
@@ -284,7 +280,7 @@ function fieldError(field: string) {
             <div class="w-6 h-6 rounded-lg bg-black border border-border flex items-center justify-center">
               <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.84 1.56V6.8a4.85 4.85 0 01-1.07-.11z"/></svg>
             </div>
-            <span class="text-sm font-medium text-cream">TikTok</span>
+            <span class="text-sm font-medium text-ink">TikTok</span>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
@@ -297,9 +293,9 @@ function fieldError(field: string) {
             </div>
             <div>
               <label class="block text-xs text-muted mb-1">Categoría seguidores</label>
-              <select v-model="form.categoria_seguidores_tt" class="input-field">
+              <select v-model="form.categoria_seguidores_tt" class="select-field">
                 <option value="">—</option>
-                <option v-for="c in CATEGORIA_IG_OPTIONS" :key="c" :value="c">{{ c }}</option>
+                <option v-for="c in store.filterOptions.categoria_seguidores_tt" :key="c" :value="c">{{ c }}</option>
               </select>
             </div>
             <div>
@@ -315,20 +311,20 @@ function fieldError(field: string) {
       </div>
 
       <!-- STEP 3: Valoración -->
-      <div v-show="currentStep === 2" class="rounded-2xl border border-border p-6 space-y-4" style="background:#141417">
+      <div v-show="currentStep === 2" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-4" >
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5">Calidad del contenido</label>
-            <select v-model="form.calidad_contenido" class="input-field">
+            <select v-model="form.calidad_contenido" class="select-field">
               <option value="">—</option>
-              <option v-for="c in CALIDAD_OPTIONS" :key="c" :value="c">{{ c }}</option>
+              <option v-for="c in store.filterOptions.calidad_contenido" :key="c" :value="c">{{ c }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5">Apariencia</label>
-            <select v-model="form.apariencia" class="input-field">
+            <select v-model="form.apariencia" class="select-field">
               <option value="">—</option>
-              <option v-for="a in APARIENCIA_OPTIONS" :key="a" :value="a">{{ a }}</option>
+              <option v-for="a in store.filterOptions.apariencia" :key="a" :value="a">{{ a }}</option>
             </select>
           </div>
           <div class="col-span-2">
@@ -358,13 +354,13 @@ function fieldError(field: string) {
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
               </svg>
             </div>
-            <span class="text-sm text-cream">{{ item.label }}</span>
+            <span class="text-sm text-ink">{{ item.label }}</span>
           </label>
         </div>
       </div>
 
       <!-- STEP 4: Tallaje -->
-      <div v-show="currentStep === 3" class="rounded-2xl border border-border p-6 space-y-4" style="background:#141417">
+      <div v-show="currentStep === 3" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-4" >
         <div class="grid grid-cols-3 gap-4">
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5">Parte arriba</label>
@@ -386,7 +382,7 @@ function fieldError(field: string) {
       </div>
 
       <!-- STEP 5: Contacto -->
-      <div v-show="currentStep === 4" class="rounded-2xl border border-border p-6 space-y-4" style="background:#141417">
+      <div v-show="currentStep === 4" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-4" >
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5">Teléfono</label>
@@ -433,7 +429,7 @@ function fieldError(field: string) {
         <button
           v-if="currentStep > 0"
           type="button"
-          class="h-9 px-5 rounded-xl border border-border text-xs text-muted hover:text-cream transition-colors"
+          class="h-9 px-5 rounded-xl border border-border text-xs text-muted hover:text-ink transition-colors"
           @click="prev"
         >
           ← Anterior
@@ -443,7 +439,7 @@ function fieldError(field: string) {
         <button
           v-if="currentStep < STEPS.length - 1"
           type="button"
-          class="h-9 px-5 rounded-xl bg-white/6 text-cream text-xs font-medium hover:bg-white/10 transition-colors"
+          class="h-9 px-5 rounded-xl bg-white/6 text-ink text-xs font-medium hover:bg-white/10 transition-colors"
           @click="next"
         >
           Siguiente →

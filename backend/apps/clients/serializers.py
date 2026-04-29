@@ -17,7 +17,7 @@ class ClientProfileListSerializer(serializers.ModelSerializer):
         model = ClientProfile
         fields = [
             "id", "cliente_id", "nombre_cliente", "tipo_nombre",
-            "cif", "ciudad", "pais", "contrato_firmado",
+            "cif", "ciudad", "pais", "contrato_firmado", "es_agencia",
             "created_by_name", "created_at",
         ]
 
@@ -32,6 +32,9 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
     tipo_nombre = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     contrato_url = serializers.SerializerMethodField()
+    user_email = serializers.SerializerMethodField()
+    user_name = serializers.SerializerMethodField()
+    has_account = serializers.SerializerMethodField()
 
     class Meta:
         model = ClientProfile
@@ -48,6 +51,15 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
             request = self.context.get("request")
             return request.build_absolute_uri(obj.contrato.url) if request else obj.contrato.url
         return None
+
+    def get_user_email(self, obj):
+        return obj.user.email if obj.user else None
+
+    def get_user_name(self, obj):
+        return obj.user.full_name if obj.user else None
+
+    def get_has_account(self, obj):
+        return obj.user_id is not None
 
 
 class ClientProfileCreateSerializer(serializers.ModelSerializer):

@@ -2,6 +2,32 @@ from django.conf import settings
 from django.db import models
 
 
+class ContentMakerStatus(models.Model):
+    nombre = models.CharField(max_length=50, unique=True)
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Estado de Content Maker"
+        verbose_name_plural = "Estados de Content Maker"
+        ordering = ["orden", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
+class ContentMakerType(models.Model):
+    nombre = models.CharField(max_length=50, unique=True)
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Tipo de Content Maker"
+        verbose_name_plural = "Tipos de Content Maker"
+        ordering = ["orden", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
 class ContentMakerProfile(models.Model):
     # Identificador Stimada
     stimada_id = models.CharField(max_length=30, unique=True)

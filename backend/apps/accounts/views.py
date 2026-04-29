@@ -22,6 +22,7 @@ from apps.accounts.serializers import (
     UserDetailSerializer,
     UserUpdateSerializer,
 )
+from config.pagination import FlexiblePageNumberPagination
 
 
 def get_client_ip(request):
@@ -80,6 +81,35 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(UserDetailSerializer(request.user).data)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        current_password = request.data.get("current_password", "")
+        new_password = request.data.get("new_password", "")
+        confirm_password = request.data.get("confirm_password", "")
+
+        if not request.user.check_password(current_password):
+            return Response(
+                {"current_password": ["La contraseña actual es incorrecta."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(new_password) < 8:
+            return Response(
+                {"new_password": ["La contraseña debe tener al menos 8 caracteres."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if new_password != confirm_password:
+            return Response(
+                {"confirm_password": ["Las contraseñas no coinciden."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request.user.set_password(new_password)
+        request.user.save(update_fields=["password"])
+        return Response({"detail": "Contraseña actualizada correctamente."})
 
 
 class PasswordResetRequestView(APIView):
@@ -181,11 +211,23 @@ class UserViewSet(viewsets.ViewSet):
         return [IsAuthenticated()]
 
     def list(self, request):
-        qs = CustomUser.objects.all()
+        qs = CustomUser.objects.all().order_by("-created_at")
         if request.user.role == CustomUser.EMPLOYEE:
             qs = qs.filter(role__in=[CustomUser.CLIENT, CustomUser.CONTENT_MAKER])
-        serializer = UserDetailSerializer(qs, many=True)
-        return Response(serializer.data)
+
+        role = request.query_params.get("role")
+        if role:
+            qs = qs.filter(role=role)
+        status_filter = request.query_params.get("status")
+        if status_filter == "active":
+            qs = qs.filter(is_active=True)
+        elif status_filter == "inactive":
+            qs = qs.filter(is_active=False)
+
+        paginator = FlexiblePageNumberPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = UserDetailSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     def create(self, request):
         serializer = CreateUserSerializer(data=request.data, context={"request": request})

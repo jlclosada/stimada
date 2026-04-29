@@ -10,8 +10,7 @@ const filterStatus = ref("");
 const filterTipo = ref("");
 const filterCuenta = ref("");
 
-const STATUS_OPTIONS = ["Alta", "Contactada", "Aceptada", "Mail Alta enviado", "Entrevista hecha", "Agendada", "Encontrada", "Out", "Dar de baja", "Descartada"];
-const TIPO_OPTIONS = ["Content Maker", "Potencial", "Colaborador/a"];
+onMounted(() => store.fetchFilters());
 
 const debouncedSearch = ref("");
 let searchTimer: ReturnType<typeof setTimeout>;
@@ -29,18 +28,45 @@ const params = computed(() => {
   return p;
 });
 
-watch(params, () => store.fetchList(params.value), { immediate: true });
+// Reset to page 1 when filters change
+watch(params, () => {
+  store.currentPage = 1;
+  store.fetchList(params.value, 1);
+}, { immediate: true });
+
+function goToPage(page: number) {
+  if (page < 1 || page > store.totalPages) return;
+  store.fetchList(params.value, page);
+}
+
+const visiblePages = computed(() => {
+  const total = store.totalPages;
+  const current = store.currentPage;
+  const pages: (number | string)[] = [];
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (current > 3) pages.push("...");
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (current < total - 2) pages.push("...");
+    pages.push(total);
+  }
+  return pages;
+});
 
 const STATUS_COLOR: Record<string, string> = {
-  Alta: "text-green-400 bg-green-400/10 border-green-400/20",
-  Out: "text-red-400 bg-red-400/10 border-red-400/20",
-  "Dar de baja": "text-red-400 bg-red-400/10 border-red-400/20",
-  Descartada: "text-zinc-500 bg-zinc-500/10 border-zinc-500/20",
-  Potencial: "text-blue-400 bg-blue-400/10 border-blue-400/20",
+  Alta: "text-emerald-700 bg-emerald-50 border-emerald-200",
+  Out: "text-red-600 bg-red-50 border-red-200",
+  "Dar de baja": "text-red-600 bg-red-50 border-red-200",
+  Descartada: "text-zinc-500 bg-zinc-100 border-zinc-200",
+  Potencial: "text-blue-600 bg-blue-50 border-blue-200",
 };
 
 function statusColor(s: string) {
-  return STATUS_COLOR[s] ?? "text-muted bg-muted/10 border-border";
+  return STATUS_COLOR[s] ?? "text-muted bg-gray-50 border-border";
 }
 
 function fmt(n: number | null) {
@@ -52,61 +78,60 @@ function fmt(n: number | null) {
 </script>
 
 <template>
-  <div class="space-y-5 animate-fade-up">
+  <div class="space-y-6 animate-fade-up">
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <p class="text-xs font-medium uppercase tracking-widest text-gold/60 mb-0.5">Comunidad</p>
-        <h1 class="text-3xl font-semibold tracking-tight text-cream">Content Makers</h1>
+        <h1 class="text-2xl font-semibold tracking-tight text-ink">Content Makers</h1>
+        <p class="text-sm text-muted mt-0.5">Gestiona tu comunidad de creadoras</p>
       </div>
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-muted"><span class="text-cream font-semibold">{{ store.list.length }}</span> registradas</span>
-        <NuxtLink
-          to="/dashboard/content-makers/nuevo"
-          class="flex items-center gap-2 h-9 px-4 rounded-xl bg-gold text-ink text-xs font-semibold
-                 hover:bg-gold/90 active:scale-[0.98] transition-all duration-150"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          Dar de alta CM
-        </NuxtLink>
-      </div>
+      <NuxtLink
+        to="/dashboard/content-makers/nuevo"
+        class="group flex items-center gap-2 h-10 px-5 rounded-xl bg-ink text-white text-sm font-medium
+               hover:bg-ink/80 hover:shadow-soft active:scale-[0.97] transition-all duration-200"
+      >
+        <svg class="w-4 h-4 transition-transform duration-200 group-hover:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        Dar de alta
+      </NuxtLink>
     </div>
 
     <!-- Filters -->
-    <div class="flex flex-wrap gap-2">
-      <div class="relative flex-1 min-w-[200px] max-w-xs">
-        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-        </svg>
+    <div class="flex flex-wrap items-center gap-3 animate-fade-up delay-100">
+      <div class="relative flex-1 min-w-[260px] max-w-md group/search">
+        <div class="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 group-focus-within/search:scale-90 group-focus-within/search:text-gold">
+          <svg class="w-4 h-4 text-muted/50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          </svg>
+        </div>
         <input
           v-model="search"
           type="text"
           placeholder="Buscar por nombre o email…"
-          class="input-field pl-9 text-xs"
+          class="input-field !pl-12"
         />
       </div>
 
-      <select v-model="filterStatus" class="input-field text-xs max-w-[160px]">
+      <select v-model="filterStatus" class="select-field min-w-[180px] max-w-[200px]">
         <option value="">Todos los estados</option>
-        <option v-for="s in STATUS_OPTIONS" :key="s" :value="s">{{ s }}</option>
+        <option v-for="s in store.filterOptions.statuses" :key="s" :value="s">{{ s }}</option>
       </select>
 
-      <select v-model="filterTipo" class="input-field text-xs max-w-[160px]">
+      <select v-model="filterTipo" class="select-field min-w-[180px] max-w-[200px]">
         <option value="">Todos los tipos</option>
-        <option v-for="t in TIPO_OPTIONS" :key="t" :value="t">{{ t }}</option>
+        <option v-for="t in store.filterOptions.tipos" :key="t" :value="t">{{ t }}</option>
       </select>
 
-      <select v-model="filterCuenta" class="input-field text-xs max-w-[160px]">
-        <option value="">Todas</option>
+      <select v-model="filterCuenta" class="select-field min-w-[150px] max-w-[170px]">
+        <option value="">Cuenta</option>
         <option value="true">Con cuenta</option>
         <option value="false">Sin cuenta</option>
       </select>
 
       <button
         v-if="filterStatus || filterTipo || filterCuenta || search"
-        class="px-3 h-10 rounded-xl text-xs text-muted hover:text-cream border border-border hover:border-subtle transition-colors"
+        class="h-11 px-4 rounded-xl text-sm text-muted hover:text-ink border border-border/70 hover:border-ink/20 hover:bg-panel/80 hover:shadow-sm active:scale-[0.97] transition-all duration-300"
         @click="search = ''; filterStatus = ''; filterTipo = ''; filterCuenta = ''"
       >
         Limpiar
@@ -114,84 +139,127 @@ function fmt(n: number | null) {
     </div>
 
     <!-- Table -->
-    <div class="rounded-2xl border border-border overflow-hidden" style="background:#0f0f11">
+    <div class="rounded-2xl border border-border/60 bg-white shadow-card overflow-hidden">
       <!-- Loading -->
-      <div v-if="store.isLoading" class="flex justify-center items-center h-40">
-        <svg class="animate-spin w-5 h-5 text-gold" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
+      <div v-if="store.isLoading" class="flex justify-center items-center h-48">
+        <div class="w-7 h-7 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
       </div>
 
-      <table v-else class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-border">
-            <th class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-widest">Nombre</th>
-            <th class="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-widest hidden md:table-cell">Instagram</th>
-            <th class="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-widest hidden lg:table-cell">TikTok</th>
-            <th class="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-widest hidden lg:table-cell">Contenido</th>
-            <th class="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-widest">Estado</th>
-            <th class="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-widest">Cuenta</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="store.list.length === 0">
-            <td colspan="6" class="text-center py-14 text-sm text-muted">Sin resultados con estos filtros.</td>
-          </tr>
-          <tr
-            v-for="cm in store.list"
-            :key="cm.id"
-            class="border-b border-border/40 hover:bg-white/[0.02] cursor-pointer transition-colors group"
-            @click="navigateTo(`/dashboard/content-makers/${cm.id}`)"
-          >
-            <td class="px-5 py-3.5">
-              <div>
-                <p class="text-sm text-cream font-medium group-hover:text-gold transition-colors">
-                  {{ cm.nombre_completo }}
-                </p>
-                <p class="text-xs text-muted mt-0.5">{{ cm.stimada_id }}</p>
-              </div>
-            </td>
-            <td class="px-4 py-3.5 hidden md:table-cell">
-              <div v-if="cm.instagram_handle">
-                <p class="text-xs text-cream">@{{ cm.instagram_handle }}</p>
-                <p class="text-xs text-muted">{{ fmt(cm.seguidores_instagram) }}</p>
-              </div>
-              <span v-else class="text-xs text-muted">—</span>
-            </td>
-            <td class="px-4 py-3.5 hidden lg:table-cell">
-              <div v-if="cm.tiktok_handle">
-                <p class="text-xs text-cream">{{ cm.tiktok_handle }}</p>
-                <p class="text-xs text-muted">{{ fmt(cm.seguidores_tiktok) }}</p>
-              </div>
-              <span v-else class="text-xs text-muted">—</span>
-            </td>
-            <td class="px-4 py-3.5 hidden lg:table-cell">
-              <p class="text-xs text-muted truncate max-w-[150px]">{{ cm.categorias_contenido || "—" }}</p>
-            </td>
-            <td class="px-4 py-3.5">
-              <span
-                class="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border"
-                :class="statusColor(cm.status)"
+      <template v-else>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-border/60 bg-panel/50">
+              <th class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider">Nombre</th>
+              <th class="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider hidden md:table-cell">Instagram</th>
+              <th class="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider hidden lg:table-cell">TikTok</th>
+              <th class="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider hidden lg:table-cell">Contenido</th>
+              <th class="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Estado</th>
+              <th class="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Cuenta</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="store.list.length === 0">
+              <td colspan="6" class="text-center py-16 text-sm text-muted">Sin resultados con estos filtros.</td>
+            </tr>
+            <tr
+              v-for="cm in store.list"
+              :key="cm.id"
+              class="border-b border-border/30 table-row-hover cursor-pointer group"
+              @click="navigateTo(`/dashboard/content-makers/${cm.id}`)"
+            >
+              <td class="px-5 py-3.5">
+                <div>
+                  <p class="text-sm text-ink font-medium group-hover:text-gold transition-colors duration-150">
+                    {{ cm.nombre_completo }}
+                  </p>
+                  <p class="text-xs text-muted mt-0.5">{{ cm.stimada_id }}</p>
+                </div>
+              </td>
+              <td class="px-4 py-3.5 hidden md:table-cell">
+                <div v-if="cm.instagram_handle">
+                  <p class="text-sm text-ink/80">@{{ cm.instagram_handle }}</p>
+                  <p class="text-xs text-muted">{{ fmt(cm.seguidores_instagram) }}</p>
+                </div>
+                <span v-else class="text-xs text-muted/60">—</span>
+              </td>
+              <td class="px-4 py-3.5 hidden lg:table-cell">
+                <div v-if="cm.tiktok_handle">
+                  <p class="text-sm text-ink/80">{{ cm.tiktok_handle }}</p>
+                  <p class="text-xs text-muted">{{ fmt(cm.seguidores_tiktok) }}</p>
+                </div>
+                <span v-else class="text-xs text-muted/60">—</span>
+              </td>
+              <td class="px-4 py-3.5 hidden lg:table-cell">
+                <p class="text-sm text-muted truncate max-w-[150px]">{{ cm.categorias_contenido || "—" }}</p>
+              </td>
+              <td class="px-4 py-3.5">
+                <span
+                  class="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-lg border"
+                  :class="statusColor(cm.status)"
+                >
+                  {{ cm.status || "—" }}
+                </span>
+              </td>
+              <td class="px-4 py-3.5">
+                <span
+                  v-if="cm.tiene_cuenta"
+                  class="inline-flex items-center gap-1.5 text-xs text-emerald-600 font-medium"
+                >
+                  <div class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Activa
+                </span>
+                <span v-else class="text-xs text-muted/60">Sin cuenta</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Pagination -->
+        <div class="flex items-center justify-between px-5 py-4 border-t border-border/40 bg-panel/30">
+          <p class="text-sm text-muted">
+            Mostrando <span class="font-medium text-ink">{{ (store.currentPage - 1) * store.pageSize + 1 }}</span>–<span class="font-medium text-ink">{{ Math.min(store.currentPage * store.pageSize, store.total) }}</span> de <span class="font-medium text-ink">{{ store.total }}</span>
+          </p>
+
+          <div class="flex items-center gap-1">
+            <!-- Prev -->
+            <button
+              :disabled="store.currentPage <= 1"
+              class="w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all duration-150"
+              @click="goToPage(store.currentPage - 1)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+            </button>
+
+            <!-- Page numbers -->
+            <template v-for="p in visiblePages" :key="p">
+              <span v-if="p === '...'" class="w-9 h-9 flex items-center justify-center text-xs text-muted">…</span>
+              <button
+                v-else
+                class="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium transition-all duration-150"
+                :class="p === store.currentPage
+                  ? 'bg-ink text-white shadow-sm'
+                  : 'text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border'"
+                @click="goToPage(p as number)"
               >
-                {{ cm.status || "—" }}
-              </span>
-            </td>
-            <td class="px-4 py-3.5">
-              <span
-                v-if="cm.tiene_cuenta"
-                class="inline-flex items-center gap-1 text-xs text-green-400"
-              >
-                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
-                </svg>
-                Activa
-              </span>
-              <span v-else class="text-xs text-muted">Sin cuenta</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                {{ p }}
+              </button>
+            </template>
+
+            <!-- Next -->
+            <button
+              :disabled="store.currentPage >= store.totalPages"
+              class="w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all duration-150"
+              @click="goToPage(store.currentPage + 1)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>

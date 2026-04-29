@@ -54,22 +54,51 @@ export const useContentMakersStore = defineStore("contentMakers", {
     list: [] as ContentMaker[],
     isLoading: false,
     total: 0,
+    currentPage: 1,
+    pageSize: 20,
+    totalPages: 1,
+    filterOptions: {
+      statuses: [] as string[],
+      tipos: [] as string[],
+      sexos: [] as string[],
+      calidad_contenido: [] as string[],
+      apariencia: [] as string[],
+      categoria_seguidores_ig: [] as string[],
+      categoria_seguidores_tt: [] as string[],
+    },
   }),
 
   actions: {
-    async fetchList(params?: Record<string, string>) {
+    async fetchFilters() {
+      const auth = useAuthStore();
+      const config = useRuntimeConfig();
+      if (this.filterOptions.statuses.length) return;
+      const data = await $fetch<typeof this.filterOptions>(
+        `${config.public.apiBase}/content-makers/filters/`,
+        { headers: { Authorization: `Bearer ${auth.accessToken}` } }
+      );
+      this.filterOptions = data;
+    },
+
+    async fetchList(params?: Record<string, string>, page?: number) {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       this.isLoading = true;
       try {
-        // Fetch all pages
-        const baseParams = new URLSearchParams({ page_size: "300", ...(params ?? {}) });
+        const p = page ?? this.currentPage;
+        const baseParams = new URLSearchParams({
+          page_size: String(this.pageSize),
+          page: String(p),
+          ...(params ?? {}),
+        });
         const data = await $fetch<{ count: number; results: ContentMaker[] }>(
           `${config.public.apiBase}/content-makers/?${baseParams.toString()}`,
           { headers: { Authorization: `Bearer ${auth.accessToken}` } }
         );
         this.list = data.results;
         this.total = data.count;
+        this.currentPage = p;
+        this.totalPages = Math.ceil(data.count / this.pageSize);
       } finally {
         this.isLoading = false;
       }
@@ -105,6 +134,31 @@ export const useContentMakersStore = defineStore("contentMakers", {
         {
           method: "POST",
           body: { email, password },
+          headers: { Authorization: `Bearer ${auth.accessToken}` },
+        }
+      );
+    },
+
+    async updateContentMaker(id: number | string, data: Partial<ContentMakerDetail>) {
+      const auth = useAuthStore();
+      const config = useRuntimeConfig();
+      return $fetch<ContentMakerDetail>(
+        `${config.public.apiBase}/content-makers/${id}/`,
+        {
+          method: "PATCH",
+          body: data,
+          headers: { Authorization: `Bearer ${auth.accessToken}` },
+        }
+      );
+    },
+
+    async deleteContentMaker(id: number | string) {
+      const auth = useAuthStore();
+      const config = useRuntimeConfig();
+      await $fetch(
+        `${config.public.apiBase}/content-makers/${id}/`,
+        {
+          method: "DELETE",
           headers: { Authorization: `Bearer ${auth.accessToken}` },
         }
       );

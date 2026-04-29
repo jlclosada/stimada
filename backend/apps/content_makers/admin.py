@@ -1,6 +1,20 @@
 from django.contrib import admin
 
-from apps.content_makers.models import ContentMakerProfile
+from apps.content_makers.models import ContentMakerProfile, ContentMakerStatus, ContentMakerType
+
+
+@admin.register(ContentMakerStatus)
+class ContentMakerStatusAdmin(admin.ModelAdmin):
+    list_display = ["nombre", "orden"]
+    list_editable = ["orden"]
+    ordering = ["orden", "nombre"]
+
+
+@admin.register(ContentMakerType)
+class ContentMakerTypeAdmin(admin.ModelAdmin):
+    list_display = ["nombre", "orden"]
+    list_editable = ["orden"]
+    ordering = ["orden", "nombre"]
 
 
 @admin.register(ContentMakerProfile)

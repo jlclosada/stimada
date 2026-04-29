@@ -11,7 +11,7 @@ definePageMeta({ layout: false });
       <p class="font-sans text-xs tracking-editorial uppercase text-gold/50 mb-6">
         Error 403
       </p>
-      <h1 class="font-display text-6xl font-light text-cream mb-4">
+      <h1 class="font-display text-6xl font-light text-ink mb-4">
         Acceso<br />denegado
       </h1>
       <div class="w-8 h-px bg-gold/40 mx-auto my-6" />

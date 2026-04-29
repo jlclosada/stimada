@@ -27,6 +27,9 @@ export interface ClientProfileDetail extends ClientProfile {
   direccion_facturacion: string;
   codigo_postal: string;
   contrato_url: string | null;
+  user_email: string | null;
+  user_name: string | null;
+  has_account: boolean;
 }
 
 export const useClientsStore = defineStore("clients", {
@@ -35,6 +38,9 @@ export const useClientsStore = defineStore("clients", {
     types: [] as ClientType[],
     isLoading: false,
     total: 0,
+    currentPage: 1,
+    pageSize: 20,
+    totalPages: 1,
   }),
 
   actions: {
@@ -48,18 +54,25 @@ export const useClientsStore = defineStore("clients", {
       this.types = data;
     },
 
-    async fetchList(params?: Record<string, string>) {
+    async fetchList(params?: Record<string, string>, page?: number) {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       this.isLoading = true;
       try {
-        const query = new URLSearchParams({ page_size: "300", ...(params ?? {}) }).toString();
+        const p = page ?? this.currentPage;
+        const query = new URLSearchParams({
+          page_size: String(this.pageSize),
+          page: String(p),
+          ...(params ?? {}),
+        }).toString();
         const data = await $fetch<{ count: number; results: ClientProfile[] }>(
           `${config.public.apiBase}/clients/?${query}`,
           { headers: { Authorization: `Bearer ${auth.accessToken}` } }
         );
         this.list = data.results;
         this.total = data.count;
+        this.currentPage = p;
+        this.totalPages = Math.ceil(data.count / this.pageSize);
       } finally {
         this.isLoading = false;
       }
@@ -79,6 +92,38 @@ export const useClientsStore = defineStore("clients", {
       return $fetch<ClientProfileDetail>(`${config.public.apiBase}/clients/`, {
         method: "POST",
         body: formData,
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+      });
+    },
+
+    async updateClient(id: number | string, data: Record<string, unknown>): Promise<ClientProfileDetail> {
+      const auth = useAuthStore();
+      const config = useRuntimeConfig();
+      return $fetch<ClientProfileDetail>(`${config.public.apiBase}/clients/${id}/`, {
+        method: "PATCH",
+        body: data,
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+      });
+    },
+
+    async deleteClient(id: number | string): Promise<void> {
+      const auth = useAuthStore();
+      const config = useRuntimeConfig();
+      await $fetch(`${config.public.apiBase}/clients/${id}/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+      });
+    },
+
+    async createClientAccount(
+      id: number | string,
+      data: { email: string; full_name?: string; password?: string }
+    ): Promise<{ detail: string; user: { id: number; email: string; full_name: string }; password: string }> {
+      const auth = useAuthStore();
+      const config = useRuntimeConfig();
+      return $fetch(`${config.public.apiBase}/clients/${id}/create-account/`, {
+        method: "POST",
+        body: data,
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       });
     },

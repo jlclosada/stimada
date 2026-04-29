@@ -8,7 +8,7 @@ definePageMeta({ middleware: ["auth", "role"] });
       <p class="font-sans text-xs tracking-editorial uppercase text-gold/50 mb-1">
         Cliente
       </p>
-      <h1 class="font-display text-4xl font-light text-cream">Mis proyectos</h1>
+      <h1 class="font-display text-4xl font-light text-ink">Mis proyectos</h1>
     </div>
     <div class="border border-dashed border-border rounded-sm p-16 flex flex-col items-center gap-4">
       <div class="w-8 h-px bg-gold/20" />

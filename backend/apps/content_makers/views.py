@@ -9,7 +9,7 @@ from rest_framework.response import Response
 
 from apps.accounts.models import CustomUser
 from apps.accounts.permissions import IsAdminOrEmployee
-from apps.content_makers.models import ContentMakerProfile
+from apps.content_makers.models import ContentMakerProfile, ContentMakerStatus, ContentMakerType
 from apps.content_makers.serializers import (
     ContentMakerCreateSerializer,
     ContentMakerDetailSerializer,
@@ -36,7 +36,7 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
     def get_serializer_class(self):
-        if self.action in ("create", "retrieve"):
+        if self.action in ("create", "retrieve", "update", "partial_update"):
             return ContentMakerDetailSerializer
         return ContentMakerListSerializer
 
@@ -56,6 +56,26 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
         nums = [int(m.group()) for sid in ids if (m := re.search(r"\d+", sid))]
         next_num = (max(nums) if nums else 0) + 1
         return Response({"next_id": f"[CM] - {next_num:05d}"})
+
+    @action(detail=False, methods=["get"])
+    def filters(self, request):
+        def distinct_values(field):
+            return list(
+                ContentMakerProfile.objects.exclude(**{field: ""})
+                .values_list(field, flat=True)
+                .distinct()
+                .order_by(field)
+            )
+
+        return Response({
+            "statuses": list(ContentMakerStatus.objects.values_list("nombre", flat=True)),
+            "tipos": list(ContentMakerType.objects.values_list("nombre", flat=True)),
+            "sexos": distinct_values("sexo"),
+            "calidad_contenido": distinct_values("calidad_contenido"),
+            "apariencia": distinct_values("apariencia"),
+            "categoria_seguidores_ig": distinct_values("categoria_seguidores_ig"),
+            "categoria_seguidores_tt": distinct_values("categoria_seguidores_tt"),
+        })
 
     def get_queryset(self):
         qs = super().get_queryset()

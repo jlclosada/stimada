@@ -75,7 +75,7 @@ const activeSection = ref("identificacion");
     <div class="flex items-center gap-3 mb-7">
       <NuxtLink
         to="/dashboard/clientes"
-        class="flex items-center gap-1.5 text-xs text-muted hover:text-cream transition-colors"
+        class="flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors"
       >
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -83,21 +83,21 @@ const activeSection = ref("identificacion");
         Clientes
       </NuxtLink>
       <span class="text-border">/</span>
-      <span class="text-xs text-cream">Nuevo cliente</span>
+      <span class="text-xs text-ink">Nuevo cliente</span>
     </div>
 
     <div class="mb-6">
       <p class="text-xs font-medium uppercase tracking-widest text-gold/60 mb-0.5">Alta</p>
-      <h1 class="text-3xl font-semibold tracking-tight text-cream">Nuevo cliente</h1>
+      <h1 class="text-3xl font-semibold tracking-tight text-ink">Nuevo cliente</h1>
     </div>
 
     <!-- Section tabs -->
-    <div class="flex gap-1 mb-6 p-1 rounded-xl border border-border" style="background:#141417">
+    <div class="flex gap-1 mb-6 p-1 rounded-xl border border-border/60 bg-white" >
       <button
         v-for="s in SECTIONS"
         :key="s.id"
         class="flex-1 py-2 rounded-lg text-xs font-medium transition-colors"
-        :class="activeSection === s.id ? 'bg-white/8 text-cream' : 'text-muted hover:text-cream'"
+        :class="activeSection === s.id ? 'bg-white/8 text-ink' : 'text-muted hover:text-ink'"
         @click="activeSection = s.id"
       >
         {{ s.label }}
@@ -106,7 +106,7 @@ const activeSection = ref("identificacion");
 
     <form @submit.prevent="handleSubmit">
       <!-- IDENTIFICACIÓN -->
-      <div v-show="activeSection === 'identificacion'" class="rounded-2xl border border-border p-6 space-y-5" style="background:#141417">
+      <div v-show="activeSection === 'identificacion'" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-5" >
         <div class="grid grid-cols-2 gap-4">
           <div class="col-span-2">
             <label class="block text-xs font-medium text-muted mb-1.5">Nombre del cliente *</label>
@@ -120,7 +120,7 @@ const activeSection = ref("identificacion");
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5">Tipo de cliente</label>
-            <select v-model="form.tipo_cliente" class="input-field">
+            <select v-model="form.tipo_cliente" class="select-field">
               <option value="">Seleccionar tipo…</option>
               <option v-for="t in store.types" :key="t.id" :value="t.id">{{ t.nombre }}</option>
             </select>
@@ -128,14 +128,14 @@ const activeSection = ref("identificacion");
           </div>
         </div>
         <div class="flex justify-end pt-2">
-          <button type="button" class="h-9 px-5 rounded-xl bg-white/6 text-cream text-xs font-medium hover:bg-white/10 transition-colors" @click="activeSection = 'facturacion'">
+          <button type="button" class="h-9 px-5 rounded-xl bg-white/6 text-ink text-xs font-medium hover:bg-white/10 transition-colors" @click="activeSection = 'facturacion'">
             Siguiente →
           </button>
         </div>
       </div>
 
       <!-- FACTURACIÓN -->
-      <div v-show="activeSection === 'facturacion'" class="rounded-2xl border border-border p-6 space-y-4" style="background:#141417">
+      <div v-show="activeSection === 'facturacion'" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-4" >
         <div class="grid grid-cols-2 gap-4">
           <div class="col-span-2">
             <label class="block text-xs font-medium text-muted mb-1.5">Nombre de facturación *</label>
@@ -173,17 +173,17 @@ const activeSection = ref("identificacion");
           </div>
         </div>
         <div class="flex justify-between pt-2">
-          <button type="button" class="h-9 px-5 rounded-xl border border-border text-xs text-muted hover:text-cream transition-colors" @click="activeSection = 'identificacion'">
+          <button type="button" class="h-9 px-5 rounded-xl border border-border/60 bg-white text-xs text-muted hover:text-ink transition-colors" @click="activeSection = 'identificacion'">
             ← Anterior
           </button>
-          <button type="button" class="h-9 px-5 rounded-xl bg-white/6 text-cream text-xs font-medium hover:bg-white/10 transition-colors" @click="activeSection = 'contrato'">
+          <button type="button" class="h-9 px-5 rounded-xl bg-white/6 text-ink text-xs font-medium hover:bg-white/10 transition-colors" @click="activeSection = 'contrato'">
             Siguiente →
           </button>
         </div>
       </div>
 
       <!-- CONTRATO -->
-      <div v-show="activeSection === 'contrato'" class="rounded-2xl border border-border p-6 space-y-5" style="background:#141417">
+      <div v-show="activeSection === 'contrato'" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-5" >
         <!-- Contrato firmado -->
         <label class="flex items-center gap-3 cursor-pointer group">
           <div
@@ -195,7 +195,7 @@ const activeSection = ref("identificacion");
               <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
             </svg>
           </div>
-          <span class="text-sm text-cream">Contrato firmado</span>
+          <span class="text-sm text-ink">Contrato firmado</span>
         </label>
 
         <!-- File upload -->
@@ -220,7 +220,7 @@ const activeSection = ref("identificacion");
         </div>
 
         <div class="flex justify-between pt-2">
-          <button type="button" class="h-9 px-5 rounded-xl border border-border text-xs text-muted hover:text-cream transition-colors" @click="activeSection = 'facturacion'">
+          <button type="button" class="h-9 px-5 rounded-xl border border-border/60 bg-white text-xs text-muted hover:text-ink transition-colors" @click="activeSection = 'facturacion'">
             ← Anterior
           </button>
           <button

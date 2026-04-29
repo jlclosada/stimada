@@ -10,10 +10,10 @@ const showPassword = ref(false);
 const showForgot = ref(false);
 
 const ROLE_REDIRECTS: Record<string, string> = {
-  admin: "/dashboard/usuarios",
-  stimada_employee: "/dashboard/usuarios",
-  client: "/dashboard/mis-proyectos",
-  content_maker: "/dashboard/mis-contenidos",
+  admin: "/inicio",
+  stimada_employee: "/inicio",
+  client: "/inicio",
+  content_maker: "/inicio",
 };
 
 async function handleSubmit() {
@@ -21,7 +21,7 @@ async function handleSubmit() {
   try {
     await auth.login(email.value, password.value);
     const role = auth.user?.role ?? "";
-    await navigateTo(ROLE_REDIRECTS[role] ?? "/dashboard");
+    await navigateTo(ROLE_REDIRECTS[role] ?? "/inicio");
   } catch {
     // error already in auth.error
   }
@@ -29,44 +29,37 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="relative min-h-screen flex items-center justify-center overflow-hidden grain" style="background:#09090b">
+  <div class="relative min-h-screen flex items-center justify-center overflow-hidden bg-panel">
 
-    <!-- Animated background blobs -->
+    <!-- Subtle background gradient -->
     <div class="absolute inset-0 pointer-events-none overflow-hidden">
       <div
-        class="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full opacity-[0.06] animate-blob"
-        style="background: radial-gradient(circle, #7c3aed, transparent 70%)"
+        class="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full opacity-[0.04]"
+        style="background: radial-gradient(circle, #c9a84c, transparent 70%)"
       />
       <div
-        class="absolute -bottom-32 -right-32 w-[500px] h-[500px] rounded-full opacity-[0.07] animate-blob-slow"
-        style="background: radial-gradient(circle, #c9a84c, transparent 70%); animation-delay: -8s"
-      />
-      <div
-        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full opacity-[0.04] animate-blob"
-        style="background: radial-gradient(circle, #0ea5e9, transparent 70%); animation-delay: -14s"
+        class="absolute -bottom-32 -right-32 w-[500px] h-[500px] rounded-full opacity-[0.03]"
+        style="background: radial-gradient(circle, #0071e3, transparent 70%)"
       />
     </div>
 
     <!-- Card -->
     <div
-      class="relative z-10 w-full max-w-[400px] mx-4 animate-scale-in"
+      class="relative z-10 w-full max-w-[420px] mx-4 animate-scale-in"
       style="animation-delay: 80ms"
     >
       <!-- Logo -->
-      <div class="text-center mb-8 animate-slide-down" style="animation-delay: 0ms">
-        <span class="text-sm font-medium tracking-[0.25em] uppercase text-muted">Stimada</span>
+      <div class="text-center mb-10 animate-slide-down" style="animation-delay: 0ms">
+        <img src="~/assets/images/stimada_logo.png" alt="Stimada" class="h-10 w-auto mx-auto" />
       </div>
 
-      <div
-        class="rounded-2xl border border-border p-8"
-        style="background: rgba(20,20,23,0.85); backdrop-filter: blur(20px)"
-      >
+      <div class="rounded-2xl border border-border/60 bg-white p-9 shadow-elevated">
         <!-- Heading -->
-        <div class="mb-7 animate-fade-up delay-100">
-          <h1 class="text-[26px] font-semibold tracking-tight text-cream leading-tight">
+        <div class="mb-8 animate-fade-up delay-100">
+          <h1 class="text-[26px] font-semibold tracking-tight text-ink leading-tight">
             Bienvenido de nuevo
           </h1>
-          <p class="text-sm text-muted mt-1">Accede a tu cuenta para continuar</p>
+          <p class="text-sm text-muted mt-1.5">Accede a tu cuenta para continuar</p>
         </div>
 
         <!-- Form -->
@@ -74,7 +67,7 @@ async function handleSubmit() {
 
           <!-- Email -->
           <div class="animate-fade-up delay-150">
-            <label class="block text-xs font-medium text-muted mb-1.5" for="email">
+            <label class="block text-xs font-medium text-ink/70 mb-2" for="email">
               Email
             </label>
             <input
@@ -91,7 +84,7 @@ async function handleSubmit() {
 
           <!-- Password -->
           <div class="animate-fade-up delay-200">
-            <label class="block text-xs font-medium text-muted mb-1.5" for="password">
+            <label class="block text-xs font-medium text-ink/70 mb-2" for="password">
               Contraseña
             </label>
             <div class="relative">
@@ -108,7 +101,7 @@ async function handleSubmit() {
               <button
                 type="button"
                 tabindex="-1"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-cream transition-colors"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink transition-colors"
                 @click="showPassword = !showPassword"
               >
                 <svg v-if="!showPassword" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -126,7 +119,7 @@ async function handleSubmit() {
           <div class="text-right animate-fade-up delay-250">
             <button
               type="button"
-              class="text-xs text-gold hover:text-gold/80 transition-colors font-medium"
+              class="text-xs text-gold hover:text-gold-dim transition-colors font-medium"
               @click="showForgot = true"
             >
               ¿Olvidaste tu contraseña?
@@ -137,25 +130,25 @@ async function handleSubmit() {
           <Transition name="modal">
             <div
               v-if="auth.error"
-              class="flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/8 p-3"
+              class="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3"
             >
-              <svg class="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <svg class="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
               </svg>
-              <p class="text-xs text-red-400 leading-relaxed">{{ auth.error }}</p>
+              <p class="text-xs text-red-600 leading-relaxed">{{ auth.error }}</p>
             </div>
           </Transition>
 
           <!-- Submit -->
-          <div class="animate-fade-up delay-300 pt-1">
+          <div class="animate-fade-up delay-300 pt-2">
             <button
               type="submit"
               :disabled="auth.isLoading"
-              class="w-full h-11 rounded-xl bg-gold text-ink text-sm font-semibold
+              class="w-full h-12 rounded-xl bg-ink text-white text-sm font-semibold
                      flex items-center justify-center gap-2
-                     hover:bg-gold/90 active:scale-[0.98]
+                     hover:bg-ink/85 hover:shadow-soft active:scale-[0.98]
                      disabled:opacity-60 disabled:cursor-not-allowed
-                     transition-all duration-150"
+                     transition-all duration-200"
             >
               <svg v-if="auth.isLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -168,9 +161,12 @@ async function handleSubmit() {
       </div>
 
       <!-- Footer -->
-      <p class="text-center text-xs text-subtle mt-6 animate-fade-in delay-700">
-        Acceso restringido · Solo usuarios invitados
-      </p>
+      <div class="mt-10 animate-fade-in delay-700 text-center space-y-3">
+        <img src="~/assets/images/stimada_logo.png" alt="Stimada" class="h-5 w-auto mx-auto opacity-40" />
+        <p class="text-xs text-muted/50">
+          Acceso restringido · Solo usuarios invitados
+        </p>
+      </div>
     </div>
 
     <!-- Forgot password modal -->
