@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-ink text-cream font-sans antialiased;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  * { box-sizing: border-box; }
+}
+
+@layer utilities {
+  /* Delay utilities for staggered animations */
+  .delay-50  { animation-delay: 50ms; }
+  .delay-100 { animation-delay: 100ms; }
+  .delay-150 { animation-delay: 150ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-250 { animation-delay: 250ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
+  .delay-500 { animation-delay: 500ms; }
+  .delay-600 { animation-delay: 600ms; }
+  .delay-700 { animation-delay: 700ms; }
+
+  /* Input Apple-style */
+  .input-field {
+    @apply w-full rounded-xl border border-border bg-raised px-4 py-3 text-sm text-cream placeholder-muted
+           outline-none transition-all duration-200
+           focus:border-gold/60 focus:shadow-gold-sm;
+  }
+
+  /* Grain texture overlay */
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    background-size: 200px;
+    pointer-events: none;
+    z-index: 0;
+    border-radius: inherit;
+  }
+  .grain > * { position: relative; z-index: 1; }
+}
+
+/* Page transitions */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.page-enter-from { opacity: 0; transform: translateY(8px); }
+.page-leave-to  { opacity: 0; }
+
+/* Modal transitions */
+.modal-enter-active { transition: opacity 200ms ease; }
+.modal-leave-active { transition: opacity 180ms ease; }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
+
+.modal-content-enter-active { transition: opacity 250ms ease, transform 250ms cubic-bezier(0.16,1,0.3,1); }
+.modal-content-leave-active { transition: opacity 180ms ease, transform 180ms ease; }
+.modal-content-enter-from { opacity: 0; transform: scale(0.96) translateY(8px); }
+.modal-content-leave-to  { opacity: 0; transform: scale(0.97); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #52525b; }
