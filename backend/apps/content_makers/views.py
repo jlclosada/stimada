@@ -35,6 +35,13 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
     queryset = ContentMakerProfile.objects.select_related("user").order_by("stimada_id")
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
+    def get_permissions(self):
+        # Allow clients read-only access to retrieve and list
+        if self.action in ("retrieve", "list"):
+            from rest_framework.permissions import IsAuthenticated
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
     def get_serializer_class(self):
         if self.action in ("create", "retrieve", "update", "partial_update"):
             return ContentMakerDetailSerializer

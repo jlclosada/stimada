@@ -39,6 +39,11 @@ const navItems = computed<NavItem[]>(() => {
   return [{ label: "Dashboard", href: "/dashboard", icon: "grid" }];
 });
 
+const showSidebar = computed(() => {
+  const role = auth.user?.role;
+  return role === "admin" || role === "stimada_employee";
+});
+
 function isActive(href: string) {
   if (href === "/dashboard") return route.path === "/dashboard";
   return route.path.startsWith(href);
@@ -50,7 +55,8 @@ function isActive(href: string) {
     <!-- Top App Navbar -->
     <AppNavbar />
 
-    <div class="flex" style="height: calc(100vh - 4rem);">
+    <!-- Layout with sidebar (admin / stimada_employee) -->
+    <div v-if="showSidebar" class="flex" style="height: calc(100vh - 4rem);">
       <!-- Sidebar -->
       <aside class="w-[240px] flex-shrink-0 flex flex-col border-r border-border/60 bg-white">
       <!-- Nav -->
@@ -97,5 +103,10 @@ function isActive(href: string) {
       </main>
     </div>
     </div>
+
+    <!-- Simple layout without sidebar (client / content_maker) -->
+    <main v-else class="p-8" style="min-height: calc(100vh - 4rem);">
+      <slot />
+    </main>
   </div>
 </template>

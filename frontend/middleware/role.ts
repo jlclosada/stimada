@@ -2,7 +2,7 @@ import { useAuthStore } from "~/stores/auth";
 
 const ROUTE_ROLES: Record<string, string[]> = {
   "/dashboard/usuarios": ["admin", "stimada_employee"],
-  "/dashboard/content-makers": ["admin", "stimada_employee"],
+  "/dashboard/content-makers": ["admin", "stimada_employee", "client"],
   "/dashboard/clientes": ["admin", "stimada_employee"],
   "/dashboard/admin": ["admin"],
   "/dashboard/mis-proyectos": ["client"],

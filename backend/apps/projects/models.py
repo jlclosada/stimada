@@ -45,10 +45,13 @@ class Project(models.Model):
     project_id = models.CharField(max_length=50, unique=True)
     nombre = models.CharField(max_length=300)
     descripcion = models.TextField(blank=True)
+    is_draft = models.BooleanField(default=False)
 
     # Relaciones
     client = models.ForeignKey(
         "clients.ClientProfile",
+        null=True,
+        blank=True,
         on_delete=models.PROTECT,
         related_name="projects",
     )
@@ -129,11 +132,13 @@ class Project(models.Model):
 
 class ProjectContentMaker(models.Model):
     """Content makers recomendadas o candidatas para un proyecto."""
+    STATUS_RECOMMENDED = "recommended"
     STATUS_PENDING = "pending"
     STATUS_ACCEPTED = "accepted"
     STATUS_REJECTED = "rejected"
     STATUS_SELECTED = "selected"
     STATUS_CHOICES = [
+        (STATUS_RECOMMENDED, "Recomendada"),
         (STATUS_PENDING, "Pendiente"),
         (STATUS_ACCEPTED, "Aceptada"),
         (STATUS_REJECTED, "Rechazada"),
@@ -173,11 +178,13 @@ class Notification(models.Model):
     TYPE_PROJECT_CM_REQUEST = "project_cm_request"
     TYPE_PROJECT_CM_ACCEPTED = "project_cm_accepted"
     TYPE_PROJECT_CM_REJECTED = "project_cm_rejected"
+    TYPE_BRIEFING_SUBMITTED = "briefing_submitted"
     TYPE_CHOICES = [
         (TYPE_PROJECT_CM_SELECT, "Seleccionar Content Maker"),
         (TYPE_PROJECT_CM_REQUEST, "Solicitud a Content Maker"),
         (TYPE_PROJECT_CM_ACCEPTED, "Content Maker aceptó"),
         (TYPE_PROJECT_CM_REJECTED, "Content Maker rechazó"),
+        (TYPE_BRIEFING_SUBMITTED, "Briefing enviado"),
     ]
 
     recipient = models.ForeignKey(
@@ -205,3 +212,36 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"[{self.get_notification_type_display()}] → {self.recipient.email}"
+
+
+class Briefing(models.Model):
+    """Briefing del cliente para cada content maker en un proyecto."""
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="briefings",
+    )
+    content_maker = models.ForeignKey(
+        "content_makers.ContentMakerProfile",
+        on_delete=models.CASCADE,
+        related_name="briefings",
+    )
+    link_referencia = models.URLField(max_length=500, blank=True)
+    comentarios = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="briefings_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Briefing"
+        verbose_name_plural = "Briefings"
+        unique_together = ["project", "content_maker"]
+
+    def __str__(self):
+        return f"Briefing: {self.project.project_id} → {self.content_maker}"

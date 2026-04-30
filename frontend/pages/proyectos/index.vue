@@ -149,7 +149,9 @@ function formatDate(d: string | null) {
                   :class="{
                     'bg-emerald-50 text-emerald-700': p.status_name === 'Activo',
                     'bg-amber-50 text-amber-700': p.status_name === 'Pendiente',
+                    'bg-blue-50 text-blue-700': p.status_name === 'Briefing',
                     'bg-gray-100 text-gray-600': p.status_name === 'Finalizado',
+                    'bg-slate-50 text-slate-500 border border-dashed border-slate-300': p.status_name === 'Borrador',
                   }"
                 >{{ p.status_name || '—' }}</span>
               </td>

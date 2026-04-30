@@ -29,6 +29,83 @@ const editForm = ref<any>({});
 const saving = ref(false);
 const showDeleteConfirm = ref(false);
 
+// Edit mode - CM selection
+const editSelectedCMs = ref<{ id: number; nombre: string; instagram_handle: string }[]>([]);
+const editRecommendedCMs = ref<{ id: number; nombre: string; instagram_handle: string }[]>([]);
+const editCMSearch = ref("");
+const editCMResults = ref<any[]>([]);
+const editCMSearching = ref(false);
+
+let editCMSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function onEditCMSearch() {
+  if (editCMSearchTimeout) clearTimeout(editCMSearchTimeout);
+  editCMSearchTimeout = setTimeout(async () => {
+    if (!editCMSearch.value.trim()) {
+      editCMResults.value = [];
+      return;
+    }
+    editCMSearching.value = true;
+    try {
+      const data = await $fetch<{ results: any[] }>(
+        `${config.public.apiBase}/content-makers/`,
+        {
+          params: { q: editCMSearch.value, page_size: 10 },
+          headers: { Authorization: `Bearer ${auth.accessToken}` },
+        }
+      );
+      editCMResults.value = data.results;
+    } catch {
+      editCMResults.value = [];
+    } finally {
+      editCMSearching.value = false;
+    }
+  }, 300);
+}
+
+function addEditDefinedCM(cm: any) {
+  if (!editSelectedCMs.value.find((r) => r.id === cm.id)) {
+    editSelectedCMs.value.push({ id: cm.id, nombre: `${cm.nombre} ${cm.apellidos}`.trim(), instagram_handle: cm.instagram_handle || "" });
+  }
+  editCMSearch.value = "";
+  editCMResults.value = [];
+}
+
+function removeEditDefinedCM(id: number) {
+  editSelectedCMs.value = editSelectedCMs.value.filter((r) => r.id !== id);
+}
+
+function addEditRecommendedCM(cm: any) {
+  if (!editRecommendedCMs.value.find((r) => r.id === cm.id)) {
+    editRecommendedCMs.value.push({ id: cm.id, nombre: `${cm.nombre} ${cm.apellidos}`.trim(), instagram_handle: cm.instagram_handle || "" });
+  }
+  editCMSearch.value = "";
+  editCMResults.value = [];
+}
+
+function removeEditRecommendedCM(id: number) {
+  editRecommendedCMs.value = editRecommendedCMs.value.filter((r) => r.id !== id);
+}
+
+// Confirmation modal
+const confirmAction = ref<{
+  show: boolean;
+  title: string;
+  message: string;
+  action: (() => Promise<void>) | null;
+}>({ show: false, title: "", message: "", action: null });
+
+async function executeConfirmAction() {
+  if (confirmAction.value.action) {
+    await confirmAction.value.action();
+  }
+  confirmAction.value = { show: false, title: "", message: "", action: null };
+}
+
+function cancelConfirmAction() {
+  confirmAction.value = { show: false, title: "", message: "", action: null };
+}
+
 function startEdit() {
   editForm.value = {
     nombre: project.value.nombre,
@@ -40,7 +117,21 @@ function startEdit() {
     fecha_fin: project.value.fecha_fin || "",
     status: project.value.status,
     service_type: project.value.service_type,
+    cm_selection_mode: project.value.cm_selection_mode || "client_chooses",
   };
+  // Populate selected CMs from current project content_makers
+  editSelectedCMs.value = [];
+  editRecommendedCMs.value = [];
+  if (project.value.content_makers) {
+    for (const cm of project.value.content_makers) {
+      const entry = { id: cm.content_maker_id, nombre: cm.nombre, instagram_handle: cm.instagram_handle || "" };
+      if (cm.is_recommended || cm.status === "recommended") {
+        editRecommendedCMs.value.push(entry);
+      } else if (cm.status === "pending" || cm.status === "accepted") {
+        editSelectedCMs.value.push(entry);
+      }
+    }
+  }
   isEditing.value = true;
 }
 
@@ -51,20 +142,31 @@ function cancelEdit() {
 async function saveEdit() {
   saving.value = true;
   try {
+    const body: Record<string, unknown> = {
+      nombre: editForm.value.nombre,
+      descripcion: editForm.value.descripcion,
+      base_imponible: editForm.value.base_imponible,
+      impuestos: editForm.value.impuestos,
+      fecha_venta: editForm.value.fecha_venta || null,
+      fecha_servicio: editForm.value.fecha_servicio || null,
+      fecha_fin: editForm.value.fecha_fin || null,
+      status: editForm.value.status || null,
+      service_type: editForm.value.service_type || null,
+      cm_selection_mode: editForm.value.cm_selection_mode,
+      is_draft: false,
+    };
+
+    // Include CM data based on selection mode
+    if (editForm.value.cm_selection_mode === "defined") {
+      body.defined_cms = editSelectedCMs.value.map((c) => c.id);
+    } else if (editForm.value.cm_selection_mode === "recommended") {
+      body.recommended_cms = editRecommendedCMs.value.map((c) => c.id);
+    }
+
     await $fetch(`${config.public.apiBase}/projects/${route.params.id}/`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${auth.accessToken}` },
-      body: {
-        nombre: editForm.value.nombre,
-        descripcion: editForm.value.descripcion,
-        base_imponible: editForm.value.base_imponible,
-        impuestos: editForm.value.impuestos,
-        fecha_venta: editForm.value.fecha_venta || null,
-        fecha_servicio: editForm.value.fecha_servicio || null,
-        fecha_fin: editForm.value.fecha_fin || null,
-        status: editForm.value.status || null,
-        service_type: editForm.value.service_type || null,
-      },
+      body,
     });
     isEditing.value = false;
     await loadProject();
@@ -75,13 +177,13 @@ async function saveEdit() {
   }
 }
 
-async function unlinkCM() {
+async function unlinkCM(cmId: number) {
   actionLoading.value = true;
   try {
-    await $fetch(`${config.public.apiBase}/projects/${route.params.id}/`, {
-      method: "PATCH",
+    await $fetch(`${config.public.apiBase}/projects/${route.params.id}/unlink_cm/`, {
+      method: "POST",
       headers: { Authorization: `Bearer ${auth.accessToken}` },
-      body: { content_maker: null },
+      body: { content_maker_id: cmId },
     });
     await loadProject();
   } catch {
@@ -122,7 +224,7 @@ const cmNeedToRespond = computed(() => {
 // Client needs to select a CM?
 const clientNeedsToSelectCM = computed(() => {
   if (!isClient.value || !project.value) return false;
-  if (project.value.content_maker_name) return false; // already has definitive CM
+  if (acceptedCMs.value.length > 0) return false; // already has accepted CMs
   const mode = project.value.cm_selection_mode;
   if (mode !== "client_chooses" && mode !== "recommended") return false;
   // Check if there's any pending CM already selected by client (waiting for response)
@@ -134,7 +236,7 @@ const clientNeedsToSelectCM = computed(() => {
 
 const clientWaitingForCM = computed(() => {
   if (!isClient.value || !project.value) return false;
-  if (project.value.content_maker_name) return false;
+  if (acceptedCMs.value.length > 0) return false;
   return project.value.content_makers?.some(
     (cm: any) => cm.status === "pending"
   );
@@ -172,21 +274,28 @@ function onCMSearchInput() {
 }
 
 async function selectCM(cmId: number) {
-  actionLoading.value = true;
-  try {
-    await $fetch(`${config.public.apiBase}/projects/${route.params.id}/select_cm/`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${auth.accessToken}` },
-      body: { content_maker_id: cmId },
-    });
-    cmSearchQuery.value = "";
-    cmSearchResults.value = [];
-    await loadProject();
-  } catch {
-    // silent
-  } finally {
-    actionLoading.value = false;
-  }
+  confirmAction.value = {
+    show: true,
+    title: "Confirmar selección",
+    message: `¿Estás seguro de elegir a esta Content Maker para tu campaña? Se le enviará una invitación y deberá aceptar para confirmar su participación.`,
+    action: async () => {
+      actionLoading.value = true;
+      try {
+        await $fetch(`${config.public.apiBase}/projects/${route.params.id}/select_cm/`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${auth.accessToken}` },
+          body: { content_maker_id: cmId },
+        });
+        cmSearchQuery.value = "";
+        cmSearchResults.value = [];
+        await loadProject();
+      } catch {
+        // silent
+      } finally {
+        actionLoading.value = false;
+      }
+    },
+  };
 }
 
 async function loadProject() {
@@ -203,18 +312,25 @@ async function loadProject() {
 }
 
 async function acceptProject() {
-  actionLoading.value = true;
-  try {
-    await $fetch(`${config.public.apiBase}/projects/${route.params.id}/accept/`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${auth.accessToken}` },
-    });
-    await loadProject();
-  } catch {
-    // silent
-  } finally {
-    actionLoading.value = false;
-  }
+  confirmAction.value = {
+    show: true,
+    title: "Confirmar aceptación",
+    message: `¿Estás seguro de que quieres aceptar esta campaña? Al confirmar, te comprometes a participar en el proyecto.`,
+    action: async () => {
+      actionLoading.value = true;
+      try {
+        await $fetch(`${config.public.apiBase}/projects/${route.params.id}/accept/`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${auth.accessToken}` },
+        });
+        await loadProject();
+      } catch {
+        // silent
+      } finally {
+        actionLoading.value = false;
+      }
+    },
+  };
 }
 
 async function rejectProject() {
@@ -238,6 +354,7 @@ function formatDate(d: string | null) {
 }
 
 const STATUS_COLORS: Record<string, string> = {
+  recommended: "bg-gold/10 text-gold border-gold/30",
   pending: "bg-amber-50 text-amber-700 border-amber-200",
   accepted: "bg-emerald-50 text-emerald-700 border-emerald-200",
   rejected: "bg-red-50 text-red-600 border-red-200",
@@ -245,11 +362,63 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
+  recommended: "Recomendada",
   pending: "Pendiente",
   accepted: "Aceptada",
   rejected: "Rechazada",
   selected: "Seleccionada",
 };
+
+// Briefing
+const acceptedCMs = computed(() => {
+  if (!project.value) return [];
+  return project.value.content_makers?.filter((cm: any) => cm.status === "accepted") || [];
+});
+
+const needsBriefing = computed(() => {
+  if (!project.value) return false;
+  return project.value.status_name === "Briefing" && acceptedCMs.value.length > 0;
+});
+
+// For each accepted CM, check if a briefing already exists
+function hasBriefing(cmId: number) {
+  return project.value?.briefings?.some((b: any) => b.content_maker === cmId);
+}
+
+function getBriefing(cmId: number) {
+  return project.value?.briefings?.find((b: any) => b.content_maker === cmId);
+}
+
+// Briefing form per CM
+const briefingForms = ref<Record<number, { link_referencia: string; comentarios: string }>>({});
+const briefingSaving = ref<Record<number, boolean>>({});
+
+function initBriefingForm(cmId: number) {
+  if (!briefingForms.value[cmId]) {
+    briefingForms.value[cmId] = { link_referencia: "", comentarios: "" };
+  }
+}
+
+async function submitBriefing(cmId: number) {
+  briefingSaving.value[cmId] = true;
+  try {
+    await $fetch(`${config.public.apiBase}/briefings/`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${auth.accessToken}` },
+      body: {
+        project: project.value.id,
+        content_maker: cmId,
+        link_referencia: briefingForms.value[cmId]?.link_referencia || "",
+        comentarios: briefingForms.value[cmId]?.comentarios || "",
+      },
+    });
+    await loadProject();
+  } catch {
+    // silent
+  } finally {
+    briefingSaving.value[cmId] = false;
+  }
+}
 
 onMounted(() => {
   loadProject();
@@ -282,7 +451,17 @@ onMounted(() => {
             Proyectos
           </NuxtLink>
           <h1 class="text-2xl font-semibold text-ink mt-1">{{ project.nombre }}</h1>
-          <p class="text-sm text-muted mt-1">{{ project.project_id }} · {{ project.client_name }}</p>
+          <div class="flex items-center gap-2 mt-1">
+            <p class="text-sm text-muted">{{ project.project_id }} · {{ project.client_name }}</p>
+            <NuxtLink
+              v-if="isAdminOrEmployee && project.client"
+              :to="`/dashboard/clientes/${project.client}`"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium text-gold border border-gold/30 hover:bg-gold/10 transition-all"
+            >
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+              Ver cliente
+            </NuxtLink>
+          </div>
         </div>
         <div class="flex items-center gap-2">
           <span
@@ -291,7 +470,9 @@ onMounted(() => {
             :class="{
               'bg-emerald-50 text-emerald-700': project.status_name === 'Activo',
               'bg-amber-50 text-amber-700': project.status_name === 'Pendiente',
+              'bg-blue-50 text-blue-700': project.status_name === 'Briefing',
               'bg-gray-100 text-gray-600': project.status_name === 'Finalizado',
+              'bg-slate-50 text-slate-500 border border-dashed border-slate-300': project.status_name === 'Borrador',
             }"
           >{{ project.status_name }}</span>
           <button
@@ -390,6 +571,89 @@ onMounted(() => {
             </select>
           </div>
         </div>
+
+        <!-- CM Selection Mode -->
+        <div class="border-t border-border/40 pt-5 space-y-4">
+          <label class="block text-xs font-medium text-muted">¿Cómo se asignará la Content Maker?</label>
+          <div class="grid grid-cols-1 gap-2">
+            <label
+              v-for="opt in [
+                { value: 'defined', label: 'Ya está definida', desc: 'Seleccionas directamente la content maker' },
+                { value: 'recommended', label: 'Recomendar opciones', desc: 'Sugieres varias opciones al cliente' },
+                { value: 'client_chooses', label: 'El cliente elige', desc: 'El cliente explora y selecciona por sí mismo' },
+              ]"
+              :key="opt.value"
+              class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-200"
+              :class="editForm.cm_selection_mode === opt.value ? 'border-gold/40 bg-gold/5' : 'border-border/60 bg-white hover:border-border'"
+            >
+              <input v-model="editForm.cm_selection_mode" type="radio" :value="opt.value" class="mt-0.5 accent-[#c9a84c]" />
+              <div>
+                <p class="text-sm font-medium text-ink">{{ opt.label }}</p>
+                <p class="text-xs text-muted mt-0.5">{{ opt.desc }}</p>
+              </div>
+            </label>
+          </div>
+
+          <!-- Defined: search and select -->
+          <div v-if="editForm.cm_selection_mode === 'defined'" class="space-y-3">
+            <label class="block text-xs font-medium text-muted mb-1.5">Buscar y añadir Content Makers</label>
+            <input
+              v-model="editCMSearch"
+              type="text"
+              placeholder="Nombre o @instagram…"
+              class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
+              @input="onEditCMSearch"
+            />
+            <div v-if="editCMResults.length" class="rounded-xl border border-border/60 max-h-48 overflow-auto bg-white">
+              <button
+                v-for="cm in editCMResults"
+                :key="cm.id"
+                class="w-full text-left px-4 py-2.5 text-sm hover:bg-panel/60 transition-colors border-b border-border/20 last:border-0"
+                @click="addEditDefinedCM(cm)"
+              >
+                <span class="font-medium text-ink">{{ cm.nombre }} {{ cm.apellidos }}</span>
+                <span v-if="cm.instagram_handle" class="text-muted ml-2 text-xs">@{{ cm.instagram_handle }}</span>
+              </button>
+            </div>
+            <div v-if="editSelectedCMs.length" class="space-y-1.5">
+              <p class="text-xs text-muted font-medium">Seleccionadas ({{ editSelectedCMs.length }}):</p>
+              <div v-for="cm in editSelectedCMs" :key="cm.id" class="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-border/40">
+                <span class="text-xs text-ink font-medium">{{ cm.nombre }} <span v-if="cm.instagram_handle" class="text-muted">@{{ cm.instagram_handle }}</span></span>
+                <button class="text-xs text-red-400 hover:text-red-600 transition-colors" @click="removeEditDefinedCM(cm.id)">Quitar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recommended: search and add -->
+          <div v-if="editForm.cm_selection_mode === 'recommended'" class="space-y-3">
+            <label class="block text-xs font-medium text-muted mb-1.5">Buscar y añadir recomendaciones</label>
+            <input
+              v-model="editCMSearch"
+              type="text"
+              placeholder="Nombre o @instagram…"
+              class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
+              @input="onEditCMSearch"
+            />
+            <div v-if="editCMResults.length" class="rounded-xl border border-border/60 max-h-48 overflow-auto bg-white">
+              <button
+                v-for="cm in editCMResults"
+                :key="cm.id"
+                class="w-full text-left px-4 py-2.5 text-sm hover:bg-panel/60 transition-colors border-b border-border/20 last:border-0"
+                @click="addEditRecommendedCM(cm)"
+              >
+                <span class="font-medium text-ink">{{ cm.nombre }} {{ cm.apellidos }}</span>
+                <span v-if="cm.instagram_handle" class="text-muted ml-2 text-xs">@{{ cm.instagram_handle }}</span>
+              </button>
+            </div>
+            <div v-if="editRecommendedCMs.length" class="space-y-1.5">
+              <p class="text-xs text-muted font-medium">Recomendadas ({{ editRecommendedCMs.length }}):</p>
+              <div v-for="cm in editRecommendedCMs" :key="cm.id" class="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-border/40">
+                <span class="text-xs text-ink font-medium">{{ cm.nombre }} <span v-if="cm.instagram_handle" class="text-muted">@{{ cm.instagram_handle }}</span></span>
+                <button class="text-xs text-red-400 hover:text-red-600 transition-colors" @click="removeEditRecommendedCM(cm.id)">Quitar</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- CM Action Banner (for Content Makers with pending response) -->
@@ -454,29 +718,35 @@ onMounted(() => {
 
       <!-- Content Maker Section -->
       <div class="rounded-2xl border border-border/60 bg-white p-6 mb-8">
-        <h2 class="text-sm font-semibold text-ink mb-4">Content Maker</h2>
+        <h2 class="text-sm font-semibold text-ink mb-4">Content Makers</h2>
 
-        <!-- Assigned CM -->
-        <div v-if="project.content_maker_name" class="flex items-center justify-between p-3 rounded-xl bg-emerald-50/50 border border-emerald-200/50">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
-              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-            </div>
-            <div>
-              <p class="text-sm font-medium text-ink">{{ project.content_maker_name }}</p>
-              <p class="text-[11px] text-emerald-600">Asignada al proyecto</p>
-            </div>
-          </div>
-          <button
-            v-if="isAdminOrEmployee"
-            :disabled="actionLoading"
-            class="px-3 py-1.5 rounded-lg text-[11px] font-medium border border-red-200 text-red-500 hover:bg-red-50 transition-all disabled:opacity-50"
-            @click="unlinkCM"
+        <!-- Accepted/Assigned CMs -->
+        <div v-if="acceptedCMs.length" class="space-y-2 mb-4">
+          <div
+            v-for="cm in acceptedCMs"
+            :key="cm.content_maker_id"
+            class="flex items-center justify-between p-3 rounded-xl bg-emerald-50/50 border border-emerald-200/50"
           >
-            Desvincular
-          </button>
+            <NuxtLink :to="`/dashboard/content-makers/${cm.content_maker_id}`" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+              <div class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
+                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-ink hover:text-gold transition-colors">{{ cm.nombre }}</p>
+                <p class="text-[11px] text-emerald-600">Asignada al proyecto</p>
+              </div>
+            </NuxtLink>
+            <button
+              v-if="isAdminOrEmployee"
+              :disabled="actionLoading"
+              class="px-3 py-1.5 rounded-lg text-[11px] font-medium border border-red-200 text-red-500 hover:bg-red-50 transition-all disabled:opacity-50"
+              @click="unlinkCM(cm.content_maker_id)"
+            >
+              Desvincular
+            </button>
+          </div>
         </div>
 
         <!-- Client waiting for CM response -->
@@ -498,7 +768,43 @@ onMounted(() => {
         <div v-else-if="clientNeedsToSelectCM" class="space-y-4">
           <div class="rounded-xl bg-blue-50/50 border border-blue-200/50 p-4 mb-4">
             <p class="text-sm font-medium text-ink">Elige una Content Maker para este proyecto</p>
-            <p class="text-[11px] text-blue-600 mt-1">Busca por nombre o usuario de Instagram y selecciona a la Content Maker que quieres para esta campaña.</p>
+            <p class="text-[11px] text-blue-600 mt-1">
+              {{ project.cm_selection_mode === 'recommended'
+                ? 'Te hemos recomendado las siguientes Content Makers. Selecciona la que prefieras para esta campaña.'
+                : 'Busca por nombre o usuario de Instagram y selecciona a la Content Maker que quieres para esta campaña.'
+              }}
+            </p>
+          </div>
+
+          <!-- Recommended CMs (shown when mode is recommended) -->
+          <div v-if="project.cm_selection_mode === 'recommended' && project.content_makers?.length" class="space-y-2">
+            <p class="text-xs text-muted font-medium">Recomendadas para ti:</p>
+            <div
+              v-for="cm in project.content_makers.filter((c: any) => c.is_recommended && c.status !== 'rejected')"
+              :key="cm.content_maker_id"
+              class="flex items-center justify-between p-3 rounded-xl border border-gold/20 bg-gold/5 hover:border-gold/40 transition-all"
+            >
+              <NuxtLink :to="`/dashboard/content-makers/${cm.content_maker_id}`" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                <div class="w-9 h-9 rounded-lg bg-gold/10 flex items-center justify-center text-[10px] font-bold text-gold">
+                  {{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-ink hover:text-gold transition-colors">{{ cm.nombre }}</p>
+                  <p v-if="cm.instagram_handle" class="text-[10px] text-muted">@{{ cm.instagram_handle }} · {{ cm.seguidores_instagram?.toLocaleString() }} seg.</p>
+                </div>
+              </NuxtLink>
+              <button
+                :disabled="actionLoading"
+                class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-gold text-white hover:bg-gold/90 transition-all disabled:opacity-50"
+                @click="selectCM(cm.content_maker_id)"
+              >
+                Seleccionar
+              </button>
+            </div>
+
+            <div class="pt-2 border-t border-border/40 mt-4">
+              <p class="text-[11px] text-muted">¿Ninguna te convence? Busca otra Content Maker:</p>
+            </div>
           </div>
 
           <!-- Search input -->
@@ -558,15 +864,15 @@ onMounted(() => {
             :key="cm.id"
             class="flex items-center justify-between p-3 rounded-xl border border-border/40 bg-panel/30"
           >
-            <div class="flex items-center gap-3">
+            <NuxtLink :to="`/dashboard/content-makers/${cm.content_maker_id}`" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
               <div class="w-8 h-8 rounded-lg bg-panel flex items-center justify-center text-[10px] font-bold text-muted">
                 {{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
               </div>
               <div>
-                <p class="text-xs font-medium text-ink">{{ cm.nombre }}</p>
+                <p class="text-xs font-medium text-ink hover:text-gold transition-colors">{{ cm.nombre }}</p>
                 <p v-if="cm.instagram_handle" class="text-[10px] text-muted">@{{ cm.instagram_handle }}</p>
               </div>
-            </div>
+            </NuxtLink>
             <span
               class="px-2 py-0.5 rounded-md text-[10px] font-medium border"
               :class="STATUS_COLORS[cm.status] || 'bg-gray-50 text-gray-600 border-gray-200'"
@@ -575,8 +881,83 @@ onMounted(() => {
         </div>
 
         <!-- No CM yet (only for admin when no candidates) -->
-        <div v-if="!project.content_maker_name && !project.content_makers?.length && !clientNeedsToSelectCM && !clientWaitingForCM" class="text-center py-6">
+        <div v-if="!acceptedCMs.length && !project.content_makers?.length && !clientNeedsToSelectCM && !clientWaitingForCM" class="text-center py-6">
           <p class="text-xs text-muted">Aún no se ha asignado una Content Maker</p>
+        </div>
+      </div>
+
+      <!-- Briefing Section -->
+      <div v-if="needsBriefing || project.briefings?.length" class="rounded-2xl border border-border/60 bg-white p-6 mb-8">
+        <h2 class="text-sm font-semibold text-ink mb-4">Briefing</h2>
+
+        <div class="space-y-5">
+          <div v-for="cm in acceptedCMs" :key="cm.content_maker_id">
+            <!-- Briefing already submitted -->
+            <div v-if="hasBriefing(cm.content_maker_id)" class="rounded-xl border border-emerald-200/50 bg-emerald-50/30 p-4">
+              <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 rounded-md bg-emerald-100 flex items-center justify-center">
+                  <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                </div>
+                <p class="text-xs font-medium text-ink">Briefing para {{ cm.nombre }}</p>
+              </div>
+              <div class="space-y-2 text-xs pl-8">
+                <div v-if="getBriefing(cm.content_maker_id)?.link_referencia">
+                  <span class="text-muted">Link de referencia:</span>
+                  <a :href="getBriefing(cm.content_maker_id).link_referencia" target="_blank" class="text-gold hover:underline ml-1">{{ getBriefing(cm.content_maker_id).link_referencia }}</a>
+                </div>
+                <div v-if="getBriefing(cm.content_maker_id)?.comentarios">
+                  <span class="text-muted">Comentarios:</span>
+                  <p class="text-ink mt-0.5">{{ getBriefing(cm.content_maker_id).comentarios }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Briefing form (client fills in) -->
+            <div v-else-if="isClient" class="rounded-xl border border-blue-200/50 bg-blue-50/30 p-4">
+              <p class="text-xs font-medium text-ink mb-3">Briefing para {{ cm.nombre }}</p>
+              <div class="space-y-3">
+                <div>
+                  <label class="text-[11px] text-muted font-medium mb-1 block">Link de referencia</label>
+                  <input
+                    :value="briefingForms[cm.content_maker_id]?.link_referencia || ''"
+                    type="url"
+                    placeholder="https://..."
+                    class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
+                    @focus="initBriefingForm(cm.content_maker_id)"
+                    @input="initBriefingForm(cm.content_maker_id); briefingForms[cm.content_maker_id].link_referencia = ($event.target as HTMLInputElement).value"
+                  />
+                </div>
+                <div>
+                  <label class="text-[11px] text-muted font-medium mb-1 block">Comentarios</label>
+                  <textarea
+                    :value="briefingForms[cm.content_maker_id]?.comentarios || ''"
+                    rows="3"
+                    placeholder="Instrucciones, referencias, tono, etc."
+                    class="w-full px-3 py-2 rounded-lg border border-border/60 bg-white text-sm text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40 resize-none"
+                    @focus="initBriefingForm(cm.content_maker_id)"
+                    @input="initBriefingForm(cm.content_maker_id); briefingForms[cm.content_maker_id].comentarios = ($event.target as HTMLTextAreaElement).value"
+                  />
+                </div>
+                <button
+                  :disabled="briefingSaving[cm.content_maker_id]"
+                  class="px-4 py-2 rounded-xl text-xs font-medium bg-gold text-white hover:bg-gold/90 shadow-gold-sm transition-all disabled:opacity-50"
+                  @click="submitBriefing(cm.content_maker_id)"
+                >
+                  Enviar briefing
+                </button>
+              </div>
+            </div>
+
+            <!-- Admin/employee sees pending briefing -->
+            <div v-else-if="isAdminOrEmployee" class="rounded-xl border border-amber-200/50 bg-amber-50/30 p-4">
+              <p class="text-xs text-amber-700">Pendiente: briefing para {{ cm.nombre }} (el cliente debe completarlo)</p>
+            </div>
+
+            <!-- CM sees waiting state -->
+            <div v-else-if="isContentMaker" class="rounded-xl border border-amber-200/50 bg-amber-50/30 p-4">
+              <p class="text-xs text-amber-700">Esperando briefing del cliente para este proyecto.</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -590,5 +971,38 @@ onMounted(() => {
         </div>
       </div>
     </template>
+
+    <!-- Confirmation Modal -->
+    <Teleport to="body">
+      <div v-if="confirmAction.show" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="cancelConfirmAction" />
+        <div class="relative w-full max-w-sm bg-white rounded-2xl shadow-elevated p-6 animate-scale-in">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+            </div>
+            <h3 class="text-sm font-semibold text-ink">{{ confirmAction.title }}</h3>
+          </div>
+          <p class="text-xs text-muted leading-relaxed mb-6">{{ confirmAction.message }}</p>
+          <div class="flex items-center justify-end gap-3">
+            <button
+              class="px-4 py-2 rounded-xl text-sm font-medium border border-border/60 text-muted hover:text-ink hover:border-ink/20 transition-all"
+              @click="cancelConfirmAction"
+            >
+              Cancelar
+            </button>
+            <button
+              :disabled="actionLoading"
+              class="px-5 py-2 rounded-xl text-sm font-medium bg-gold text-white hover:bg-gold/90 shadow-gold-sm transition-all disabled:opacity-50"
+              @click="executeConfirmAction"
+            >
+              Confirmar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

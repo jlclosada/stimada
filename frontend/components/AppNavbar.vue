@@ -25,18 +25,21 @@ const navLinks = computed<NavLink[]>(() => {
       { label: "Inicio", href: "/inicio" },
       { label: "Dashboard", href: "/dashboard" },
       { label: "Proyectos", href: "/proyectos" },
+      { label: "Notificaciones", href: "/notificaciones" },
     ];
   }
   if (role === "client") {
     return [
       { label: "Inicio", href: "/inicio" },
       { label: "Mis proyectos", href: "/proyectos" },
+      { label: "Notificaciones", href: "/notificaciones" },
     ];
   }
   if (role === "content_maker") {
     return [
       { label: "Inicio", href: "/inicio" },
       { label: "Mis campañas", href: "/proyectos" },
+      { label: "Notificaciones", href: "/notificaciones" },
     ];
   }
   return [{ label: "Inicio", href: "/inicio" }];

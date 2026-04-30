@@ -36,6 +36,15 @@ const isSending = ref(false);
 const sendSuccess = ref(false);
 const copied = ref(false);
 
+// IBAN copy state
+const ibanCopied = ref(false);
+async function copyIban() {
+  if (!cm.value?.iban) return;
+  await navigator.clipboard.writeText(cm.value.iban);
+  ibanCopied.value = true;
+  setTimeout(() => (ibanCopied.value = false), 2000);
+}
+
 const canEdit = computed(() => {
   return auth.user?.role === "admin" || auth.user?.role === "stimada_employee";
 });
@@ -173,37 +182,57 @@ load();
       </svg>
     </div>
 
-    <div v-else-if="cm" class="max-w-4xl animate-fade-up space-y-5">
+    <div v-else-if="cm" class="animate-fade-up">
       <!-- Back -->
-      <NuxtLink to="/dashboard/content-makers" class="inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors mb-1">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-        </svg>
-        Volver a Content Makers
-      </NuxtLink>
+      <div class="max-w-5xl">
+        <NuxtLink v-if="canEdit" to="/dashboard/content-makers" class="inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors mb-4">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+          </svg>
+          Volver a Content Makers
+        </NuxtLink>
+      </div>
+
+      <!-- Two-column layout: content + photo -->
+      <div class="flex gap-6 items-start">
+        <!-- Main content column -->
+        <div class="max-w-4xl flex-1 space-y-5">
 
       <!-- Header -->
       <div class="rounded-2xl border border-border/60 bg-white shadow-card p-6 flex items-start justify-between gap-4" >
-        <div class="flex items-center gap-4">
-          <div class="w-14 h-14 rounded-2xl bg-orange-400/10 border border-orange-400/20 flex items-center justify-center text-orange-400 text-lg font-semibold flex-shrink-0">
-            {{ cm.nombre.charAt(0) }}{{ cm.apellidos.charAt(0) }}
-          </div>
-          <div>
-            <h1 class="text-2xl font-semibold tracking-tight text-ink">{{ cm.nombre_completo }}</h1>
-            <div class="flex items-center gap-2 mt-1 flex-wrap">
-              <span class="text-xs text-muted">{{ cm.stimada_id }}</span>
-              <span class="text-border">·</span>
-              <span class="text-xs text-muted">{{ cm.tipo_cm }}</span>
-              <span
-                v-if="cm.status"
-                class="text-xs font-medium px-2 py-0.5 rounded-full border"
-                :class="cm.status === 'Alta' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-muted border-border'"
-              >
-                {{ cm.status }}
-              </span>
+          <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-orange-400/10 border border-orange-400/20 flex items-center justify-center text-orange-400 text-lg font-semibold flex-shrink-0">
+              {{ cm.nombre.charAt(0) }}{{ cm.apellidos.charAt(0) }}
+            </div>
+            <div>
+              <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl font-semibold tracking-tight text-ink">{{ cm.nombre_completo }}</h1>
+                <!-- Fee badge -->
+                <div v-if="cm.fee_instagram || cm.fee_tiktok" class="flex items-center gap-1.5">
+                  <span v-if="cm.fee_instagram" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gold/10 border border-gold/20">
+                    <svg class="w-3.5 h-3.5 text-gold" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" /><circle cx="12" cy="12" r="5" /><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none" /></svg>
+                    <span class="text-xs font-semibold text-gold">{{ cm.fee_instagram }}€</span>
+                  </span>
+                  <span v-if="cm.fee_tiktok" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-ink/5 border border-ink/10">
+                    <svg class="w-3 h-3 text-ink/70" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.84 1.56V6.8a4.85 4.85 0 01-1.07-.11z"/></svg>
+                    <span class="text-xs font-semibold text-ink/70">{{ cm.fee_tiktok }}€</span>
+                  </span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 mt-1 flex-wrap">
+                <span class="text-xs text-muted">{{ cm.stimada_id }}</span>
+                <span class="text-border">·</span>
+                <span class="text-xs text-muted">{{ cm.tipo_cm }}</span>
+                <span
+                  v-if="cm.status"
+                  class="text-xs font-medium px-2 py-0.5 rounded-full border"
+                  :class="cm.status === 'Alta' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-muted border-border'"
+                >
+                  {{ cm.status }}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
         <!-- Action buttons -->
         <div class="flex-shrink-0 flex items-center gap-2">
@@ -359,7 +388,6 @@ load();
                   </a>
                   <p v-else class="text-sm text-ink">@{{ cm.instagram_handle || "—" }}</p>
                   <p class="text-xs text-muted">{{ fmt(cm.seguidores_instagram) }} seguidores · {{ cm.categoria_seguidores_ig || "—" }}</p>
-                  <p v-if="cm.fee_instagram" class="text-xs text-gold mt-0.5">Fee: {{ cm.fee_instagram }}€</p>
                 </div>
               </div>
               <!-- TikTok -->
@@ -380,7 +408,6 @@ load();
                   </a>
                   <p v-else class="text-sm text-ink">{{ cm.tiktok_handle || "—" }}</p>
                   <p class="text-xs text-muted">{{ fmt(cm.seguidores_tiktok) }} seguidores · {{ cm.categoria_seguidores_tt || "—" }}</p>
-                  <p v-if="cm.fee_tiktok" class="text-xs text-gold mt-0.5">Fee: {{ cm.fee_tiktok }}€</p>
                 </div>
               </div>
             </div>
@@ -449,20 +476,57 @@ load();
           <!-- Contacto -->
           <div class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-3" >
             <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Contacto y facturación</h3>
-            <div class="space-y-2">
-              <div v-for="item in [
-                { label: 'Email', value: cm.email },
-                { label: 'Teléfono', value: cm.telefono },
-                { label: 'DNI / CIF', value: cm.dni_cif },
-                { label: 'IBAN', value: cm.iban },
-                { label: 'Dirección', value: cm.direccion_facturacion },
-                { label: 'C.P.', value: cm.codigo_postal },
-                { label: 'Provincia', value: cm.provincia },
-              ]" :key="item.label">
-                <div v-if="item.value" class="flex items-start gap-2">
-                  <p class="text-xs text-muted w-16 flex-shrink-0 pt-0.5">{{ item.label }}</p>
-                  <p class="text-xs text-ink">{{ item.value }}</p>
-                </div>
+            <div class="space-y-2.5">
+              <!-- Email -->
+              <div v-if="cm.email" class="flex items-center gap-2">
+                <p class="text-xs text-muted w-16 flex-shrink-0">Email</p>
+                <a :href="`mailto:${cm.email}`" class="text-xs text-ink hover:text-gold transition-colors font-medium">{{ cm.email }}</a>
+              </div>
+              <!-- Teléfono -->
+              <div v-if="cm.telefono" class="flex items-center gap-2">
+                <p class="text-xs text-muted w-16 flex-shrink-0">Teléfono</p>
+                <a :href="`tel:${cm.telefono}`" class="text-xs text-ink hover:text-gold transition-colors">{{ cm.telefono }}</a>
+              </div>
+              <!-- DNI / CIF -->
+              <div v-if="cm.dni_cif" class="flex items-center gap-2">
+                <p class="text-xs text-muted w-16 flex-shrink-0">DNI / CIF</p>
+                <p class="text-xs text-ink">{{ cm.dni_cif }}</p>
+              </div>
+              <!-- IBAN with copy -->
+              <div v-if="cm.iban" class="flex items-center gap-2">
+                <p class="text-xs text-muted w-16 flex-shrink-0">IBAN</p>
+                <p class="text-xs text-ink font-mono">{{ cm.iban }}</p>
+                <button
+                  class="ml-1 p-1 rounded-md hover:bg-panel/60 transition-colors group"
+                  :title="ibanCopied ? 'Copiado' : 'Copiar IBAN'"
+                  @click="copyIban"
+                >
+                  <svg v-if="!ibanCopied" class="w-3.5 h-3.5 text-muted group-hover:text-ink transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                </button>
+              </div>
+              <!-- Dirección with Google Maps link -->
+              <div v-if="cm.direccion_facturacion" class="flex items-start gap-2">
+                <p class="text-xs text-muted w-16 flex-shrink-0 pt-0.5">Dirección</p>
+                <a
+                  :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([cm.direccion_facturacion, cm.codigo_postal, cm.provincia, cm.pais].filter(Boolean).join(', '))}`"
+                  target="_blank"
+                  class="text-xs text-ink hover:text-gold transition-colors group flex items-start gap-1.5"
+                >
+                  <span>{{ cm.direccion_facturacion }}<span v-if="cm.codigo_postal">, {{ cm.codigo_postal }}</span><span v-if="cm.provincia"> — {{ cm.provincia }}</span></span>
+                  <svg class="w-3 h-3 text-muted group-hover:text-gold transition-colors flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                </a>
+              </div>
+              <!-- Provincia standalone if no address -->
+              <div v-else-if="cm.provincia" class="flex items-center gap-2">
+                <p class="text-xs text-muted w-16 flex-shrink-0">Provincia</p>
+                <p class="text-xs text-ink">{{ cm.provincia }}</p>
               </div>
             </div>
           </div>
@@ -671,6 +735,20 @@ load();
           </div>
         </div>
       </template>
+
+        </div><!-- end main content column -->
+
+        <!-- Photo column (sticky on the right) -->
+        <div class="hidden lg:block sticky top-8 flex-shrink-0">
+          <div class="w-[280px] h-[380px] rounded-2xl overflow-hidden shadow-card border border-border/60">
+            <img
+              src="~/assets/images/modelo1.jpg"
+              alt="Content Maker"
+              class="w-full h-full object-cover"
+            />
+          </div>
+        </div>
+      </div><!-- end flex layout -->
     </div>
 
     <!-- Create account modal -->

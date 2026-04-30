@@ -62,7 +62,7 @@ const serviceTypes = ref<{ id: number; nombre: string }[]>([]);
 const cmSelectionMode = ref<"defined" | "recommended" | "client_chooses">("client_chooses");
 const cmSearch = ref("");
 const cmResults = ref<{ id: number; nombre: string; apellidos: string; instagram_handle: string; seguidores_instagram: number | null }[]>([]);
-const selectedCM = ref<number | null>(null);
+const selectedCMs = ref<{ id: number; nombre: string; apellidos: string; instagram_handle: string }[]>([]);
 const recommendedCMs = ref<{ id: number; nombre: string; apellidos: string; instagram_handle: string }[]>([]);
 
 async function searchCMs() {
@@ -78,10 +78,16 @@ async function searchCMs() {
   }
 }
 
-function selectDefinedCM(cm: typeof cmResults.value[0]) {
-  selectedCM.value = cm.id;
-  cmSearch.value = `${cm.nombre} ${cm.apellidos}`;
+function addDefinedCM(cm: typeof cmResults.value[0]) {
+  if (!selectedCMs.value.find((r) => r.id === cm.id)) {
+    selectedCMs.value.push({ id: cm.id, nombre: cm.nombre, apellidos: cm.apellidos, instagram_handle: cm.instagram_handle });
+  }
+  cmSearch.value = "";
   cmResults.value = [];
+}
+
+function removeDefinedCM(id: number) {
+  selectedCMs.value = selectedCMs.value.filter((r) => r.id !== id);
 }
 
 function addRecommendedCM(cm: typeof cmResults.value[0]) {
@@ -156,6 +162,16 @@ function nextStep() {
     error.value = "Nombre e ID del proyecto son obligatorios.";
     return;
   }
+  if (currentStep.value === 3) {
+    if (cmSelectionMode.value === "defined" && selectedCMs.value.length === 0) {
+      error.value = "Debes seleccionar al menos una Content Maker.";
+      return;
+    }
+    if (cmSelectionMode.value === "recommended" && recommendedCMs.value.length === 0) {
+      error.value = "Debes recomendar al menos una Content Maker.";
+      return;
+    }
+  }
   if (currentStep.value < totalSteps) currentStep.value++;
 }
 
@@ -184,7 +200,8 @@ async function submit() {
       fecha_servicio: form.fecha_servicio || null,
       fecha_fin: form.fecha_fin || null,
       cm_selection_mode: cmSelectionMode.value,
-      content_maker: cmSelectionMode.value === "defined" ? selectedCM.value : null,
+      content_maker: null,
+      defined_cms: cmSelectionMode.value === "defined" ? selectedCMs.value.map((c) => c.id) : [],
       recommended_cms: cmSelectionMode.value === "recommended" ? recommendedCMs.value.map((c) => c.id) : [],
     };
 
@@ -204,6 +221,70 @@ async function submit() {
 }
 
 const stepLabels = ["Cliente", "Detalles", "Content Maker", "Resumen"];
+
+// Exit warning
+const showExitWarning = ref(false);
+
+const hasFormData = computed(() => {
+  return !!(
+    selectedClient.value ||
+    form.nombre ||
+    form.project_id ||
+    form.descripcion ||
+    selectedCMs.value.length ||
+    recommendedCMs.value.length
+  );
+});
+
+function attemptClose() {
+  if (hasFormData.value) {
+    showExitWarning.value = true;
+  } else {
+    emit("close");
+  }
+}
+
+const savingDraft = ref(false);
+
+async function saveDraftAndClose() {
+  savingDraft.value = true;
+  try {
+    const payload: Record<string, unknown> = {
+      project_id: form.project_id || "",
+      nombre: form.nombre || "",
+      descripcion: form.descripcion,
+      client: selectedClient.value,
+      brand: selectedBrand.value || null,
+      status: form.status,
+      service_type: form.service_type,
+      base_imponible: form.base_imponible || "0",
+      impuestos: form.impuestos || "0",
+      fecha_venta: form.fecha_venta || null,
+      fecha_servicio: form.fecha_servicio || null,
+      fecha_fin: form.fecha_fin || null,
+      cm_selection_mode: cmSelectionMode.value,
+      content_maker: null,
+      defined_cms: cmSelectionMode.value === "defined" ? selectedCMs.value.map((c) => c.id) : [],
+      recommended_cms: cmSelectionMode.value === "recommended" ? recommendedCMs.value.map((c) => c.id) : [],
+      is_draft: true,
+    };
+
+    await projectsStore.createProject(payload);
+    showExitWarning.value = false;
+    emit("created");
+  } catch {
+    // If draft save fails, just close without saving
+    showExitWarning.value = false;
+    emit("close");
+  } finally {
+    savingDraft.value = false;
+  }
+}
+
+function discardAndClose() {
+  showExitWarning.value = false;
+  emit("close");
+}
 </script>
 
 <template>
@@ -211,7 +292,7 @@ const stepLabels = ["Cliente", "Detalles", "Content Maker", "Resumen"];
   <Teleport to="body">
     <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <!-- Backdrop -->
-      <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="emit('close')" />
+      <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="attemptClose" />
 
       <!-- Modal -->
       <div class="relative w-full max-w-2xl bg-white rounded-2xl shadow-elevated overflow-hidden animate-scale-in">
@@ -219,7 +300,7 @@ const stepLabels = ["Cliente", "Detalles", "Content Maker", "Resumen"];
         <div class="px-8 pt-8 pb-4">
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-xl font-semibold text-ink">Nuevo proyecto</h2>
-            <button class="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-ink hover:bg-panel/80 transition-colors" @click="emit('close')">
+            <button class="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-ink hover:bg-panel/80 transition-colors" @click="attemptClose">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -377,9 +458,9 @@ const stepLabels = ["Cliente", "Detalles", "Content Maker", "Resumen"];
               </div>
             </div>
 
-            <!-- Defined: search and select one -->
+            <!-- Defined: search and select multiple -->
             <div v-if="cmSelectionMode === 'defined'" class="space-y-3">
-              <label class="block text-xs font-medium text-muted mb-1.5">Buscar Content Maker</label>
+              <label class="block text-xs font-medium text-muted mb-1.5">Buscar y añadir Content Makers</label>
               <input
                 v-model="cmSearch"
                 type="text"
@@ -391,13 +472,21 @@ const stepLabels = ["Cliente", "Detalles", "Content Maker", "Resumen"];
                   v-for="cm in cmResults"
                   :key="cm.id"
                   class="w-full text-left px-4 py-2.5 text-sm hover:bg-panel/60 transition-colors border-b border-border/20 last:border-0"
-                  @click="selectDefinedCM(cm)"
+                  @click="addDefinedCM(cm)"
                 >
                   <span class="font-medium text-ink">{{ cm.nombre }} {{ cm.apellidos }}</span>
                   <span v-if="cm.instagram_handle" class="text-muted ml-2 text-xs">@{{ cm.instagram_handle }}</span>
                 </button>
               </div>
-              <p v-if="selectedCM" class="text-xs text-gold font-medium">✓ Content Maker seleccionada</p>
+
+              <!-- Selected defined CMs -->
+              <div v-if="selectedCMs.length" class="space-y-1.5">
+                <p class="text-xs text-muted font-medium">Seleccionadas ({{ selectedCMs.length }}):</p>
+                <div v-for="cm in selectedCMs" :key="cm.id" class="flex items-center justify-between px-3 py-2 rounded-lg bg-panel/60 border border-border/40">
+                  <span class="text-xs text-ink font-medium">{{ cm.nombre }} {{ cm.apellidos }} <span class="text-muted">@{{ cm.instagram_handle }}</span></span>
+                  <button class="text-xs text-red-400 hover:text-red-600 transition-colors" @click="removeDefinedCM(cm.id)">Quitar</button>
+                </div>
+              </div>
             </div>
 
             <!-- Recommended: search and add multiple -->
@@ -460,9 +549,9 @@ const stepLabels = ["Cliente", "Detalles", "Content Maker", "Resumen"];
                 <span class="text-xs text-ink font-medium">{{ form.fecha_venta || '—' }} → {{ form.fecha_fin || '—' }}</span>
               </div>
               <div class="px-4 py-3 flex justify-between">
-                <span class="text-xs text-muted">Content Maker</span>
+                <span class="text-xs text-muted">Content Makers</span>
                 <span class="text-xs text-ink font-medium">
-                  <template v-if="cmSelectionMode === 'defined'">Definida</template>
+                  <template v-if="cmSelectionMode === 'defined'">{{ selectedCMs.length }} definida{{ selectedCMs.length !== 1 ? 's' : '' }}</template>
                   <template v-else-if="cmSelectionMode === 'recommended'">{{ recommendedCMs.length }} recomendadas</template>
                   <template v-else>El cliente elige</template>
                 </span>
@@ -485,7 +574,7 @@ const stepLabels = ["Cliente", "Detalles", "Content Maker", "Resumen"];
           <div class="flex items-center gap-3">
             <button
               class="px-4 py-2 rounded-xl text-sm text-muted hover:text-ink transition-colors"
-              @click="emit('close')"
+              @click="attemptClose"
             >
               Cancelar
             </button>
@@ -505,6 +594,45 @@ const stepLabels = ["Cliente", "Detalles", "Content Maker", "Resumen"];
               {{ isSubmitting ? "Creando…" : "Crear proyecto" }}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exit Warning Modal -->
+    <div v-if="showExitWarning" class="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/50" @click="showExitWarning = false" />
+      <div class="relative w-full max-w-sm bg-white rounded-2xl shadow-elevated p-6 animate-scale-in">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+          </div>
+          <h3 class="text-sm font-semibold text-ink">¿Salir de la creación del proyecto?</h3>
+        </div>
+        <p class="text-xs text-muted leading-relaxed mb-6">
+          Tienes datos sin guardar. Puedes guardar el proyecto como borrador para continuar más tarde, o descartarlo.
+        </p>
+        <div class="flex items-center justify-end gap-2">
+          <button
+            class="px-3 py-2 rounded-xl text-xs font-medium border border-border/60 text-muted hover:text-ink hover:border-ink/20 transition-all"
+            @click="showExitWarning = false"
+          >
+            Seguir editando
+          </button>
+          <button
+            :disabled="savingDraft"
+            class="px-3 py-2 rounded-xl text-xs font-medium border border-gold/40 text-gold hover:bg-gold/5 transition-all disabled:opacity-50"
+            @click="saveDraftAndClose"
+          >
+            {{ savingDraft ? 'Guardando…' : 'Guardar borrador' }}
+          </button>
+          <button
+            class="px-3 py-2 rounded-xl text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-all"
+            @click="discardAndClose"
+          >
+            Descartar
+          </button>
         </div>
       </div>
     </div>
