@@ -468,7 +468,7 @@ onMounted(() => {
           </NuxtLink>
           <h1 class="text-2xl font-semibold text-ink mt-1">{{ project.nombre }}</h1>
           <div class="flex items-center gap-2 mt-1">
-            <p class="text-sm text-muted">{{ formatProjectId(project.project_id) }} · {{ project.client_name }}</p>
+            <p class="text-sm text-muted"><template v-if="!isContentMaker">{{ formatProjectId(project.project_id) }} · </template>{{ project.client_name }}</p>
             <NuxtLink
               v-if="isAdminOrEmployee && project.client"
               :to="`/dashboard/clientes/${project.client}`"
@@ -708,9 +708,9 @@ onMounted(() => {
           <h2 class="text-sm font-semibold text-ink">Detalles del proyecto</h2>
           <div class="space-y-3 text-xs">
             <div class="flex justify-between"><span class="text-muted">Tipo de servicio</span><span class="text-ink font-medium">{{ project.service_type_name || '—' }}</span></div>
-            <div class="flex justify-between"><span class="text-muted">Base imponible</span><span class="text-ink font-medium">{{ project.base_imponible }} €</span></div>
-            <div class="flex justify-between"><span class="text-muted">Impuestos</span><span class="text-ink font-medium">{{ project.impuestos }} €</span></div>
-            <div class="flex justify-between border-t border-border/40 pt-3"><span class="text-muted font-medium">Total</span><span class="text-ink font-bold">{{ project.precio_total }} €</span></div>
+            <div v-if="!isContentMaker" class="flex justify-between"><span class="text-muted">Base imponible</span><span class="text-ink font-medium">{{ project.base_imponible }} €</span></div>
+            <div v-if="!isContentMaker" class="flex justify-between"><span class="text-muted">Impuestos</span><span class="text-ink font-medium">{{ project.impuestos }} €</span></div>
+            <div v-if="!isContentMaker" class="flex justify-between border-t border-border/40 pt-3"><span class="text-muted font-medium">Total</span><span class="text-ink font-bold">{{ project.precio_total }} €</span></div>
           </div>
         </div>
 

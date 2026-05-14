@@ -29,10 +29,17 @@ export interface ContentMakerProject {
   fecha_servicio: string | null;
 }
 
+export interface DesempenoOption {
+  id: number;
+  nombre: string;
+}
+
 export interface ContentMakerDetail extends ContentMaker {
   sexo: string;
   desempeno: string;
-  calidad_contenido: string;
+  calidad_contenido: number | null;
+  desempeno_opciones: number[];
+  desempeno_opciones_display: DesempenoOption[];
   apariencia: string;
   es_mama: boolean;
   sigue_stimada: boolean;
@@ -79,6 +86,7 @@ export const useContentMakersStore = defineStore("contentMakers", {
       categoria_seguidores_ig: [] as string[],
       categoria_seguidores_tt: [] as string[],
     },
+    desempenoOptions: [] as DesempenoOption[],
   }),
 
   actions: {
@@ -91,6 +99,17 @@ export const useContentMakersStore = defineStore("contentMakers", {
         { headers: { Authorization: `Bearer ${auth.accessToken}` } }
       );
       this.filterOptions = data;
+    },
+
+    async fetchDesempenoOptions() {
+      const auth = useAuthStore();
+      const config = useRuntimeConfig();
+      if (this.desempenoOptions.length) return;
+      const data = await $fetch<DesempenoOption[]>(
+        `${config.public.apiBase}/content-makers/desempeno_options/`,
+        { headers: { Authorization: `Bearer ${auth.accessToken}` } }
+      );
+      this.desempenoOptions = data;
     },
 
     async fetchList(params?: Record<string, string>, page?: number) {

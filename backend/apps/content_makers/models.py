@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 
 
@@ -28,6 +29,53 @@ class ContentMakerType(models.Model):
         return self.nombre
 
 
+class DesempenoOption(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Opción de desempeño"
+        verbose_name_plural = "Opciones de desempeño"
+        ordering = ["orden", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
+class TallajeCategory(models.Model):
+    nombre = models.CharField(max_length=50, unique=True)
+    campo = models.CharField(
+        max_length=30, unique=True,
+        help_text="Nombre del campo en el perfil (ej: talla_arriba, talla_abajo, talla_pie)",
+    )
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Categoría de tallaje"
+        verbose_name_plural = "Categorías de tallaje"
+        ordering = ["orden", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
+class TallajeOption(models.Model):
+    categoria = models.ForeignKey(
+        TallajeCategory, on_delete=models.CASCADE, related_name="opciones",
+    )
+    valor = models.CharField(max_length=20)
+    orden = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Opción de tallaje"
+        verbose_name_plural = "Opciones de tallaje"
+        ordering = ["categoria", "orden"]
+        unique_together = ["categoria", "valor"]
+
+    def __str__(self):
+        return f"{self.categoria.nombre} — {self.valor}"
+
+
 class ContentMakerProfile(models.Model):
     # Identificador Stimada
     stimada_id = models.CharField(max_length=30, unique=True, blank=True)
@@ -41,7 +89,13 @@ class ContentMakerProfile(models.Model):
 
     # Valoración interna
     desempeno = models.CharField(max_length=200, blank=True)
-    calidad_contenido = models.CharField(max_length=50, blank=True)
+    calidad_contenido = models.IntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(5)],
+    )
+    desempeno_opciones = models.ManyToManyField(
+        "DesempenoOption", blank=True, related_name="content_makers",
+    )
     apariencia = models.CharField(max_length=50, blank=True)
     es_mama = models.BooleanField(default=False)
     categorias_contenido = models.CharField(max_length=200, blank=True)

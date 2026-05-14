@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import CustomUser
 from apps.accounts.permissions import IsAdminOrEmployee
-from apps.content_makers.models import ContentMakerProfile, ContentMakerStatus, ContentMakerType
+from apps.content_makers.models import ContentMakerProfile, ContentMakerStatus, ContentMakerType, DesempenoOption, TallajeCategory, TallajeOption
 from apps.content_makers.serializers import (
     ContentMakerCreateSerializer,
     ContentMakerDetailSerializer,
@@ -43,6 +43,8 @@ CM_NON_EDITABLE_FIELDS = [
     "desempeno", "calidad_contenido", "apariencia",
     # Notas internas
     "comentarios",
+    # DNI solo editable por admin
+    "dni_cif",
     "user", "created_at", "updated_at",
 ]
 
@@ -100,8 +102,8 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
     def get_permissions(self):
-        # Allow clients read-only access to retrieve, list, and filters
-        if self.action in ("retrieve", "list", "filters"):
+        # Allow clients read-only access to retrieve, list, filters, and tallaje_options
+        if self.action in ("retrieve", "list", "filters", "tallaje_options", "desempeno_options"):
             from rest_framework.permissions import IsAuthenticated
             return [IsAuthenticated()]
         return super().get_permissions()
@@ -123,10 +125,36 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    TALLAJE_FIELDS = ["talla_arriba", "talla_abajo", "talla_pie", "altura_medidas"]
+    FISCAL_FIELDS = ["dni_cif", "direccion_facturacion", "codigo_postal", "provincia", "pais", "iban"]
+
+    def partial_update(self, request, *args, **kwargs):
+        # Employees cannot modify tallaje or fiscal/banking fields
+        if request.user.is_employee:
+            for field in self.TALLAJE_FIELDS + self.FISCAL_FIELDS:
+                request.data.pop(field, None)
+        return super().partial_update(request, *args, **kwargs)
+
     @action(detail=False, methods=["get"])
     def next_id(self, request):
         next_num = ContentMakerProfile.generate_next_id()
         return Response({"next_id": next_num})
+
+    @action(detail=False, methods=["get"])
+    def tallaje_options(self, request):
+        categories = TallajeCategory.objects.prefetch_related("opciones").all()
+        result = {}
+        for cat in categories:
+            result[cat.campo] = {
+                "label": cat.nombre,
+                "options": [opt.valor for opt in cat.opciones.all()],
+            }
+        return Response(result)
+
+    @action(detail=False, methods=["get"])
+    def desempeno_options(self, request):
+        options = DesempenoOption.objects.all()
+        return Response([{"id": o.id, "nombre": o.nombre} for o in options])
 
     @action(detail=False, methods=["get"])
     def filters(self, request):

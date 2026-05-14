@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useAuthStore } from "~/stores/auth";
 import type { ContentMakerDetail } from "~/stores/contentMakers";
-import { formatContentMakerId } from "~/utils/formatId";
 
 definePageMeta({ middleware: ["auth", "role"] });
 
@@ -28,6 +27,19 @@ async function copyIban() {
   await navigator.clipboard.writeText(cm.value.iban);
   ibanCopied.value = true;
   setTimeout(() => (ibanCopied.value = false), 2000);
+}
+
+// Tallaje options from backend
+const tallajeOptions = ref<Record<string, { label: string; options: string[] }>>({});
+
+async function loadTallajeOptions() {
+  try {
+    tallajeOptions.value = await $fetch(`${config.public.apiBase}/content-makers/tallaje_options/`, {
+      headers: { Authorization: `Bearer ${auth.accessToken}` },
+    });
+  } catch {
+    // fallback empty
+  }
 }
 
 // Photo upload
@@ -70,6 +82,7 @@ async function load() {
       `${config.public.apiBase}/content-makers/me/`,
       { headers: { Authorization: `Bearer ${auth.accessToken}` } }
     );
+    loadTallajeOptions();
   } catch {
     error.value = "No se pudo cargar tu perfil.";
   } finally {
@@ -82,6 +95,7 @@ function startEditing() {
   editData.value = { ...cm.value };
   isEditing.value = true;
   saveError.value = "";
+  loadTallajeOptions();
 }
 
 function cancelEditing() {
@@ -206,16 +220,7 @@ load();
         <!-- Name + meta -->
         <h1 class="text-3xl font-bold tracking-tight text-ink">{{ cm.nombre_completo }}</h1>
         <div class="flex items-center justify-center gap-3 mt-2 flex-wrap">
-          <span class="text-sm text-muted">{{ formatContentMakerId(cm.stimada_id) }}</span>
-          <span class="w-1 h-1 rounded-full bg-border" />
           <span class="text-sm text-muted">{{ cm.tipo_cm }}</span>
-          <span
-            v-if="cm.status"
-            class="text-xs font-medium px-2.5 py-0.5 rounded-full border"
-            :class="cm.status === 'Alta' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-muted border-border bg-panel'"
-          >
-            {{ cm.status }}
-          </span>
         </div>
 
         <!-- Fee badges -->
@@ -341,29 +346,29 @@ load();
 
           <!-- Tallaje + Contacto stacked -->
           <div class="lg:col-span-2 space-y-8">
-            <!-- Tallaje -->
             <div>
               <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted/80 pl-1 mb-5">Tallaje</h3>
               <div class="rounded-2xl border border-border/50 bg-white p-6">
                 <div class="grid grid-cols-3 gap-4">
-                  <div class="text-center p-4 rounded-xl bg-gradient-to-b from-panel to-white border border-border/40">
-                    <p class="text-[10px] uppercase tracking-wider text-muted mb-2 font-medium">Arriba</p>
-                    <p class="text-2xl font-bold text-ink">{{ cm.talla_arriba || "—" }}</p>
-                  </div>
-                  <div class="text-center p-4 rounded-xl bg-gradient-to-b from-panel to-white border border-border/40">
-                    <p class="text-[10px] uppercase tracking-wider text-muted mb-2 font-medium">Abajo</p>
-                    <p class="text-2xl font-bold text-ink">{{ cm.talla_abajo || "—" }}</p>
-                  </div>
-                  <div class="text-center p-4 rounded-xl bg-gradient-to-b from-panel to-white border border-border/40">
-                    <p class="text-[10px] uppercase tracking-wider text-muted mb-2 font-medium">Pie</p>
-                    <p class="text-2xl font-bold text-ink">{{ cm.talla_pie || "—" }}</p>
+                  <div
+                    v-for="(cat, campo) in tallajeOptions"
+                    :key="campo"
+                    class="text-center p-4 rounded-xl bg-gradient-to-b from-panel to-white border border-border/40"
+                  >
+                    <p class="text-[10px] uppercase tracking-wider text-muted mb-2 font-medium">{{ cat.label }}</p>
+                    <p class="text-2xl font-bold text-ink">{{ (cm as Record<string, unknown>)[campo] || "—" }}</p>
                   </div>
                 </div>
                 <div v-if="cm.altura_medidas" class="mt-5 pt-4 border-t border-border/40 flex items-center gap-3">
-                  <svg class="w-4 h-4 text-muted flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                  </svg>
-                  <p class="text-sm text-ink font-medium">{{ cm.altura_medidas }}</p>
+                  <div class="w-8 h-8 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-gold" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75L17.25 9m0 0L21 12.75M17.25 9v12" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p class="text-[10px] uppercase tracking-wider text-muted font-medium">Altura</p>
+                    <p class="text-lg font-bold text-ink">{{ cm.altura_medidas }} <span class="text-sm font-normal text-muted">cm</span></p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -498,21 +503,16 @@ load();
             <h3 class="text-[11px] font-semibold uppercase tracking-widest text-gold pl-1 mb-4">Tallaje</h3>
             <div class="rounded-2xl border border-gold/20 bg-white p-6">
               <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div>
-                  <label class="block text-xs font-medium text-muted mb-1.5">Parte de arriba</label>
-                  <input v-model="editData.talla_arriba" type="text" class="input-field" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-muted mb-1.5">Parte de abajo</label>
-                  <input v-model="editData.talla_abajo" type="text" class="input-field" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-muted mb-1.5">Pie</label>
-                  <input v-model="editData.talla_pie" type="text" class="input-field" />
+                <div v-for="(cat, campo) in tallajeOptions" :key="campo">
+                  <label class="block text-xs font-medium text-muted mb-1.5">{{ cat.label }}</label>
+                  <select v-model="(editData as Record<string, unknown>)[campo]" class="input-field">
+                    <option value="">—</option>
+                    <option v-for="opt in cat.options" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
                 </div>
                 <div class="md:col-span-3">
-                  <label class="block text-xs font-medium text-muted mb-1.5">Altura / Medidas</label>
-                  <input v-model="editData.altura_medidas" type="text" class="input-field" />
+                  <label class="block text-xs font-medium text-muted mb-1.5">Altura (cm)</label>
+                  <input v-model="editData.altura_medidas" type="number" min="0" step="1" class="input-field" placeholder="Ej: 169" />
                 </div>
               </div>
             </div>
@@ -531,9 +531,19 @@ load();
                   <label class="block text-xs font-medium text-muted mb-1.5">Teléfono</label>
                   <input v-model="editData.telefono" type="text" class="input-field" />
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Datos fiscales y bancarios (editable — except DNI) -->
+          <div>
+            <h3 class="text-[11px] font-semibold uppercase tracking-widest text-gold pl-1 mb-4">Datos fiscales y bancarios</h3>
+            <div class="rounded-2xl border border-gold/20 bg-white p-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label class="block text-xs font-medium text-muted mb-1.5">DNI / CIF</label>
-                  <input v-model="editData.dni_cif" type="text" class="input-field" />
+                  <label class="block text-xs font-medium text-muted mb-1.5">DNI / NIF</label>
+                  <input :value="editData.dni_cif" type="text" class="input-field opacity-50 cursor-not-allowed" disabled />
+                  <p class="text-[10px] text-muted mt-1 italic">Solo modificable por administración.</p>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-muted mb-1.5">IBAN</label>

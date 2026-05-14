@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.content_makers.models import ContentMakerProfile
+from apps.content_makers.models import ContentMakerProfile, DesempenoOption
 
 
 class ContentMakerProjectSerializer(serializers.Serializer):
@@ -39,6 +39,10 @@ class ContentMakerDetailSerializer(serializers.ModelSerializer):
     user_email = serializers.SerializerMethodField()
     foto_url = serializers.SerializerMethodField()
     proyectos_asociados = serializers.SerializerMethodField()
+    desempeno_opciones = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=DesempenoOption.objects.all(), required=False,
+    )
+    desempeno_opciones_display = serializers.SerializerMethodField()
 
     class Meta:
         model = ContentMakerProfile
@@ -55,6 +59,16 @@ class ContentMakerDetailSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.foto.url)
             return obj.foto.url
         return None
+
+    def get_desempeno_opciones_display(self, obj):
+        return [{"id": o.id, "nombre": o.nombre} for o in obj.desempeno_opciones.all()]
+
+    def update(self, instance, validated_data):
+        desempeno_opciones = validated_data.pop("desempeno_opciones", None)
+        instance = super().update(instance, validated_data)
+        if desempeno_opciones is not None:
+            instance.desempeno_opciones.set(desempeno_opciones)
+        return instance
 
     def get_proyectos_asociados(self, obj):
         from apps.projects.models import Project, ProjectContentMaker
@@ -119,12 +133,29 @@ class ContentMakerPublicSerializer(serializers.ModelSerializer):
 
 
 class ContentMakerCreateSerializer(serializers.ModelSerializer):
+    desempeno_opciones = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=DesempenoOption.objects.all(), required=False,
+    )
+
     class Meta:
         model = ContentMakerProfile
         exclude = ["user", "created_at", "updated_at"]
         extra_kwargs = {
             "stimada_id": {"required": False, "allow_blank": True},
+            "dni_cif": {"required": True, "allow_blank": False},
+            "direccion_facturacion": {"required": True, "allow_blank": False},
+            "codigo_postal": {"required": True, "allow_blank": False},
+            "provincia": {"required": True, "allow_blank": False},
+            "pais": {"required": True, "allow_blank": False},
+            "iban": {"required": True, "allow_blank": False},
         }
+
+    def create(self, validated_data):
+        desempeno_opciones = validated_data.pop("desempeno_opciones", [])
+        instance = super().create(validated_data)
+        if desempeno_opciones:
+            instance.desempeno_opciones.set(desempeno_opciones)
+        return instance
 
     def validate_link_instagram(self, value):
         if value and not value.startswith("http"):

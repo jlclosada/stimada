@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAuthStore } from "~/stores/auth";
+import type { DesempenoOption } from "~/stores/contentMakers";
 import { useContentMakersStore } from "~/stores/contentMakers";
 
 definePageMeta({ middleware: ["auth", "role"] });
@@ -11,6 +12,13 @@ const router = useRouter();
 
 // --- Next ID ---
 const nextId = ref("");
+
+// Tallaje options from backend
+const tallajeOptions = ref<Record<string, { label: string; options: string[] }>>({});
+
+// Desempeño options from backend
+const desempenoOptions = ref<DesempenoOption[]>([]);
+
 onMounted(async () => {
   store.fetchFilters();
   try {
@@ -21,6 +29,16 @@ onMounted(async () => {
     nextId.value = data.next_id;
     form.stimada_id = data.next_id;
   } catch {}
+  try {
+    tallajeOptions.value = await $fetch(`${config.public.apiBase}/content-makers/tallaje_options/`, {
+      headers: { Authorization: `Bearer ${auth.accessToken}` },
+    });
+  } catch {}
+  try {
+    desempenoOptions.value = await $fetch(`${config.public.apiBase}/content-makers/desempeno_options/`, {
+      headers: { Authorization: `Bearer ${auth.accessToken}` },
+    });
+  } catch {}
 });
 
 // --- Steps ---
@@ -29,7 +47,7 @@ const STEPS = [
   { id: "redes", label: "Redes sociales" },
   { id: "valoracion", label: "Valoración" },
   { id: "tallaje", label: "Tallaje" },
-  { id: "contacto", label: "Contacto" },
+  { id: "contacto", label: "Contacto y facturación" },
 ];
 const currentStep = ref(0);
 function prev() { currentStep.value = Math.max(0, currentStep.value - 1); }
@@ -56,7 +74,8 @@ const form = reactive({
   categoria_seguidores_tt: "",
   fee_tiktok: "" as string | number,
   // Valoración
-  calidad_contenido: "",
+  calidad_contenido: null as number | null,
+  desempeno_opciones: [] as number[],
   apariencia: "",
   desempeno: "",
   es_mama: false,
@@ -64,6 +83,7 @@ const form = reactive({
   sigue_stimada: false,
   stimada_en_bio: false,
   contrato_firmado: false,
+  comentarios: "",
   // Tallaje
   talla_arriba: "",
   talla_abajo: "",
@@ -77,7 +97,6 @@ const form = reactive({
   pais: "España",
   dni_cif: "",
   iban: "",
-  comentarios: "",
 });
 
 const isLoading = ref(false);
@@ -88,6 +107,14 @@ function boolField(key: keyof typeof form) {
     modelValue: form[key] as boolean,
     "onUpdate:modelValue": (v: boolean) => { (form as Record<string, unknown>)[key] = v; },
   };
+}
+
+function toggleDesempeno(id: number) {
+  if (form.desempeno_opciones.includes(id)) {
+    form.desempeno_opciones = form.desempeno_opciones.filter((x) => x !== id);
+  } else {
+    form.desempeno_opciones = [...form.desempeno_opciones, id];
+  }
 }
 
 async function handleSubmit() {
@@ -117,9 +144,9 @@ async function handleSubmit() {
       const stepFields: Record<string, string[]> = {
         basico: ["stimada_id", "nombre", "apellidos", "tipo_cm", "sexo", "status", "email"],
         redes: ["instagram_handle", "link_instagram", "seguidores_instagram", "fee_instagram", "tiktok_handle", "link_tiktok", "seguidores_tiktok", "fee_tiktok"],
-        valoracion: ["calidad_contenido", "apariencia", "desempeno", "categorias_contenido"],
+        valoracion: ["calidad_contenido", "desempeno_opciones", "comentarios"],
         tallaje: ["talla_arriba", "talla_abajo", "talla_pie", "altura_medidas"],
-        contacto: ["telefono", "direccion_facturacion", "codigo_postal", "provincia", "pais", "dni_cif", "iban", "comentarios"],
+        contacto: ["telefono", "direccion_facturacion", "codigo_postal", "provincia", "pais", "dni_cif", "iban"],
       };
       for (const [step, fields] of Object.entries(stepFields)) {
         if (errorFields.some(f => fields.includes(f))) {
@@ -314,26 +341,30 @@ function fieldError(field: string) {
       <div v-show="currentStep === 2" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-4" >
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-medium text-muted mb-1.5">Calidad del contenido</label>
+            <label class="block text-xs font-medium text-muted mb-1.5">Calidad del contenido (0–5)</label>
             <select v-model="form.calidad_contenido" class="select-field">
-              <option value="">—</option>
-              <option v-for="c in store.filterOptions.calidad_contenido" :key="c" :value="c">{{ c }}</option>
+              <option :value="null">—</option>
+              <option v-for="n in [0, 1, 2, 3, 4, 5]" :key="n" :value="n">{{ n }}</option>
             </select>
           </div>
           <div>
-            <label class="block text-xs font-medium text-muted mb-1.5">Apariencia</label>
-            <select v-model="form.apariencia" class="select-field">
-              <option value="">—</option>
-              <option v-for="a in store.filterOptions.apariencia" :key="a" :value="a">{{ a }}</option>
-            </select>
-          </div>
-          <div class="col-span-2">
             <label class="block text-xs font-medium text-muted mb-1.5">Desempeño</label>
-            <input v-model="form.desempeno" type="text" class="input-field" placeholder="Ej: Fiable, Engage" />
+            <div class="flex flex-wrap gap-2 p-2 rounded-xl border border-border bg-raised min-h-[38px]">
+              <button
+                v-for="opt in desempenoOptions"
+                :key="opt.id"
+                type="button"
+                class="text-xs px-2.5 py-1 rounded-full border transition-colors"
+                :class="form.desempeno_opciones.includes(opt.id)
+                  ? 'border-gold bg-gold/15 text-gold font-medium'
+                  : 'border-border text-muted hover:border-gold/40 hover:text-ink'"
+                @click="toggleDesempeno(opt.id)"
+              >{{ opt.nombre }}</button>
+            </div>
           </div>
           <div class="col-span-2">
-            <label class="block text-xs font-medium text-muted mb-1.5">Categorías de contenido</label>
-            <input v-model="form.categorias_contenido" type="text" class="input-field" placeholder="Ej: Moda & Beauty, Lifestyle" />
+            <label class="block text-xs font-medium text-muted mb-1.5">Comentarios internos</label>
+            <textarea v-model="form.comentarios" rows="3" class="input-field resize-none" placeholder="Observaciones internas sobre la content maker…" />
           </div>
         </div>
 
@@ -362,26 +393,21 @@ function fieldError(field: string) {
       <!-- STEP 4: Tallaje -->
       <div v-show="currentStep === 3" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-4" >
         <div class="grid grid-cols-3 gap-4">
-          <div>
-            <label class="block text-xs font-medium text-muted mb-1.5">Parte arriba</label>
-            <input v-model="form.talla_arriba" type="text" class="input-field" placeholder="Ej: M / L" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-muted mb-1.5">Parte abajo</label>
-            <input v-model="form.talla_abajo" type="text" class="input-field" placeholder="Ej: 38" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-muted mb-1.5">Pie</label>
-            <input v-model="form.talla_pie" type="text" class="input-field" placeholder="Ej: 38" />
+          <div v-for="(cat, campo) in tallajeOptions" :key="campo">
+            <label class="block text-xs font-medium text-muted mb-1.5">{{ cat.label }}</label>
+            <select v-model="(form as Record<string, unknown>)[campo]" class="input-field">
+              <option value="">—</option>
+              <option v-for="opt in cat.options" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
           </div>
           <div class="col-span-3">
-            <label class="block text-xs font-medium text-muted mb-1.5">Altura y medidas</label>
-            <textarea v-model="form.altura_medidas" rows="3" class="input-field resize-none" placeholder="Ej: Altura: 1,69m / Pecho: 90cm / Cintura: 68cm" />
+            <label class="block text-xs font-medium text-muted mb-1.5">Altura (cm)</label>
+            <input v-model="form.altura_medidas" type="number" min="0" step="1" class="input-field" placeholder="Ej: 169" />
           </div>
         </div>
       </div>
 
-      <!-- STEP 5: Contacto -->
+      <!-- STEP 5: Contacto y facturación -->
       <div v-show="currentStep === 4" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-4" >
         <div class="grid grid-cols-2 gap-4">
           <div>
@@ -389,32 +415,28 @@ function fieldError(field: string) {
             <input v-model="form.telefono" type="tel" class="input-field" placeholder="6XXXXXXXX" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-muted mb-1.5">DNI / CIF</label>
-            <input v-model="form.dni_cif" type="text" class="input-field" />
+            <label class="block text-xs font-medium text-muted mb-1.5">DNI / NIF <span class="text-red-400">*</span></label>
+            <input v-model="form.dni_cif" type="text" class="input-field" placeholder="12345678A" />
           </div>
           <div class="col-span-2">
-            <label class="block text-xs font-medium text-muted mb-1.5">Dirección de facturación</label>
+            <label class="block text-xs font-medium text-muted mb-1.5">Dirección de facturación <span class="text-red-400">*</span></label>
             <input v-model="form.direccion_facturacion" type="text" class="input-field" placeholder="Calle, número…" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-muted mb-1.5">Código postal</label>
+            <label class="block text-xs font-medium text-muted mb-1.5">Código postal <span class="text-red-400">*</span></label>
             <input v-model="form.codigo_postal" type="text" class="input-field" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-muted mb-1.5">Provincia</label>
+            <label class="block text-xs font-medium text-muted mb-1.5">Provincia <span class="text-red-400">*</span></label>
             <input v-model="form.provincia" type="text" class="input-field" placeholder="Madrid" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-muted mb-1.5">País</label>
+            <label class="block text-xs font-medium text-muted mb-1.5">País <span class="text-red-400">*</span></label>
             <input v-model="form.pais" type="text" class="input-field" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-muted mb-1.5">IBAN</label>
+            <label class="block text-xs font-medium text-muted mb-1.5">IBAN <span class="text-red-400">*</span></label>
             <input v-model="form.iban" type="text" class="input-field" placeholder="ES00 0000 0000 0000 0000 0000" />
-          </div>
-          <div class="col-span-2">
-            <label class="block text-xs font-medium text-muted mb-1.5">Comentarios internos</label>
-            <textarea v-model="form.comentarios" rows="3" class="input-field resize-none" placeholder="Notas visibles solo para el equipo de Stimada…" />
           </div>
         </div>
 

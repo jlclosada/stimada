@@ -51,7 +51,39 @@ const canEdit = computed(() => {
   return auth.user?.role === "admin" || auth.user?.role === "stimada_employee";
 });
 
+const canEditTallaje = computed(() => auth.user?.role === "admin");
+
+const canEditFiscal = computed(() => auth.user?.role === "admin");
+
+const canEditDni = computed(() => auth.user?.role === "admin");
+
 const isClient = computed(() => auth.user?.role === "client");
+
+// Tallaje options from backend
+const tallajeOptions = ref<Record<string, { label: string; options: string[] }>>({});
+
+// Desempeño options from backend
+const desempenoOptions = ref<DesempenoOption[]>([]);
+
+async function loadTallajeOptions() {
+  try {
+    tallajeOptions.value = await $fetch(`${config.public.apiBase}/content-makers/tallaje_options/`, {
+      headers: { Authorization: `Bearer ${auth.accessToken}` },
+    });
+  } catch {
+    // fallback empty
+  }
+}
+
+async function loadDesempenoOptions() {
+  try {
+    desempenoOptions.value = await $fetch(`${config.public.apiBase}/content-makers/desempeno_options/`, {
+      headers: { Authorization: `Bearer ${auth.accessToken}` },
+    });
+  } catch {
+    // fallback empty
+  }
+}
 
 // Favorites
 const isFavorite = ref(false);
@@ -123,6 +155,7 @@ async function load() {
     cm.value = await store.fetchDetail(route.params.id as string);
     createEmail.value = cm.value?.email ?? "";
     checkFavorite();
+    loadTallajeOptions();
   } catch {
     error.value = "No se pudo cargar el perfil.";
   } finally {
@@ -135,12 +168,23 @@ function startEditing() {
   editData.value = { ...cm.value };
   isEditing.value = true;
   saveError.value = "";
+  loadTallajeOptions();
+  loadDesempenoOptions();
 }
 
 function cancelEditing() {
   isEditing.value = false;
   editData.value = {};
   saveError.value = "";
+}
+
+function toggleDesempeno(id: number) {
+  const current = editData.value.desempeno_opciones as number[] || [];
+  if (current.includes(id)) {
+    editData.value.desempeno_opciones = current.filter((x: number) => x !== id);
+  } else {
+    editData.value.desempeno_opciones = [...current, id];
+  }
 }
 
 async function saveChanges() {
@@ -536,14 +580,24 @@ load();
           <div v-if="canEdit" class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-3" >
             <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Valoración</h3>
             <div class="grid grid-cols-2 gap-3">
-              <div v-for="item in [
-                { label: 'Calidad', value: cm.calidad_contenido },
-                { label: 'Apariencia', value: cm.apariencia },
-                { label: 'Desempeño', value: cm.desempeno },
-                { label: 'Contenido', value: cm.categorias_contenido },
-              ]" :key="item.label">
-                <p class="text-xs text-muted">{{ item.label }}</p>
-                <p class="text-xs text-ink mt-0.5">{{ item.value || "—" }}</p>
+              <div>
+                <p class="text-xs text-muted">Calidad del contenido</p>
+                <p class="text-xs text-ink mt-0.5">{{ cm.calidad_contenido != null ? `${cm.calidad_contenido} / 5` : "—" }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-muted">Desempeño</p>
+                <div class="flex flex-wrap gap-1 mt-0.5">
+                  <span
+                    v-for="opt in cm.desempeno_opciones_display"
+                    :key="opt.id"
+                    class="text-xs px-2 py-0.5 rounded-full border border-amber-200 text-amber-700 bg-amber-50"
+                  >{{ opt.nombre }}</span>
+                  <span v-if="!cm.desempeno_opciones_display?.length" class="text-xs text-ink">—</span>
+                </div>
+              </div>
+              <div class="col-span-2">
+                <p class="text-xs text-muted">Comentarios internos</p>
+                <p class="text-sm text-ink/80 mt-0.5 leading-relaxed">{{ cm.comentarios || "—" }}</p>
               </div>
             </div>
             <div class="flex flex-wrap gap-2 pt-1">
@@ -558,43 +612,34 @@ load();
           <div class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-4" >
             <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Tallaje</h3>
             <div class="grid grid-cols-3 gap-3">
-              <div class="flex flex-col items-center p-3 rounded-xl border border-border bg-panel">
+              <div
+                v-for="(cat, campo) in tallajeOptions"
+                :key="campo"
+                class="flex flex-col items-center p-3 rounded-xl border border-border bg-panel"
+              >
                 <svg class="w-5 h-5 text-muted mb-2" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                 </svg>
-                <p class="text-[10px] uppercase tracking-wider text-muted mb-1">Arriba</p>
-                <p class="text-lg font-semibold text-ink">{{ cm.talla_arriba || "—" }}</p>
-              </div>
-              <div class="flex flex-col items-center p-3 rounded-xl border border-border bg-panel">
-                <svg class="w-5 h-5 text-muted mb-2" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
-                </svg>
-                <p class="text-[10px] uppercase tracking-wider text-muted mb-1">Abajo</p>
-                <p class="text-lg font-semibold text-ink">{{ cm.talla_abajo || "—" }}</p>
-              </div>
-              <div class="flex flex-col items-center p-3 rounded-xl border border-border bg-panel">
-                <svg class="w-5 h-5 text-muted mb-2" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-2.25-1.313M21 7.5v2.25m0-2.25l-2.25 1.313M3 7.5l2.25-1.313M3 7.5l2.25 1.313M3 7.5v2.25m9 3l2.25-1.313M12 12.75l-2.25-1.313M12 12.75V15m0 6.75l2.25-1.313M12 21.75V19.5m0 2.25l-2.25-1.313m0-16.875L12 2.25l2.25 1.313M21 14.25v2.25l-2.25 1.313m-13.5 0L3 16.5v-2.25" />
-                </svg>
-                <p class="text-[10px] uppercase tracking-wider text-muted mb-1">Pie</p>
-                <p class="text-lg font-semibold text-ink">{{ cm.talla_pie || "—" }}</p>
+                <p class="text-[10px] uppercase tracking-wider text-muted mb-1">{{ cat.label }}</p>
+                <p class="text-lg font-semibold text-ink">{{ (cm as Record<string, unknown>)[campo] || "—" }}</p>
               </div>
             </div>
-            <div v-if="cm.altura_medidas" class="flex items-center gap-3 pt-1 border-t border-border/50">
-              <svg class="w-4 h-4 text-muted flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-              </svg>
+            <div v-if="cm.altura_medidas" class="flex items-center gap-3 pt-3 border-t border-border/50">
+              <div class="w-8 h-8 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-gold" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75L17.25 9m0 0L21 12.75M17.25 9v12" />
+                </svg>
+              </div>
               <div>
-                <p class="text-[10px] uppercase tracking-wider text-muted">Medidas</p>
-                <p class="text-sm text-ink font-medium mt-0.5">{{ cm.altura_medidas }}</p>
+                <p class="text-[10px] uppercase tracking-wider text-muted font-medium">Altura</p>
+                <p class="text-lg font-bold text-ink">{{ cm.altura_medidas }} <span class="text-sm font-normal text-muted">cm</span></p>
               </div>
             </div>
           </div>
 
           <!-- Contacto -->
           <div v-if="canEdit" class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-3" >
-            <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Contacto y facturación</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Contacto</h3>
             <div class="space-y-2.5">
               <!-- Email -->
               <div v-if="cm.email" class="flex items-center gap-2">
@@ -606,9 +651,16 @@ load();
                 <p class="text-xs text-muted w-16 flex-shrink-0">Teléfono</p>
                 <a :href="`tel:${cm.telefono}`" class="text-xs text-ink hover:text-gold transition-colors">{{ cm.telefono }}</a>
               </div>
-              <!-- DNI / CIF -->
+            </div>
+          </div>
+
+          <!-- Datos fiscales y bancarios -->
+          <div v-if="canEdit" class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-3" >
+            <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Datos fiscales y bancarios</h3>
+            <div class="space-y-2.5">
+              <!-- DNI / NIF -->
               <div v-if="cm.dni_cif" class="flex items-center gap-2">
-                <p class="text-xs text-muted w-16 flex-shrink-0">DNI / CIF</p>
+                <p class="text-xs text-muted w-16 flex-shrink-0">DNI / NIF</p>
                 <p class="text-xs text-ink">{{ cm.dni_cif }}</p>
               </div>
               <!-- IBAN with copy -->
@@ -649,12 +701,6 @@ load();
               </div>
             </div>
           </div>
-        </div>
-
-        <!-- Comentarios -->
-        <div v-if="canEdit && cm.comentarios" class="rounded-2xl border border-border/60 bg-white shadow-card p-5" >
-          <h3 class="text-xs font-semibold uppercase tracking-widest text-muted mb-2">Comentarios internos</h3>
-          <p class="text-sm text-ink/80 leading-relaxed">{{ cm.comentarios }}</p>
         </div>
 
         <!-- Proyectos asociados -->
@@ -790,20 +836,34 @@ load();
             <h3 class="text-xs font-semibold uppercase tracking-widest text-gold">Valoración interna</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-medium text-muted mb-1.5">Calidad del contenido</label>
-                <input v-model="editData.calidad_contenido" type="text" class="input-field" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-muted mb-1.5">Apariencia</label>
-                <input v-model="editData.apariencia" type="text" class="input-field" />
+                <label class="block text-xs font-medium text-muted mb-1.5">Calidad del contenido (0–5)</label>
+                <select v-model="editData.calidad_contenido" class="input-field">
+                  <option :value="null">—</option>
+                  <option v-for="n in [0, 1, 2, 3, 4, 5]" :key="n" :value="n">{{ n }}</option>
+                </select>
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Desempeño</label>
-                <input v-model="editData.desempeno" type="text" class="input-field" />
+                <div class="flex flex-wrap gap-2 p-2 rounded-xl border border-border bg-raised min-h-[38px]">
+                  <button
+                    v-for="opt in desempenoOptions"
+                    :key="opt.id"
+                    type="button"
+                    class="text-xs px-2.5 py-1 rounded-full border transition-colors"
+                    :class="(editData.desempeno_opciones || []).includes(opt.id)
+                      ? 'border-gold bg-gold/15 text-gold font-medium'
+                      : 'border-border text-muted hover:border-gold/40 hover:text-ink'"
+                    @click="toggleDesempeno(opt.id)"
+                  >{{ opt.nombre }}</button>
+                </div>
               </div>
-              <div>
-                <label class="block text-xs font-medium text-muted mb-1.5">Categorías de contenido</label>
-                <input v-model="editData.categorias_contenido" type="text" class="input-field" />
+              <div class="col-span-2">
+                <label class="block text-xs font-medium text-muted mb-1.5">Comentarios internos</label>
+                <textarea
+                  v-model="editData.comentarios"
+                  rows="4"
+                  class="input-field resize-none"
+                />
               </div>
               <div class="flex items-center gap-6 col-span-2">
                 <label class="flex items-center gap-2 cursor-pointer">
@@ -829,22 +889,18 @@ load();
           <!-- Tallaje -->
           <div class="rounded-2xl border border-gold/20 p-5 space-y-4" >
             <h3 class="text-xs font-semibold uppercase tracking-widest text-gold">Tallaje</h3>
+            <p v-if="!canEditTallaje" class="text-xs text-muted italic">Solo administradores y la propia content maker pueden modificar el tallaje.</p>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-muted mb-1.5">Parte de arriba</label>
-                <input v-model="editData.talla_arriba" type="text" class="input-field" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-muted mb-1.5">Parte de abajo</label>
-                <input v-model="editData.talla_abajo" type="text" class="input-field" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-muted mb-1.5">Pie</label>
-                <input v-model="editData.talla_pie" type="text" class="input-field" />
+              <div v-for="(cat, campo) in tallajeOptions" :key="campo">
+                <label class="block text-xs font-medium text-muted mb-1.5">{{ cat.label }}</label>
+                <select v-model="(editData as Record<string, unknown>)[campo]" class="input-field" :disabled="!canEditTallaje" :class="{ 'opacity-50 cursor-not-allowed': !canEditTallaje }">
+                  <option value="">—</option>
+                  <option v-for="opt in cat.options" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
               </div>
               <div class="md:col-span-3">
-                <label class="block text-xs font-medium text-muted mb-1.5">Altura / Medidas</label>
-                <input v-model="editData.altura_medidas" type="text" class="input-field" />
+                <label class="block text-xs font-medium text-muted mb-1.5">Altura (cm)</label>
+                <input v-model="editData.altura_medidas" type="number" min="0" step="1" class="input-field" placeholder="Ej: 169" :disabled="!canEditTallaje" :class="{ 'opacity-50 cursor-not-allowed': !canEditTallaje }" />
               </div>
             </div>
           </div>
@@ -861,42 +917,39 @@ load();
                 <label class="block text-xs font-medium text-muted mb-1.5">Teléfono</label>
                 <input v-model="editData.telefono" type="text" class="input-field" />
               </div>
+            </div>
+
+            <!-- Datos fiscales y bancarios -->
+            <h4 class="text-[11px] font-semibold uppercase tracking-widest text-gold/80 pt-2">Datos fiscales y bancarios</h4>
+            <p v-if="!canEditFiscal" class="text-xs text-muted italic">Solo administradores pueden modificar los datos fiscales.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-medium text-muted mb-1.5">DNI / CIF</label>
-                <input v-model="editData.dni_cif" type="text" class="input-field" />
+                <label class="block text-xs font-medium text-muted mb-1.5">DNI / NIF</label>
+                <input v-model="editData.dni_cif" type="text" class="input-field" :disabled="!canEditDni" :class="{ 'opacity-50 cursor-not-allowed': !canEditDni }" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">IBAN</label>
-                <input v-model="editData.iban" type="text" class="input-field" />
+                <input v-model="editData.iban" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
               </div>
               <div class="md:col-span-2">
                 <label class="block text-xs font-medium text-muted mb-1.5">Dirección de facturación</label>
-                <input v-model="editData.direccion_facturacion" type="text" class="input-field" />
+                <input v-model="editData.direccion_facturacion" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Código Postal</label>
-                <input v-model="editData.codigo_postal" type="text" class="input-field" />
+                <input v-model="editData.codigo_postal" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Provincia</label>
-                <input v-model="editData.provincia" type="text" class="input-field" />
+                <input v-model="editData.provincia" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">País</label>
-                <input v-model="editData.pais" type="text" class="input-field" />
+                <input v-model="editData.pais" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
               </div>
             </div>
           </div>
 
-          <!-- Comentarios -->
-          <div class="rounded-2xl border border-gold/20 p-5 space-y-4" >
-            <h3 class="text-xs font-semibold uppercase tracking-widest text-gold">Comentarios internos</h3>
-            <textarea
-              v-model="editData.comentarios"
-              rows="4"
-              class="input-field resize-none"
-            />
-          </div>
         </div>
       </template>
 
