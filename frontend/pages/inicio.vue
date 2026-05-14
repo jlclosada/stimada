@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from "~/stores/auth";
 import { useNotificationsStore, type NotificationItem } from "~/stores/notifications";
+import { formatProjectId } from "~/utils/formatId";
 
 definePageMeta({
   layout: "app",
@@ -66,6 +67,21 @@ async function fetchClientDashboard() {
   }
 }
 
+// Favorite CMs for client
+const favoriteCMs = ref<any[]>([]);
+
+async function fetchFavoriteCMs() {
+  if (!auth.accessToken || !isClient.value) return;
+  try {
+    favoriteCMs.value = await $fetch<any[]>(
+      `${config.public.apiBase}/clients/me/favorite-cms/`,
+      { headers: { Authorization: `Bearer ${auth.accessToken}` } }
+    );
+  } catch {
+    favoriteCMs.value = [];
+  }
+}
+
 // Notifications for CM
 const notifications = ref<NotificationItem[]>([]);
 const loadingNotifications = ref(false);
@@ -119,6 +135,7 @@ function formatTimeAgo(dateStr: string) {
 onMounted(() => {
   fetchPendingProjects();
   fetchClientDashboard();
+  fetchFavoriteCMs();
   fetchNotifications();
 });
 
@@ -172,6 +189,13 @@ const quickActions = computed<QuickAction[]>(() => {
         icon: "folder",
         color: "from-blue-500/10 to-indigo-500/10 border-blue-200/60",
       },
+      {
+        title: "Content Makers",
+        description: "Explora perfiles de creadoras de contenido",
+        href: "/dashboard/content-makers",
+        icon: "star",
+        color: "from-amber-500/10 to-orange-500/10 border-amber-200/60",
+      },
     ];
   }
   if (isContentMaker.value) {
@@ -182,6 +206,13 @@ const quickActions = computed<QuickAction[]>(() => {
         href: "/proyectos",
         icon: "folder",
         color: "from-orange-500/10 to-amber-500/10 border-orange-200/60",
+      },
+      {
+        title: "Mi perfil",
+        description: "Edita tus datos, redes sociales y tallaje",
+        href: "/dashboard/content-makers/me",
+        icon: "star",
+        color: "from-violet-500/10 to-purple-500/10 border-violet-200/60",
       },
     ];
   }
@@ -394,15 +425,7 @@ function formatEventDate(dateStr: string) {
           <p class="text-[11px] text-muted font-medium">Activos ahora</p>
         </div>
 
-        <div class="rounded-2xl border border-border/60 bg-white p-5 space-y-2">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center">
-              <svg class="w-4 h-4 text-gold" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </div>
-          </div>
-          <p class="text-2xl font-bold text-ink">{{ formatCurrency(dashboard.total_invertido) }} €</p>
-          <p class="text-[11px] text-muted font-medium">Total invertido</p>
-        </div>
+
 
         <div class="rounded-2xl border border-border/60 bg-white p-5 space-y-2">
           <div class="flex items-center gap-2">
@@ -518,7 +541,8 @@ function formatEventDate(dateStr: string) {
           </div>
         </div>
 
-        <!-- Content Makers lista -->
+        <!-- Content Makers (both sections stacked) -->
+        <div class="space-y-4">
         <div class="rounded-2xl border border-border/60 bg-white p-6">
           <h3 class="text-sm font-semibold text-ink mb-4">Tus Content Makers</h3>
           <div v-if="dashboard.content_makers?.length" class="space-y-2.5">
@@ -528,8 +552,16 @@ function formatEventDate(dateStr: string) {
               :to="`/dashboard/content-makers/${cm.id}`"
               class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-panel/40 transition-colors group"
             >
-              <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-gold/10 to-amber-100 flex items-center justify-center text-[10px] font-bold text-gold flex-shrink-0">
-                {{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
+              <div class="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
+                <img
+                  v-if="cm.foto_url"
+                  :src="cm.foto_url"
+                  :alt="cm.nombre"
+                  class="w-full h-full object-cover"
+                />
+                <div v-else class="w-full h-full bg-gradient-to-br from-gold/10 to-amber-100 flex items-center justify-center text-[10px] font-bold text-gold">
+                  {{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
+                </div>
               </div>
               <div class="min-w-0 flex-1">
                 <p class="text-xs font-medium text-ink truncate group-hover:text-gold transition-colors">{{ cm.nombre }}</p>
@@ -546,6 +578,51 @@ function formatEventDate(dateStr: string) {
             <svg class="w-8 h-8 text-muted/20 mx-auto mb-2" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
             <p class="text-[11px] text-muted">Aún no tienes Content Makers asignadas</p>
           </div>
+        </div>
+
+        <!-- Favorite CMs -->
+        <div class="rounded-2xl border border-border/60 bg-white p-6">
+          <h3 class="text-sm font-semibold text-ink mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-pink-500" fill="currentColor" stroke="currentColor" stroke-width="0.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+            </svg>
+            Tus CM favoritas
+          </h3>
+          <div v-if="favoriteCMs.length" class="space-y-2.5">
+            <NuxtLink
+              v-for="cm in favoriteCMs.slice(0, 8)"
+              :key="cm.id"
+              :to="`/dashboard/content-makers/${cm.id}`"
+              class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-panel/40 transition-colors group"
+            >
+              <div class="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
+                <img
+                  v-if="cm.foto_url"
+                  :src="cm.foto_url"
+                  :alt="cm.nombre"
+                  class="w-full h-full object-cover"
+                />
+                <div v-else class="w-full h-full bg-gradient-to-br from-pink-100 to-pink-50 flex items-center justify-center text-[10px] font-bold text-pink-400">
+                  {{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
+                </div>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-xs font-medium text-ink truncate group-hover:text-gold transition-colors">{{ cm.nombre }}</p>
+                <p class="text-[10px] text-muted truncate">
+                  <span v-if="cm.instagram_handle">@{{ cm.instagram_handle }}</span>
+                  <span v-if="cm.tiktok_handle"> · {{ cm.tiktok_handle }}</span>
+                </p>
+              </div>
+              <svg class="w-3.5 h-3.5 text-muted/30 group-hover:text-gold/60 transition-colors flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+            </NuxtLink>
+          </div>
+          <div v-else class="text-center py-8">
+            <svg class="w-8 h-8 text-muted/20 mx-auto mb-2" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+            </svg>
+            <p class="text-[11px] text-muted">Aún no tienes Content Makers favoritas</p>
+          </div>
+        </div>
         </div>
       </div>
 
@@ -586,7 +663,7 @@ function formatEventDate(dateStr: string) {
               </div>
               <div>
                 <p class="text-xs font-medium text-ink">{{ event.nombre }}</p>
-                <p class="text-[10px] text-muted">{{ event.type === 'servicio' ? 'Fecha servicio' : 'Fecha fin' }} · {{ event.project_id }}</p>
+                <p class="text-[10px] text-muted">{{ event.type === 'servicio' ? 'Fecha servicio' : 'Fecha fin' }} · {{ formatProjectId(event.project_id) }}</p>
               </div>
             </div>
             <span class="text-xs font-medium text-ink/70 tabular-nums">{{ formatEventDate(event.date) }}</span>
@@ -615,14 +692,21 @@ function formatEventDate(dateStr: string) {
       </div>
 
       <!-- Unread count badge -->
-      <div v-else-if="unreadNotifications.length > 0" class="space-y-3">
-        <div class="rounded-xl bg-gold/5 border border-gold/20 px-4 py-3 flex items-center gap-3">
-          <div class="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center flex-shrink-0">
-            <span class="text-xs font-bold text-gold">{{ unreadNotifications.length }}</span>
+      <div v-else-if="unreadNotifications.length > 0" class="space-y-4">
+        <div class="rounded-xl bg-emerald-50 border border-emerald-200/60 px-4 py-3 flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+            <span class="text-xs font-bold text-emerald-600">{{ unreadNotifications.length }}</span>
           </div>
-          <p class="text-xs text-ink">
+          <p class="text-xs text-emerald-800">
             Tienes <span class="font-semibold">{{ unreadNotifications.length }}</span> notificación{{ unreadNotifications.length !== 1 ? 'es' : '' }} sin leer
           </p>
+        </div>
+
+        <!-- Separator -->
+        <div class="flex items-center gap-3">
+          <div class="flex-1 h-px bg-border/50" />
+          <span class="text-[10px] text-muted/60 font-medium uppercase tracking-wider">Actividad reciente</span>
+          <div class="flex-1 h-px bg-border/50" />
         </div>
 
         <!-- Recent notifications -->

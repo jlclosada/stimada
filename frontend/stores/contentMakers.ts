@@ -17,6 +17,16 @@ export interface ContentMaker {
   tiene_cuenta: boolean;
   user_email: string | null;
   email: string;
+  foto_url?: string | null;
+}
+
+export interface ContentMakerProject {
+  id: number;
+  project_id: string;
+  nombre: string;
+  brand_name: string | null;
+  status_name: string | null;
+  fecha_servicio: string | null;
 }
 
 export interface ContentMakerDetail extends ContentMaker {
@@ -47,6 +57,9 @@ export interface ContentMakerDetail extends ContentMaker {
   dni_cif: string;
   iban: string;
   user_id: number | null;
+  foto: string | null;
+  foto_url: string | null;
+  proyectos_asociados: ContentMakerProject[];
 }
 
 export const useContentMakersStore = defineStore("contentMakers", {

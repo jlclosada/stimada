@@ -249,7 +249,13 @@ class UserViewSet(viewsets.ViewSet):
             user = CustomUser.objects.get(pk=pk)
         except CustomUser.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        if not (request.user.is_admin or str(request.user.pk) == pk):
+        # Admin can update anyone; employees can update clients/CMs; users can update themselves
+        is_self = str(request.user.pk) == pk
+        is_employee_managing = (
+            request.user.is_employee
+            and user.role in (CustomUser.CLIENT, CustomUser.CONTENT_MAKER)
+        )
+        if not (request.user.is_admin or is_employee_managing or is_self):
             return Response(status=status.HTTP_403_FORBIDDEN)
         serializer = UserUpdateSerializer(user, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)

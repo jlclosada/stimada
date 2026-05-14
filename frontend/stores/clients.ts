@@ -20,6 +20,16 @@ export interface ClientProfile {
   created_at: string;
 }
 
+export interface ClientProject {
+  id: number;
+  project_id: string;
+  nombre: string;
+  brand_name: string | null;
+  status_name: string | null;
+  fecha_servicio: string | null;
+  content_maker_name: string | null;
+}
+
 export interface ClientProfileDetail extends ClientProfile {
   tipo_cliente: number | null;
   nombre_facturacion: string;
@@ -30,6 +40,7 @@ export interface ClientProfileDetail extends ClientProfile {
   user_email: string | null;
   user_name: string | null;
   has_account: boolean;
+  proyectos_asociados: ClientProject[];
 }
 
 export const useClientsStore = defineStore("clients", {

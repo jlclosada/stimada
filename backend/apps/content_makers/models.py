@@ -30,7 +30,7 @@ class ContentMakerType(models.Model):
 
 class ContentMakerProfile(models.Model):
     # Identificador Stimada
-    stimada_id = models.CharField(max_length=30, unique=True)
+    stimada_id = models.CharField(max_length=30, unique=True, blank=True)
 
     # Datos personales
     nombre = models.CharField(max_length=100)
@@ -81,6 +81,9 @@ class ContentMakerProfile(models.Model):
     dni_cif = models.CharField(max_length=20, blank=True)
     iban = models.CharField(max_length=40, blank=True)
 
+    # Foto de perfil
+    foto = models.ImageField(upload_to="content_makers/fotos/", null=True, blank=True)
+
     # Notas
     comentarios = models.TextField(blank=True)
 
@@ -100,6 +103,20 @@ class ContentMakerProfile(models.Model):
         verbose_name = "Content Maker"
         verbose_name_plural = "Content Makers"
         ordering = ["stimada_id"]
+
+    @staticmethod
+    def generate_next_id():
+        """Generate the next sequential numeric CM ID (zero-padded to 5 digits)."""
+        import re
+        ids = ContentMakerProfile.objects.values_list("stimada_id", flat=True)
+        nums = [int(m.group()) for sid in ids if (m := re.search(r"\d+", sid))]
+        next_num = (max(nums) if nums else 0) + 1
+        return f"{next_num:05d}"
+
+    def save(self, *args, **kwargs):
+        if not self.stimada_id:
+            self.stimada_id = self.generate_next_id()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.stimada_id} — {self.nombre} {self.apellidos}"

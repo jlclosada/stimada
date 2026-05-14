@@ -2,6 +2,7 @@
 import { useAuthStore } from "~/stores/auth";
 import type { ClientProfileDetail } from "~/stores/clients";
 import { useClientsStore } from "~/stores/clients";
+import { formatClientId } from "~/utils/formatId";
 
 definePageMeta({ middleware: ["auth", "role"] });
 
@@ -199,7 +200,7 @@ load();
             <div>
               <h1 class="text-2xl font-semibold tracking-tight text-ink">{{ client.nombre_cliente }}</h1>
               <div class="flex items-center gap-2.5 mt-2 flex-wrap">
-                <span class="text-[11px] text-muted/80 font-mono bg-white/[0.03] px-2 py-0.5 rounded-md border border-white/[0.04]">{{ client.cliente_id }}</span>
+                <span class="text-[11px] text-muted/80 font-mono bg-white/[0.03] px-2 py-0.5 rounded-md border border-white/[0.04]">{{ formatClientId(client.cliente_id) }}</span>
                 <span v-if="client.tipo_nombre" class="text-[11px] px-2.5 py-0.5 rounded-full border border-blue-400/15 text-blue-400 bg-blue-400/[0.06] font-medium">
                   {{ client.tipo_nombre }}
                 </span>
@@ -308,7 +309,7 @@ load();
               </div>
               <div class="flex items-start gap-3">
                 <p class="text-[11px] text-muted/70 w-20 flex-shrink-0 pt-0.5 uppercase tracking-wider">ID</p>
-                <p class="text-sm text-ink font-mono tracking-wide">{{ client.cliente_id }}</p>
+                <p class="text-sm text-ink font-mono tracking-wide">{{ formatClientId(client.cliente_id) }}</p>
               </div>
               <div class="flex items-start gap-3">
                 <p class="text-[11px] text-muted/70 w-20 flex-shrink-0 pt-0.5 uppercase tracking-wider">Tipo</p>
@@ -319,8 +320,8 @@ load();
                 <p class="text-sm text-ink">{{ client.ciudad || "\u2014" }}</p>
               </div>
               <div class="flex items-start gap-3">
-                <p class="text-[11px] text-muted/70 w-20 flex-shrink-0 pt-0.5 uppercase tracking-wider">Pa\u00eds</p>
-                <p class="text-sm text-ink">{{ client.pais || "\u2014" }}</p>
+                <p class="text-[11px] text-muted/70 w-20 flex-shrink-0 pt-0.5 uppercase tracking-wider">País</p>
+                <p class="text-sm text-ink">{{ client.pais || "—" }}</p>
               </div>
             </div>
           </div>
@@ -333,28 +334,28 @@ load();
                   <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
                 </svg>
               </div>
-              <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">Facturaci\u00f3n</h3>
+              <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">Facturación</h3>
             </div>
             <div class="space-y-3">
               <div class="flex items-start gap-3">
-                <p class="text-[11px] text-muted/70 w-20 flex-shrink-0 pt-0.5 uppercase tracking-wider">Raz\u00f3n social</p>
-                <p class="text-sm text-ink">{{ client.nombre_facturacion || "\u2014" }}</p>
+                <p class="text-[11px] text-muted/70 w-20 flex-shrink-0 pt-0.5 uppercase tracking-wider">Razón social</p>
+                <p class="text-sm text-ink">{{ client.nombre_facturacion || "—" }}</p>
               </div>
               <div class="flex items-start gap-3">
                 <p class="text-[11px] text-muted/70 w-20 flex-shrink-0 pt-0.5 uppercase tracking-wider">CIF</p>
-                <p class="text-sm text-ink font-mono tracking-wide">{{ client.cif || "\u2014" }}</p>
+                <p class="text-sm text-ink font-mono tracking-wide">{{ client.cif || "—" }}</p>
               </div>
               <div class="flex items-start gap-3">
                 <p class="text-[11px] text-muted/70 w-20 flex-shrink-0 pt-0.5 uppercase tracking-wider">Email</p>
-                <p class="text-sm text-ink">{{ client.email_facturacion || "\u2014" }}</p>
+                <p class="text-sm text-ink">{{ client.email_facturacion || "—" }}</p>
               </div>
               <div class="flex items-start gap-3">
-                <p class="text-[11px] text-muted/70 w-20 flex-shrink-0 pt-0.5 uppercase tracking-wider">Direcci\u00f3n</p>
-                <p class="text-sm text-ink">{{ client.direccion_facturacion || "\u2014" }}</p>
+                <p class="text-[11px] text-muted/70 w-20 flex-shrink-0 pt-0.5 uppercase tracking-wider">Dirección</p>
+                <p class="text-sm text-ink">{{ client.direccion_facturacion || "—" }}</p>
               </div>
               <div class="flex items-start gap-3">
                 <p class="text-[11px] text-muted/70 w-20 flex-shrink-0 pt-0.5 uppercase tracking-wider">C.P.</p>
-                <p class="text-sm text-ink">{{ client.codigo_postal || "\u2014" }}</p>
+                <p class="text-sm text-ink">{{ client.codigo_postal || "—" }}</p>
               </div>
             </div>
           </div>
@@ -467,6 +468,59 @@ load();
             </div>
           </div>
         </div>
+
+        <!-- Proyectos asociados -->
+        <div class="group rounded-3xl border border-border/60 bg-white shadow-card p-6 space-y-4 transition-all duration-300 hover:border-border hover:shadow-soft">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5 text-gold" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+              </svg>
+            </div>
+            <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">Proyectos asociados</h3>
+          </div>
+          <div v-if="client.proyectos_asociados && client.proyectos_asociados.length > 0" class="space-y-2">
+            <NuxtLink
+              v-for="project in client.proyectos_asociados"
+              :key="project.id"
+              :to="`/proyectos/${project.id}`"
+              class="flex items-center justify-between p-3.5 rounded-xl border border-border/50 hover:border-gold/30 hover:bg-gold/[0.02] transition-all duration-200 group/item"
+            >
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-9 h-9 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-gold" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-ink truncate group-hover/item:text-gold transition-colors duration-200">{{ project.nombre }}</p>
+                  <div class="flex items-center gap-2 mt-0.5">
+                    <span class="text-[11px] text-muted/70 font-mono">{{ project.project_id }}</span>
+                    <span v-if="project.brand_name" class="text-[11px] text-muted/70">· {{ project.brand_name }}</span>
+                    <span v-if="project.content_maker_name" class="text-[11px] text-muted/70">· {{ project.content_maker_name }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 flex-shrink-0 ml-3">
+                <span
+                  v-if="project.status_name"
+                  class="text-[11px] font-medium px-2 py-0.5 rounded-full border border-border bg-panel text-muted"
+                >
+                  {{ project.status_name }}
+                </span>
+                <span v-if="project.fecha_servicio" class="text-[11px] text-muted/60 hidden sm:inline">
+                  {{ new Date(project.fecha_servicio).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) }}
+                </span>
+                <svg class="w-4 h-4 text-muted/40 group-hover/item:text-gold transition-colors duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+              </div>
+            </NuxtLink>
+          </div>
+          <div v-else class="py-4 text-center">
+            <p class="text-xs text-muted/60">Este cliente no tiene proyectos asociados.</p>
+          </div>
+        </div>
       </template>
 
       <!-- ============ EDIT MODE ============ -->
@@ -489,7 +543,7 @@ load();
               </div>
               <div>
                 <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">ID Cliente</label>
-                <input v-model="editData.cliente_id" type="text" class="input-field" />
+                <input :value="formatClientId(editData.cliente_id)" type="text" disabled class="input-field opacity-60 cursor-not-allowed" />
               </div>
               <div>
                 <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Tipo de cliente</label>
@@ -503,7 +557,7 @@ load();
                 <input v-model="editData.ciudad" type="text" class="input-field" />
               </div>
               <div>
-                <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Pa\u00eds</label>
+                <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">País</label>
                 <input v-model="editData.pais" type="text" class="input-field" />
               </div>
             </div>
@@ -517,11 +571,11 @@ load();
                   <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
                 </svg>
               </div>
-              <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-gold">Facturaci\u00f3n</h3>
+              <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-gold">Facturación</h3>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Nombre / Raz\u00f3n social</label>
+                <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Nombre / Razón social</label>
                 <input v-model="editData.nombre_facturacion" type="text" class="input-field" />
               </div>
               <div>
@@ -529,15 +583,15 @@ load();
                 <input v-model="editData.cif" type="text" class="input-field" />
               </div>
               <div>
-                <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Email de facturaci\u00f3n</label>
+                <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Email de facturación</label>
                 <input v-model="editData.email_facturacion" type="email" class="input-field" />
               </div>
               <div>
-                <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">C\u00f3digo Postal</label>
+                <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Código Postal</label>
                 <input v-model="editData.codigo_postal" type="text" class="input-field" />
               </div>
               <div class="md:col-span-2">
-                <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Direcci\u00f3n de facturaci\u00f3n</label>
+                <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Dirección de facturación</label>
                 <input v-model="editData.direccion_facturacion" type="text" class="input-field" />
               </div>
             </div>
@@ -594,13 +648,13 @@ load();
                   </div>
                   <div class="h-px bg-border/30" />
                   <div class="flex items-center justify-between">
-                    <span class="text-[11px] text-muted uppercase tracking-wider">Contrase\u00f1a</span>
+                    <span class="text-[11px] text-muted uppercase tracking-wider">Contraseña</span>
                     <span class="text-sm text-ink font-mono bg-white/[0.04] px-2 py-0.5 rounded">{{ accountSuccess.password }}</span>
                   </div>
                 </div>
 
                 <p class="text-xs text-muted/60 leading-relaxed">
-                  Comunica estas credenciales al cliente de forma segura. Se recomienda cambiar la contrase\u00f1a tras el primer acceso.
+                  Comunica estas credenciales al cliente de forma segura. Se recomienda cambiar la contraseña tras el primer acceso.
                 </p>
 
                 <button
@@ -621,7 +675,7 @@ load();
                   </div>
                   <div>
                     <h2 class="text-lg font-semibold text-ink">Crear cuenta de acceso</h2>
-                    <p class="text-xs text-muted mt-0.5">El cliente podr\u00e1 iniciar sesi\u00f3n con estas credenciales</p>
+                    <p class="text-xs text-muted mt-0.5">El cliente podrá iniciar sesión con estas credenciales</p>
                   </div>
                 </div>
 
@@ -644,17 +698,17 @@ load();
                       :placeholder="client?.nombre_cliente"
                       class="input-field"
                     />
-                    <p class="text-[10px] text-muted/40 mt-1.5">Si se deja vac\u00edo se usar\u00e1 el nombre del cliente</p>
+                    <p class="text-[10px] text-muted/40 mt-1.5">Si se deja vacío se usará el nombre del cliente</p>
                   </div>
                   <div>
-                    <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Contrase\u00f1a</label>
+                    <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Contraseña</label>
                     <input
                       v-model="accountForm.password"
                       type="text"
-                      placeholder="Se generar\u00e1 autom\u00e1ticamente"
+                      placeholder="Se generará automáticamente"
                       class="input-field"
                     />
-                    <p class="text-[10px] text-muted/40 mt-1.5">Si se deja vac\u00edo se generar\u00e1 una contrase\u00f1a segura</p>
+                    <p class="text-[10px] text-muted/40 mt-1.5">Si se deja vacío se generará una contraseña segura</p>
                   </div>
 
                   <Transition name="modal">
@@ -714,12 +768,12 @@ load();
                 </div>
                 <div>
                   <h2 class="text-lg font-semibold text-ink">Eliminar cliente</h2>
-                  <p class="text-xs text-muted mt-0.5">Esta acci\u00f3n no se puede deshacer</p>
+                  <p class="text-xs text-muted mt-0.5">Esta acción no se puede deshacer</p>
                 </div>
               </div>
               <p class="text-sm text-muted mb-6 leading-relaxed">
-                \u00bfEst\u00e1s seguro de que quieres eliminar a <span class="text-ink font-medium">{{ client?.nombre_cliente }}</span>?
-                Se eliminar\u00e1 toda la informaci\u00f3n asociada.
+                ¿Estás seguro de que quieres eliminar a <span class="text-ink font-medium">{{ client?.nombre_cliente }}</span>?
+                Se eliminará toda la información asociada.
               </p>
               <div class="flex gap-3">
                 <button

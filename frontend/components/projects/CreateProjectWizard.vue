@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from "~/stores/auth";
 import { useProjectsStore } from "~/stores/projects";
+import { formatClientId } from "~/utils/formatId";
 
 const emit = defineEmits<{ close: []; created: [] }>();
 
@@ -103,7 +104,7 @@ function removeRecommendedCM(id: number) {
 }
 
 // Auto-calculate fecha_fin
-watch(() => form.fecha_venta, (val) => {
+watch(() => form.fecha_servicio, (val) => {
   if (val && !form.fecha_fin) {
     const d = new Date(val);
     d.setDate(d.getDate() + 14);
@@ -158,8 +159,8 @@ function nextStep() {
     error.value = "Debes seleccionar un cliente.";
     return;
   }
-  if (currentStep.value === 2 && (!form.nombre || !form.project_id)) {
-    error.value = "Nombre e ID del proyecto son obligatorios.";
+  if (currentStep.value === 2 && !form.nombre) {
+    error.value = "El nombre del proyecto es obligatorio.";
     return;
   }
   if (currentStep.value === 3) {
@@ -187,7 +188,6 @@ async function submit() {
 
   try {
     const payload: Record<string, unknown> = {
-      project_id: form.project_id,
       nombre: form.nombre,
       descripcion: form.descripcion,
       client: selectedClient.value,
@@ -229,7 +229,6 @@ const hasFormData = computed(() => {
   return !!(
     selectedClient.value ||
     form.nombre ||
-    form.project_id ||
     form.descripcion ||
     selectedCMs.value.length ||
     recommendedCMs.value.length
@@ -250,7 +249,6 @@ async function saveDraftAndClose() {
   savingDraft.value = true;
   try {
     const payload: Record<string, unknown> = {
-      project_id: form.project_id || "",
       nombre: form.nombre || "",
       descripcion: form.descripcion,
       client: selectedClient.value,
@@ -354,7 +352,7 @@ function discardAndClose() {
                   @click="selectedClient = c.id; clientSearch = c.nombre_cliente"
                 >
                   <span class="font-medium text-ink">{{ c.nombre_cliente }}</span>
-                  <span class="text-muted ml-2 text-xs">{{ c.cliente_id }}</span>
+                  <span class="text-muted ml-2 text-xs">{{ formatClientId(c.cliente_id) }}</span>
                   <span v-if="c.es_agencia" class="ml-2 text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium">Agencia</span>
                 </button>
               </div>
@@ -375,11 +373,12 @@ function discardAndClose() {
 
           <!-- Step 2: Project details -->
           <div v-if="currentStep === 2" class="space-y-4 animate-fade-up">
+            <div>
+              <label class="block text-xs font-medium text-muted mb-1.5">Nombre del proyecto *</label>
+              <input v-model="form.nombre" type="text" placeholder="Campaña verano 2026…" class="input-field" />
+            </div>
+
             <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-muted mb-1.5">ID del proyecto *</label>
-                <input v-model="form.project_id" type="text" placeholder="STM-001" class="input-field" />
-              </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Tipo de servicio</label>
                 <select v-model="form.service_type" class="select-field">
@@ -387,11 +386,6 @@ function discardAndClose() {
                   <option v-for="st in serviceTypes" :key="st.id" :value="st.id">{{ st.nombre }}</option>
                 </select>
               </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-muted mb-1.5">Nombre del proyecto *</label>
-              <input v-model="form.nombre" type="text" placeholder="Campaña verano 2026…" class="input-field" />
             </div>
 
             <div>
@@ -530,7 +524,7 @@ function discardAndClose() {
               </div>
               <div class="px-4 py-3 flex justify-between">
                 <span class="text-xs text-muted">ID Proyecto</span>
-                <span class="text-xs text-ink font-medium">{{ form.project_id }}</span>
+                <span class="text-xs text-ink font-medium text-muted/60 italic">Se asignará automáticamente</span>
               </div>
               <div class="px-4 py-3 flex justify-between">
                 <span class="text-xs text-muted">Nombre</span>

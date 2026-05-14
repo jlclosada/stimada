@@ -42,7 +42,7 @@ class Project(models.Model):
     ]
 
     # Identificación
-    project_id = models.CharField(max_length=50, unique=True)
+    project_id = models.CharField(max_length=50, unique=True, blank=True)
     nombre = models.CharField(max_length=300)
     descripcion = models.TextField(blank=True)
     is_draft = models.BooleanField(default=False)
@@ -124,9 +124,20 @@ class Project(models.Model):
     def __str__(self):
         return f"{self.project_id} — {self.nombre}"
 
+    @staticmethod
+    def generate_next_id():
+        """Generate the next sequential numeric project ID (zero-padded to 4 digits)."""
+        import re
+        ids = Project.objects.values_list("project_id", flat=True)
+        nums = [int(m.group()) for pid in ids if (m := re.search(r"\d+", pid))]
+        next_num = (max(nums) if nums else 0) + 1
+        return f"{next_num:04d}"
+
     def save(self, *args, **kwargs):
-        if not self.fecha_fin and self.fecha_venta:
-            self.fecha_fin = self.fecha_venta + timedelta(days=14)
+        if not self.project_id:
+            self.project_id = self.generate_next_id()
+        if not self.fecha_fin and self.fecha_servicio:
+            self.fecha_fin = self.fecha_servicio + timedelta(days=14)
         super().save(*args, **kwargs)
 
 

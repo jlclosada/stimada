@@ -32,6 +32,7 @@ const navLinks = computed<NavLink[]>(() => {
     return [
       { label: "Inicio", href: "/inicio" },
       { label: "Mis proyectos", href: "/proyectos" },
+      { label: "Content Makers", href: "/dashboard/content-makers" },
       { label: "Notificaciones", href: "/notificaciones" },
     ];
   }
@@ -39,6 +40,7 @@ const navLinks = computed<NavLink[]>(() => {
     return [
       { label: "Inicio", href: "/inicio" },
       { label: "Mis campañas", href: "/proyectos" },
+      { label: "Mi perfil", href: "/dashboard/content-makers/me" },
       { label: "Notificaciones", href: "/notificaciones" },
     ];
   }

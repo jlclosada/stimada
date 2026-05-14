@@ -3,6 +3,17 @@ from rest_framework import serializers
 from apps.clients.models import ClientProfile, ClientType
 
 
+class ClientProjectSerializer(serializers.Serializer):
+    """Lightweight project info for the client detail view."""
+    id = serializers.IntegerField()
+    project_id = serializers.CharField()
+    nombre = serializers.CharField()
+    brand_name = serializers.CharField(allow_null=True)
+    status_name = serializers.CharField(allow_null=True)
+    fecha_servicio = serializers.DateField(allow_null=True)
+    content_maker_name = serializers.CharField(allow_null=True)
+
+
 class ClientTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClientType
@@ -35,6 +46,7 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
     user_email = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField()
     has_account = serializers.SerializerMethodField()
+    proyectos_asociados = serializers.SerializerMethodField()
 
     class Meta:
         model = ClientProfile
@@ -61,11 +73,31 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
     def get_has_account(self, obj):
         return obj.user_id is not None
 
+    def get_proyectos_asociados(self, obj):
+        from apps.projects.models import Project
+
+        projects = Project.objects.filter(client=obj).select_related("brand", "status", "content_maker").order_by("-created_at")
+        return ClientProjectSerializer([
+            {
+                "id": p.id,
+                "project_id": p.project_id,
+                "nombre": p.nombre,
+                "brand_name": p.brand.nombre if p.brand else None,
+                "status_name": p.status.nombre if p.status else None,
+                "fecha_servicio": p.fecha_servicio,
+                "content_maker_name": f"{p.content_maker.nombre} {p.content_maker.apellidos}".strip() if p.content_maker else None,
+            }
+            for p in projects
+        ], many=True).data
+
 
 class ClientProfileCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClientProfile
         exclude = ["created_by", "created_at", "updated_at"]
+        extra_kwargs = {
+            "cliente_id": {"required": False, "allow_blank": True},
+        }
 
     def create(self, validated_data):
         validated_data["created_by"] = self.context["request"].user

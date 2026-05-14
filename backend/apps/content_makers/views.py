@@ -5,7 +5,9 @@ from django.core.mail import send_mail
 from django.conf import settings
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.accounts.models import CustomUser
 from apps.accounts.permissions import IsAdminOrEmployee
@@ -14,6 +16,7 @@ from apps.content_makers.serializers import (
     ContentMakerCreateSerializer,
     ContentMakerDetailSerializer,
     ContentMakerListSerializer,
+    ContentMakerPublicSerializer,
 )
 
 
@@ -30,19 +33,83 @@ def _generate_password(length: int = 14) -> str:
             return pwd
 
 
+# Fields a Content Maker can NOT edit on their own profile
+CM_NON_EDITABLE_FIELDS = [
+    "nombre", "apellidos", "stimada_id",
+    "fee_instagram", "fee_tiktok",
+    "status", "tipo_cm",
+    "categorias_contenido",
+    # Valoración interna (solo admin/empleados)
+    "desempeno", "calidad_contenido", "apariencia",
+    # Notas internas
+    "comentarios",
+    "user", "created_at", "updated_at",
+]
+
+
+class ContentMakerMeView(APIView):
+    """Endpoint for content maker users to view and edit their own profile."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_content_maker:
+            return Response(
+                {"detail": "Solo content makers pueden acceder a este recurso."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not hasattr(request.user, "content_maker_profile") or not request.user.content_maker_profile:
+            return Response(
+                {"detail": "No tienes un perfil de content maker asociado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        profile = request.user.content_maker_profile
+        return Response(ContentMakerDetailSerializer(profile, context={"request": request}).data)
+
+    def patch(self, request):
+        if not request.user.is_content_maker:
+            return Response(
+                {"detail": "Solo content makers pueden acceder a este recurso."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not hasattr(request.user, "content_maker_profile") or not request.user.content_maker_profile:
+            return Response(
+                {"detail": "No tienes un perfil de content maker asociado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        profile = request.user.content_maker_profile
+
+        # Handle file uploads (foto)
+        update_data = {}
+        for k, v in request.data.items():
+            if k not in CM_NON_EDITABLE_FIELDS:
+                update_data[k] = v
+        # Include uploaded files
+        for k, v in request.FILES.items():
+            if k not in CM_NON_EDITABLE_FIELDS:
+                update_data[k] = v
+
+        serializer = ContentMakerDetailSerializer(profile, data=update_data, partial=True, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(ContentMakerDetailSerializer(profile, context={"request": request}).data)
+
+
 class ContentMakerViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrEmployee]
     queryset = ContentMakerProfile.objects.select_related("user").order_by("stimada_id")
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
     def get_permissions(self):
-        # Allow clients read-only access to retrieve and list
-        if self.action in ("retrieve", "list"):
+        # Allow clients read-only access to retrieve, list, and filters
+        if self.action in ("retrieve", "list", "filters"):
             from rest_framework.permissions import IsAuthenticated
             return [IsAuthenticated()]
         return super().get_permissions()
 
     def get_serializer_class(self):
+        # Clients see a limited public view
+        if self.request.user.is_client:
+            return ContentMakerPublicSerializer
         if self.action in ("create", "retrieve", "update", "partial_update"):
             return ContentMakerDetailSerializer
         return ContentMakerListSerializer
@@ -58,11 +125,8 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def next_id(self, request):
-        import re
-        ids = ContentMakerProfile.objects.values_list("stimada_id", flat=True)
-        nums = [int(m.group()) for sid in ids if (m := re.search(r"\d+", sid))]
-        next_num = (max(nums) if nums else 0) + 1
-        return Response({"next_id": f"[CM] - {next_num:05d}"})
+        next_num = ContentMakerProfile.generate_next_id()
+        return Response({"next_id": next_num})
 
     @action(detail=False, methods=["get"])
     def filters(self, request):
@@ -76,7 +140,7 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
 
         return Response({
             "statuses": list(ContentMakerStatus.objects.values_list("nombre", flat=True)),
-            "tipos": list(ContentMakerType.objects.values_list("nombre", flat=True)),
+            "tipos": distinct_values("tipo_cm"),
             "sexos": distinct_values("sexo"),
             "calidad_contenido": distinct_values("calidad_contenido"),
             "apariencia": distinct_values("apariencia"),

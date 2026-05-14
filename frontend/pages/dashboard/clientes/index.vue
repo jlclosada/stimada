@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useClientsStore } from "~/stores/clients";
+import { formatClientId } from "~/utils/formatId";
 
 definePageMeta({ middleware: ["auth", "role"] });
 
@@ -127,7 +128,7 @@ const visiblePages = computed(() => {
               <td class="px-5 py-3.5">
                 <p class="text-sm text-ink font-medium group-hover:text-gold transition-colors duration-150">{{ client.nombre_cliente }}</p>
               </td>
-              <td class="px-5 py-3.5 text-xs text-muted">{{ client.cliente_id }}</td>
+              <td class="px-5 py-3.5 text-xs text-muted">{{ formatClientId(client.cliente_id) }}</td>
               <td class="px-5 py-3.5">
                 <span v-if="client.tipo_nombre" class="text-xs px-2.5 py-1 rounded-lg border border-blue-200 text-blue-600 bg-blue-50 font-medium">
                   {{ client.tipo_nombre }}

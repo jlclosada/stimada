@@ -319,15 +319,18 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 | models.Q(instagram_handle__icontains=q)
             )
         qs = qs[:20]
-        results = [
-            {
+        results = []
+        for cm in qs:
+            foto_url = None
+            if cm.foto:
+                foto_url = request.build_absolute_uri(cm.foto.url)
+            results.append({
                 "id": cm.id,
                 "nombre": f"{cm.nombre} {cm.apellidos}".strip(),
                 "instagram_handle": cm.instagram_handle,
                 "seguidores_instagram": cm.seguidores_instagram,
-            }
-            for cm in qs
-        ]
+                "foto_url": foto_url,
+            })
         return Response(results)
 
     @action(detail=False, methods=["get"])
@@ -335,6 +338,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
         statuses = list(ProjectStatus.objects.values("id", "nombre"))
         service_types = list(ServiceType.objects.values("id", "nombre"))
         return Response({"statuses": statuses, "service_types": service_types})
+
+    @action(detail=False, methods=["get"])
+    def next_id(self, request):
+        next_num = Project.generate_next_id()
+        return Response({"next_id": next_num})
 
     @action(detail=False, methods=["get"], url_path="client_dashboard")
     def client_dashboard(self, request):
@@ -372,10 +380,14 @@ class ProjectViewSet(viewsets.ModelViewSet):
         for entry in cm_entries:
             cm = entry.content_maker
             if cm.id not in unique_cms:
+                foto_url = None
+                if cm.foto:
+                    foto_url = request.build_absolute_uri(cm.foto.url)
                 unique_cms[cm.id] = {
                     "id": cm.id,
                     "nombre": f"{cm.nombre} {cm.apellidos}".strip(),
                     "instagram_handle": cm.instagram_handle,
+                    "foto_url": foto_url,
                     "projects_count": 0,
                 }
             unique_cms[cm.id]["projects_count"] += 1

@@ -1,12 +1,13 @@
 from django.utils.crypto import get_random_string
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
 from apps.accounts.models import CustomUser
-from apps.accounts.permissions import IsAdminOrEmployee
+from apps.accounts.permissions import IsAdminOrEmployee, IsClient
 from apps.clients.models import Brand, ClientProfile, ClientType
 from apps.clients.serializers import (
     ClientProfileCreateSerializer,
@@ -22,6 +23,30 @@ class ClientTypeListView(APIView):
     def get(self, request):
         types = ClientType.objects.filter(activo=True)
         return Response(ClientTypeSerializer(types, many=True).data)
+
+
+class ClientMeView(APIView):
+    """Endpoint for client users to view their own profile and brands."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_client:
+            return Response(
+                {"detail": "Solo usuarios de tipo cliente pueden acceder a este recurso."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not hasattr(request.user, "client_profile") or not request.user.client_profile:
+            return Response(
+                {"detail": "No tienes un perfil de cliente asociado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        profile = request.user.client_profile
+        data = ClientProfileDetailSerializer(profile, context={"request": request}).data
+        data["brands"] = [
+            {"id": b.id, "nombre": b.nombre, "descripcion": b.descripcion}
+            for b in profile.brands.filter(activo=True)
+        ]
+        return Response(data)
 
 
 class ClientProfileViewSet(ModelViewSet):
@@ -56,6 +81,11 @@ class ClientProfileViewSet(ModelViewSet):
             ClientProfileDetailSerializer(instance, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+    @action(detail=False, methods=["get"])
+    def next_id(self, request):
+        next_num = ClientProfile.generate_next_id()
+        return Response({"next_id": next_num})
 
     @action(detail=True, methods=["post"], url_path="create-account")
     def create_account(self, request, pk=None):
@@ -114,3 +144,89 @@ class ClientProfileViewSet(ModelViewSet):
         brand_list = Brand.objects.filter(client=client, activo=True)
         data = [{"id": b.id, "nombre": b.nombre} for b in brand_list]
         return Response(data)
+
+
+class ClientFavoriteCMsView(APIView):
+    """Manage favorite content makers for the authenticated client."""
+    permission_classes = [IsAuthenticated]
+
+    def _get_client_profile(self, request):
+        if not request.user.is_client:
+            return None, Response(
+                {"detail": "Solo clientes pueden acceder a este recurso."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not hasattr(request.user, "client_profile") or not request.user.client_profile:
+            return None, Response(
+                {"detail": "No tienes un perfil de cliente asociado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return request.user.client_profile, None
+
+    def get(self, request):
+        """List favorite content makers."""
+        profile, err = self._get_client_profile(request)
+        if err:
+            return err
+        favorites = profile.favorite_cms.all()
+        data = []
+        for cm in favorites:
+            foto_url = None
+            if cm.foto:
+                foto_url = request.build_absolute_uri(cm.foto.url)
+            data.append({
+                "id": cm.id,
+                "nombre": f"{cm.nombre} {cm.apellidos}".strip(),
+                "instagram_handle": cm.instagram_handle,
+                "seguidores_instagram": cm.seguidores_instagram,
+                "tiktok_handle": cm.tiktok_handle,
+                "seguidores_tiktok": cm.seguidores_tiktok,
+                "foto_url": foto_url,
+            })
+        return Response(data)
+
+    def post(self, request):
+        """Add a content maker to favorites."""
+        from apps.content_makers.models import ContentMakerProfile
+
+        profile, err = self._get_client_profile(request)
+        if err:
+            return err
+        cm_id = request.data.get("content_maker_id")
+        if not cm_id:
+            return Response(
+                {"detail": "content_maker_id es obligatorio."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            cm = ContentMakerProfile.objects.get(id=cm_id)
+        except ContentMakerProfile.DoesNotExist:
+            return Response(
+                {"detail": "Content Maker no encontrada."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        profile.favorite_cms.add(cm)
+        return Response({"status": "added"})
+
+    def delete(self, request):
+        """Remove a content maker from favorites."""
+        from apps.content_makers.models import ContentMakerProfile
+
+        profile, err = self._get_client_profile(request)
+        if err:
+            return err
+        cm_id = request.data.get("content_maker_id")
+        if not cm_id:
+            return Response(
+                {"detail": "content_maker_id es obligatorio."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            cm = ContentMakerProfile.objects.get(id=cm_id)
+        except ContentMakerProfile.DoesNotExist:
+            return Response(
+                {"detail": "Content Maker no encontrada."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        profile.favorite_cms.remove(cm)
+        return Response({"status": "removed"})

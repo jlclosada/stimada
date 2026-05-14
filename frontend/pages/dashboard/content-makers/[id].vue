@@ -2,11 +2,13 @@
 import { useAuthStore } from "~/stores/auth";
 import type { ContentMakerDetail } from "~/stores/contentMakers";
 import { useContentMakersStore } from "~/stores/contentMakers";
+import { formatContentMakerId } from "~/utils/formatId";
 
 definePageMeta({ middleware: ["auth", "role"] });
 
 const route = useRoute();
 const router = useRouter();
+const config = useRuntimeConfig();
 const store = useContentMakersStore();
 const auth = useAuthStore();
 
@@ -49,11 +51,78 @@ const canEdit = computed(() => {
   return auth.user?.role === "admin" || auth.user?.role === "stimada_employee";
 });
 
+const isClient = computed(() => auth.user?.role === "client");
+
+// Favorites
+const isFavorite = ref(false);
+const favoriteLoading = ref(false);
+
+// Project selection flow (when coming from a project's CM browser)
+const fromProject = computed(() => route.query.fromProject as string | undefined);
+const selectLoading = ref(false);
+const selectDone = ref(false);
+
+async function selectForProject() {
+  if (!fromProject.value) return;
+  selectLoading.value = true;
+  try {
+    await $fetch(`${config.public.apiBase}/projects/${fromProject.value}/select_cm/`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${auth.accessToken}` },
+      body: { content_maker_id: Number(route.params.id) },
+    });
+    selectDone.value = true;
+  } catch {
+    // silent
+  } finally {
+    selectLoading.value = false;
+  }
+}
+
+async function checkFavorite() {
+  if (!isClient.value) return;
+  try {
+    const favorites = await $fetch<{ id: number }[]>(
+      `${config.public.apiBase}/clients/me/favorite-cms/`,
+      { headers: { Authorization: `Bearer ${auth.accessToken}` } }
+    );
+    isFavorite.value = favorites.some((f) => f.id === Number(route.params.id));
+  } catch {
+    // ignore
+  }
+}
+
+async function toggleFavorite() {
+  favoriteLoading.value = true;
+  try {
+    if (isFavorite.value) {
+      await $fetch(`${config.public.apiBase}/clients/me/favorite-cms/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+        body: { content_maker_id: Number(route.params.id) },
+      });
+      isFavorite.value = false;
+    } else {
+      await $fetch(`${config.public.apiBase}/clients/me/favorite-cms/`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+        body: { content_maker_id: Number(route.params.id) },
+      });
+      isFavorite.value = true;
+    }
+  } catch {
+    // ignore
+  } finally {
+    favoriteLoading.value = false;
+  }
+}
+
 async function load() {
   isLoading.value = true;
   try {
     cm.value = await store.fetchDetail(route.params.id as string);
     createEmail.value = cm.value?.email ?? "";
+    checkFavorite();
   } catch {
     error.value = "No se pudo cargar el perfil.";
   } finally {
@@ -185,7 +254,13 @@ load();
     <div v-else-if="cm" class="animate-fade-up">
       <!-- Back -->
       <div class="max-w-5xl">
-        <NuxtLink v-if="canEdit" to="/dashboard/content-makers" class="inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors mb-4">
+        <NuxtLink v-if="fromProject" :to="`/proyectos/${fromProject}`" class="inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors mb-4">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+          </svg>
+          Volver al proyecto
+        </NuxtLink>
+        <NuxtLink v-else-if="canEdit" to="/dashboard/content-makers" class="inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors mb-4">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
@@ -201,14 +276,22 @@ load();
       <!-- Header -->
       <div class="rounded-2xl border border-border/60 bg-white shadow-card p-6 flex items-start justify-between gap-4" >
           <div class="flex items-center gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-orange-400/10 border border-orange-400/20 flex items-center justify-center text-orange-400 text-lg font-semibold flex-shrink-0">
-              {{ cm.nombre.charAt(0) }}{{ cm.apellidos.charAt(0) }}
+            <div class="w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0">
+              <img
+                v-if="cm.foto_url"
+                :src="cm.foto_url"
+                :alt="cm.nombre_completo"
+                class="w-full h-full object-cover"
+              />
+              <div v-else class="w-full h-full bg-orange-400/10 border border-orange-400/20 flex items-center justify-center text-orange-400 text-lg font-semibold">
+                {{ cm.nombre.charAt(0) }}{{ cm.apellidos.charAt(0) }}
+              </div>
             </div>
             <div>
               <div class="flex items-center gap-3 flex-wrap">
                 <h1 class="text-2xl font-semibold tracking-tight text-ink">{{ cm.nombre_completo }}</h1>
                 <!-- Fee badge -->
-                <div v-if="cm.fee_instagram || cm.fee_tiktok" class="flex items-center gap-1.5">
+                <div v-if="canEdit && (cm.fee_instagram || cm.fee_tiktok)" class="flex items-center gap-1.5">
                   <span v-if="cm.fee_instagram" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gold/10 border border-gold/20">
                     <svg class="w-3.5 h-3.5 text-gold" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" /><circle cx="12" cy="12" r="5" /><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none" /></svg>
                     <span class="text-xs font-semibold text-gold">{{ cm.fee_instagram }}€</span>
@@ -220,8 +303,8 @@ load();
                 </div>
               </div>
               <div class="flex items-center gap-2 mt-1 flex-wrap">
-                <span class="text-xs text-muted">{{ cm.stimada_id }}</span>
-                <span class="text-border">·</span>
+                <span v-if="canEdit" class="text-xs text-muted">{{ formatContentMakerId(cm.stimada_id) }}</span>
+                <span v-if="canEdit" class="text-border">·</span>
                 <span class="text-xs text-muted">{{ cm.tipo_cm }}</span>
                 <span
                   v-if="cm.status"
@@ -236,6 +319,42 @@ load();
 
         <!-- Action buttons -->
         <div class="flex-shrink-0 flex items-center gap-2">
+          <!-- Select for project button (when coming from project CM browser) -->
+          <button
+            v-if="isClient && fromProject && !selectDone"
+            :disabled="selectLoading"
+            class="px-5 h-9 rounded-xl text-xs font-medium bg-gold text-white hover:bg-gold/90 shadow-gold-sm transition-all disabled:opacity-50 flex items-center gap-1.5"
+            @click="selectForProject"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Seleccionar para proyecto
+          </button>
+          <span
+            v-if="isClient && fromProject && selectDone"
+            class="px-4 h-9 rounded-xl text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+            Invitación enviada
+          </span>
+          <!-- Favorite button for clients -->
+          <button
+            v-if="isClient"
+            :disabled="favoriteLoading"
+            class="px-4 h-9 rounded-xl border text-xs font-medium transition-all flex items-center gap-1.5 disabled:opacity-50"
+            :class="isFavorite
+              ? 'border-pink-200 text-pink-600 bg-pink-50 hover:bg-pink-100'
+              : 'border-border text-muted hover:text-pink-600 hover:border-pink-200 hover:bg-pink-50'"
+            @click="toggleFavorite"
+          >
+            <svg class="w-3.5 h-3.5" :fill="isFavorite ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+            </svg>
+            {{ isFavorite ? 'Favorita' : 'Guardar como favorita' }}
+          </button>
           <!-- Edit/Delete buttons for admin/employee -->
           <template v-if="canEdit && !isEditing">
             <button
@@ -291,7 +410,7 @@ load();
       </div>
 
       <!-- Account status -->
-      <div class="rounded-2xl border border-border/60 bg-white shadow-card p-5 flex items-center justify-between" >
+      <div v-if="canEdit" class="rounded-2xl border border-border/60 bg-white shadow-card p-5 flex items-center justify-between" >
         <div v-if="cm.tiene_cuenta" class="flex items-center gap-2">
           <svg class="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
@@ -414,7 +533,7 @@ load();
           </div>
 
           <!-- Valoración interna -->
-          <div class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-3" >
+          <div v-if="canEdit" class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-3" >
             <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Valoración</h3>
             <div class="grid grid-cols-2 gap-3">
               <div v-for="item in [
@@ -474,7 +593,7 @@ load();
           </div>
 
           <!-- Contacto -->
-          <div class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-3" >
+          <div v-if="canEdit" class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-3" >
             <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Contacto y facturación</h3>
             <div class="space-y-2.5">
               <!-- Email -->
@@ -533,9 +652,54 @@ load();
         </div>
 
         <!-- Comentarios -->
-        <div v-if="cm.comentarios" class="rounded-2xl border border-border/60 bg-white shadow-card p-5" >
+        <div v-if="canEdit && cm.comentarios" class="rounded-2xl border border-border/60 bg-white shadow-card p-5" >
           <h3 class="text-xs font-semibold uppercase tracking-widest text-muted mb-2">Comentarios internos</h3>
           <p class="text-sm text-ink/80 leading-relaxed">{{ cm.comentarios }}</p>
+        </div>
+
+        <!-- Proyectos asociados -->
+        <div v-if="canEdit" class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-4">
+          <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Proyectos asociados</h3>
+          <div v-if="cm.proyectos_asociados && cm.proyectos_asociados.length > 0" class="space-y-2">
+            <NuxtLink
+              v-for="project in cm.proyectos_asociados"
+              :key="project.id"
+              :to="`/proyectos/${project.id}`"
+              class="flex items-center justify-between p-3 rounded-xl border border-border/50 hover:border-gold/30 hover:bg-gold/3 transition-all group"
+            >
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-8 h-8 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-gold" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-ink truncate group-hover:text-gold transition-colors">{{ project.nombre }}</p>
+                  <div class="flex items-center gap-2 mt-0.5">
+                    <span class="text-[11px] text-muted">{{ project.project_id }}</span>
+                    <span v-if="project.brand_name" class="text-[11px] text-muted">· {{ project.brand_name }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 flex-shrink-0 ml-3">
+                <span
+                  v-if="project.status_name"
+                  class="text-[11px] font-medium px-2 py-0.5 rounded-full border border-border bg-panel text-muted"
+                >
+                  {{ project.status_name }}
+                </span>
+                <span v-if="project.fecha_servicio" class="text-[11px] text-muted hidden sm:inline">
+                  {{ new Date(project.fecha_servicio).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) }}
+                </span>
+                <svg class="w-4 h-4 text-muted group-hover:text-gold transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+              </div>
+            </NuxtLink>
+          </div>
+          <div v-else class="py-4 text-center">
+            <p class="text-xs text-muted">Esta content maker no tiene proyectos asociados.</p>
+          </div>
         </div>
       </template>
 
@@ -568,7 +732,7 @@ load();
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">ID Stimada</label>
-                <input v-model="editData.stimada_id" type="text" class="input-field" />
+                <input :value="formatContentMakerId(editData.stimada_id)" type="text" disabled class="input-field opacity-60 cursor-not-allowed" />
               </div>
             </div>
           </div>
@@ -742,10 +906,17 @@ load();
         <div class="hidden lg:block sticky top-8 flex-shrink-0">
           <div class="w-[280px] h-[380px] rounded-2xl overflow-hidden shadow-card border border-border/60">
             <img
-              src="~/assets/images/modelo1.jpg"
+              v-if="cm.foto_url"
+              :src="cm.foto_url"
               alt="Content Maker"
               class="w-full h-full object-cover"
             />
+            <div
+              v-else
+              class="w-full h-full flex items-center justify-center bg-orange-400/5"
+            >
+              <span class="text-6xl font-semibold text-orange-400/40">{{ cm.nombre.charAt(0) }}{{ cm.apellidos.charAt(0) }}</span>
+            </div>
           </div>
         </div>
       </div><!-- end flex layout -->

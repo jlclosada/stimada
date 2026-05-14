@@ -10,7 +10,6 @@ onMounted(() => store.fetchTypes());
 
 const form = reactive({
   nombre_cliente: "",
-  cliente_id: "",
   tipo_cliente: "" as string | number,
   nombre_facturacion: "",
   cif: "",
@@ -114,17 +113,16 @@ const activeSection = ref("identificacion");
             <p v-if="errors.nombre_cliente" class="text-xs text-red-400 mt-1">{{ errors.nombre_cliente }}</p>
           </div>
           <div>
-            <label class="block text-xs font-medium text-muted mb-1.5">ID del cliente *</label>
-            <input v-model="form.cliente_id" type="text" required class="input-field" placeholder="Ej: CL-001" />
-            <p v-if="errors.cliente_id" class="text-xs text-red-400 mt-1">{{ errors.cliente_id }}</p>
-          </div>
-          <div>
             <label class="block text-xs font-medium text-muted mb-1.5">Tipo de cliente</label>
             <select v-model="form.tipo_cliente" class="select-field">
               <option value="">Seleccionar tipo…</option>
               <option v-for="t in store.types" :key="t.id" :value="t.id">{{ t.nombre }}</option>
             </select>
             <p v-if="errors.tipo_cliente" class="text-xs text-red-400 mt-1">{{ errors.tipo_cliente }}</p>
+          </div>
+          <div>
+            <p class="block text-xs font-medium text-muted mb-1.5">ID del cliente</p>
+            <p class="text-xs text-muted/60 italic mt-2">Se asignará automáticamente</p>
           </div>
         </div>
         <div class="flex justify-end pt-2">

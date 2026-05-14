@@ -1,9 +1,18 @@
 <script setup lang="ts">
+import { useAuthStore } from "~/stores/auth";
 import { useContentMakersStore } from "~/stores/contentMakers";
+import { formatContentMakerId } from "~/utils/formatId";
 
 definePageMeta({ middleware: ["auth", "role"] });
 
+const auth = useAuthStore();
 const store = useContentMakersStore();
+
+const isAdminOrEmployee = computed(() =>
+  auth.user?.role === "admin" || auth.user?.role === "stimada_employee"
+);
+
+const isClient = computed(() => auth.user?.role === "client");
 
 const search = ref("");
 const filterStatus = ref("");
@@ -86,6 +95,7 @@ function fmt(n: number | null) {
         <p class="text-sm text-muted mt-0.5">Gestiona tu comunidad de creadoras</p>
       </div>
       <NuxtLink
+        v-if="isAdminOrEmployee"
         to="/dashboard/content-makers/nuevo"
         class="group flex items-center gap-2 h-10 px-5 rounded-xl bg-ink text-white text-sm font-medium
                hover:bg-ink/80 hover:shadow-soft active:scale-[0.97] transition-all duration-200"
@@ -113,7 +123,7 @@ function fmt(n: number | null) {
         />
       </div>
 
-      <select v-model="filterStatus" class="select-field min-w-[180px] max-w-[200px]">
+      <select v-if="isAdminOrEmployee" v-model="filterStatus" class="select-field min-w-[180px] max-w-[200px]">
         <option value="">Todos los estados</option>
         <option v-for="s in store.filterOptions.statuses" :key="s" :value="s">{{ s }}</option>
       </select>
@@ -123,7 +133,7 @@ function fmt(n: number | null) {
         <option v-for="t in store.filterOptions.tipos" :key="t" :value="t">{{ t }}</option>
       </select>
 
-      <select v-model="filterCuenta" class="select-field min-w-[150px] max-w-[170px]">
+      <select v-if="isAdminOrEmployee" v-model="filterCuenta" class="select-field min-w-[150px] max-w-[170px]">
         <option value="">Cuenta</option>
         <option value="true">Con cuenta</option>
         <option value="false">Sin cuenta</option>
@@ -138,8 +148,8 @@ function fmt(n: number | null) {
       </button>
     </div>
 
-    <!-- Table -->
-    <div class="rounded-2xl border border-border/60 bg-white shadow-card overflow-hidden">
+    <!-- Table (admin/employee view) -->
+    <div v-if="isAdminOrEmployee" class="rounded-2xl border border-border/60 bg-white shadow-card overflow-hidden">
       <!-- Loading -->
       <div v-if="store.isLoading" class="flex justify-center items-center h-48">
         <div class="w-7 h-7 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
@@ -172,7 +182,7 @@ function fmt(n: number | null) {
                   <p class="text-sm text-ink font-medium group-hover:text-gold transition-colors duration-150">
                     {{ cm.nombre_completo }}
                   </p>
-                  <p class="text-xs text-muted mt-0.5">{{ cm.stimada_id }}</p>
+                  <p class="text-xs text-muted mt-0.5">{{ formatContentMakerId(cm.stimada_id) }}</p>
                 </div>
               </td>
               <td class="px-4 py-3.5 hidden md:table-cell">
@@ -189,7 +199,7 @@ function fmt(n: number | null) {
                 </div>
                 <span v-else class="text-xs text-muted/60">—</span>
               </td>
-              <td class="px-4 py-3.5 hidden lg:table-cell">
+              <td class="px-4 py-3.5">
                 <p class="text-sm text-muted truncate max-w-[150px]">{{ cm.categorias_contenido || "—" }}</p>
               </td>
               <td class="px-4 py-3.5">
@@ -248,6 +258,108 @@ function fmt(n: number | null) {
             </template>
 
             <!-- Next -->
+            <button
+              :disabled="store.currentPage >= store.totalPages"
+              class="w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all duration-150"
+              @click="goToPage(store.currentPage + 1)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Gallery (client view) -->
+    <div v-else>
+      <!-- Loading -->
+      <div v-if="store.isLoading" class="flex justify-center items-center h-48">
+        <div class="w-7 h-7 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
+      </div>
+
+      <template v-else>
+        <!-- Photo Grid -->
+        <div v-if="store.list.length > 0" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+          <NuxtLink
+            v-for="cm in store.list"
+            :key="cm.id"
+            :to="`/dashboard/content-makers/${cm.id}`"
+            class="group block"
+          >
+            <div class="relative aspect-[3/4] rounded-xl overflow-hidden border border-border/40 group-hover:border-gold/60 group-hover:shadow-lg transition-all duration-300">
+              <!-- Photo -->
+              <img
+                v-if="cm.foto_url"
+                :src="cm.foto_url"
+                :alt="cm.nombre_completo"
+                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+              <div v-else class="w-full h-full bg-gradient-to-br from-gold/10 to-gold/5 flex items-center justify-center">
+                <span class="text-3xl font-bold text-gold/40">{{ cm.nombre?.charAt(0) }}{{ cm.apellidos?.charAt(0) }}</span>
+              </div>
+
+              <!-- Hover overlay with social info -->
+              <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+                <div class="space-y-1">
+                  <div v-if="cm.instagram_handle" class="flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-white/80" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+                    </svg>
+                    <span class="text-[11px] text-white/90 font-medium">@{{ cm.instagram_handle }}</span>
+                    <span v-if="cm.seguidores_instagram" class="text-[10px] text-white/60">· {{ fmt(cm.seguidores_instagram) }}</span>
+                  </div>
+                  <div v-if="cm.tiktok_handle" class="flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-white/80" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.84 1.56V6.8a4.85 4.85 0 01-1.07-.11z"/>
+                    </svg>
+                    <span class="text-[11px] text-white/90 font-medium">{{ cm.tiktok_handle }}</span>
+                    <span v-if="cm.seguidores_tiktok" class="text-[10px] text-white/60">· {{ fmt(cm.seguidores_tiktok) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Name below -->
+            <p class="mt-2 text-sm font-medium text-ink text-center truncate group-hover:text-gold transition-colors duration-200">{{ cm.nombre_completo }}</p>
+          </NuxtLink>
+        </div>
+
+        <!-- No results -->
+        <div v-else class="text-center py-16">
+          <p class="text-sm text-muted">Sin resultados con estos filtros.</p>
+        </div>
+
+        <!-- Pagination -->
+        <div v-if="store.list.length > 0" class="flex items-center justify-between mt-6">
+          <p class="text-sm text-muted">
+            Mostrando <span class="font-medium text-ink">{{ (store.currentPage - 1) * store.pageSize + 1 }}</span>–<span class="font-medium text-ink">{{ Math.min(store.currentPage * store.pageSize, store.total) }}</span> de <span class="font-medium text-ink">{{ store.total }}</span>
+          </p>
+
+          <div class="flex items-center gap-1">
+            <button
+              :disabled="store.currentPage <= 1"
+              class="w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all duration-150"
+              @click="goToPage(store.currentPage - 1)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+            </button>
+            <template v-for="p in visiblePages" :key="p">
+              <span v-if="p === '...'" class="w-9 h-9 flex items-center justify-center text-xs text-muted">…</span>
+              <button
+                v-else
+                class="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium transition-all duration-150"
+                :class="p === store.currentPage
+                  ? 'bg-ink text-white shadow-sm'
+                  : 'text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border'"
+                @click="goToPage(p as number)"
+              >
+                {{ p }}
+              </button>
+            </template>
             <button
               :disabled="store.currentPage >= store.totalPages"
               class="w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all duration-150"

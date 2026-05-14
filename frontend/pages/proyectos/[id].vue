@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from "~/stores/auth";
 import { useProjectsStore } from "~/stores/projects";
+import { formatProjectId } from "~/utils/formatId";
 
 definePageMeta({
   layout: "app",
@@ -224,56 +225,72 @@ const cmNeedToRespond = computed(() => {
 // Client needs to select a CM?
 const clientNeedsToSelectCM = computed(() => {
   if (!isClient.value || !project.value) return false;
-  if (acceptedCMs.value.length > 0) return false; // already has accepted CMs
   const mode = project.value.cm_selection_mode;
   if (mode !== "client_chooses" && mode !== "recommended") return false;
-  // Check if there's any pending CM already selected by client (waiting for response)
-  const hasPending = project.value.content_makers?.some(
-    (cm: any) => cm.status === "pending"
-  );
-  return !hasPending;
+  return true;
 });
 
 const clientWaitingForCM = computed(() => {
   if (!isClient.value || !project.value) return false;
-  if (acceptedCMs.value.length > 0) return false;
   return project.value.content_makers?.some(
     (cm: any) => cm.status === "pending"
-  );
+  ) || false;
 });
 
-// CM search for client selection
-const cmSearchQuery = ref("");
-const cmSearchResults = ref<any[]>([]);
-const cmSearching = ref(false);
+// Track CMs selected during current browser session
+const selectedCMIds = ref<number[]>([]);
 
-let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+// CM browser for client selection
+const showCMBrowser = ref(false);
+const cmBrowserResults = ref<any[]>([]);
+const cmBrowserLoading = ref(false);
+const cmBrowserSearch = ref("");
+const selectedCMProfile = ref<any>(null);
 
-function onCMSearchInput() {
-  if (searchTimeout) clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(async () => {
-    if (!cmSearchQuery.value.trim()) {
-      cmSearchResults.value = [];
-      return;
-    }
-    cmSearching.value = true;
-    try {
-      cmSearchResults.value = await $fetch<any[]>(
-        `${config.public.apiBase}/projects/search_cms/`,
-        {
-          params: { q: cmSearchQuery.value },
-          headers: { Authorization: `Bearer ${auth.accessToken}` },
-        }
-      );
-    } catch {
-      cmSearchResults.value = [];
-    } finally {
-      cmSearching.value = false;
-    }
+let cmBrowserTimeout: ReturnType<typeof setTimeout> | null = null;
+
+async function openCMBrowser() {
+  showCMBrowser.value = true;
+  selectedCMProfile.value = null;
+  cmBrowserSearch.value = "";
+  await loadCMBrowserResults();
+}
+
+async function loadCMBrowserResults() {
+  cmBrowserLoading.value = true;
+  try {
+    cmBrowserResults.value = await $fetch<any[]>(
+      `${config.public.apiBase}/projects/search_cms/`,
+      {
+        params: { q: cmBrowserSearch.value },
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+      }
+    );
+  } catch {
+    cmBrowserResults.value = [];
+  } finally {
+    cmBrowserLoading.value = false;
+  }
+}
+
+function onCMBrowserSearchInput() {
+  if (cmBrowserTimeout) clearTimeout(cmBrowserTimeout);
+  cmBrowserTimeout = setTimeout(() => {
+    loadCMBrowserResults();
   }, 300);
 }
 
+function viewCMProfile(cm: any) {
+  selectedCMProfile.value = cm;
+}
+
+function backToGrid() {
+  selectedCMProfile.value = null;
+}
+
 async function selectCM(cmId: number) {
+  showCMBrowser.value = false;
+  selectedCMProfile.value = null;
   confirmAction.value = {
     show: true,
     title: "Confirmar selección",
@@ -286,8 +303,7 @@ async function selectCM(cmId: number) {
           headers: { Authorization: `Bearer ${auth.accessToken}` },
           body: { content_maker_id: cmId },
         });
-        cmSearchQuery.value = "";
-        cmSearchResults.value = [];
+        selectedCMIds.value.push(cmId);
         await loadProject();
       } catch {
         // silent
@@ -452,7 +468,7 @@ onMounted(() => {
           </NuxtLink>
           <h1 class="text-2xl font-semibold text-ink mt-1">{{ project.nombre }}</h1>
           <div class="flex items-center gap-2 mt-1">
-            <p class="text-sm text-muted">{{ project.project_id }} · {{ project.client_name }}</p>
+            <p class="text-sm text-muted">{{ formatProjectId(project.project_id) }} · {{ project.client_name }}</p>
             <NuxtLink
               v-if="isAdminOrEmployee && project.client"
               :to="`/dashboard/clientes/${project.client}`"
@@ -728,10 +744,11 @@ onMounted(() => {
             class="flex items-center justify-between p-3 rounded-xl bg-emerald-50/50 border border-emerald-200/50"
           >
             <NuxtLink :to="`/dashboard/content-makers/${cm.content_maker_id}`" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
-              <div class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
-                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
+              <div class="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0">
+                <img v-if="cm.foto_url" :src="cm.foto_url" :alt="cm.nombre" class="w-full h-full object-cover" />
+                <div v-else class="w-full h-full bg-emerald-100 flex items-center justify-center text-[10px] font-bold text-emerald-600">
+                  {{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
+                </div>
               </div>
               <div>
                 <p class="text-sm font-medium text-ink hover:text-gold transition-colors">{{ cm.nombre }}</p>
@@ -749,29 +766,37 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Client waiting for CM response -->
-        <div v-else-if="clientWaitingForCM" class="rounded-xl bg-amber-50/50 border border-amber-200/50 p-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
-              <svg class="w-4 h-4 text-amber-600 animate-pulse" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p class="text-sm font-medium text-ink">Esperando respuesta de la Content Maker</p>
-              <p class="text-[11px] text-amber-600">La Content Maker seleccionada debe confirmar su participación.</p>
-            </div>
+        <!-- Client pending CMs (invited, waiting response) -->
+        <div v-if="clientWaitingForCM" class="space-y-2 mb-4">
+          <p class="text-xs text-muted font-medium">Invitadas (esperando respuesta):</p>
+          <div
+            v-for="cm in project.content_makers.filter((c: any) => c.status === 'pending')"
+            :key="cm.content_maker_id"
+            class="flex items-center justify-between p-3 rounded-xl bg-amber-50/50 border border-amber-200/50"
+          >
+            <NuxtLink :to="`/dashboard/content-makers/${cm.content_maker_id}`" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+              <div class="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0">
+                <img v-if="cm.foto_url" :src="cm.foto_url" :alt="cm.nombre" class="w-full h-full object-cover" />
+                <div v-else class="w-full h-full bg-amber-100 flex items-center justify-center text-[10px] font-bold text-amber-600">
+                  {{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
+                </div>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-ink hover:text-gold transition-colors">{{ cm.nombre }}</p>
+                <p class="text-[11px] text-amber-600">Pendiente de confirmación</p>
+              </div>
+            </NuxtLink>
           </div>
         </div>
 
-        <!-- Client CM Selector (client_chooses mode, no CM assigned, no pending) -->
-        <div v-else-if="clientNeedsToSelectCM" class="space-y-4">
+        <!-- Client CM Selector -->
+        <div v-if="clientNeedsToSelectCM" class="space-y-4">
           <div class="rounded-xl bg-blue-50/50 border border-blue-200/50 p-4 mb-4">
-            <p class="text-sm font-medium text-ink">Elige una Content Maker para este proyecto</p>
+            <p class="text-sm font-medium text-ink">Selecciona Content Makers para este proyecto</p>
             <p class="text-[11px] text-blue-600 mt-1">
               {{ project.cm_selection_mode === 'recommended'
-                ? 'Te hemos recomendado las siguientes Content Makers. Selecciona la que prefieras para esta campaña.'
-                : 'Busca por nombre o usuario de Instagram y selecciona a la Content Maker que quieres para esta campaña.'
+                ? 'Te hemos recomendado las siguientes Content Makers. Selecciona las que prefieras para esta campaña.'
+                : 'Explora nuestras Content Makers y selecciona las que quieras para esta campaña. Puedes seleccionar varias.'
               }}
             </p>
           </div>
@@ -785,8 +810,11 @@ onMounted(() => {
               class="flex items-center justify-between p-3 rounded-xl border border-gold/20 bg-gold/5 hover:border-gold/40 transition-all"
             >
               <NuxtLink :to="`/dashboard/content-makers/${cm.content_maker_id}`" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                <div class="w-9 h-9 rounded-lg bg-gold/10 flex items-center justify-center text-[10px] font-bold text-gold">
-                  {{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
+                <div class="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0">
+                  <img v-if="cm.foto_url" :src="cm.foto_url" :alt="cm.nombre" class="w-full h-full object-cover" />
+                  <div v-else class="w-full h-full bg-gold/10 flex items-center justify-center text-[10px] font-bold text-gold">
+                    {{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
+                  </div>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-ink hover:text-gold transition-colors">{{ cm.nombre }}</p>
@@ -794,12 +822,16 @@ onMounted(() => {
                 </div>
               </NuxtLink>
               <button
+                v-if="cm.status === 'recommended'"
                 :disabled="actionLoading"
                 class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-gold text-white hover:bg-gold/90 transition-all disabled:opacity-50"
                 @click="selectCM(cm.content_maker_id)"
               >
                 Seleccionar
               </button>
+              <span v-else class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                ✓ Invitación enviada
+              </span>
             </div>
 
             <div class="pt-2 border-t border-border/40 mt-4">
@@ -807,53 +839,16 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- Search input -->
-          <div class="relative">
-            <div class="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
-              <svg class="w-4 h-4 text-muted/50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-              </svg>
-            </div>
-            <input
-              v-model="cmSearchQuery"
-              type="text"
-              placeholder="Buscar content maker por nombre o Instagram..."
-              class="w-full h-10 pl-10 pr-4 rounded-xl border border-border/60 bg-panel/30 text-sm text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40 transition-all"
-              @input="onCMSearchInput"
-            />
-          </div>
-
-          <!-- Search results -->
-          <div v-if="cmSearching" class="flex justify-center py-4">
-            <div class="w-5 h-5 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
-          </div>
-          <div v-else-if="cmSearchResults.length > 0" class="space-y-2 max-h-64 overflow-auto">
-            <div
-              v-for="cm in cmSearchResults"
-              :key="cm.id"
-              class="flex items-center justify-between p-3 rounded-xl border border-border/40 bg-panel/30 hover:border-gold/40 transition-all cursor-pointer"
-            >
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-panel flex items-center justify-center text-[10px] font-bold text-muted">
-                  {{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
-                </div>
-                <div>
-                  <p class="text-xs font-medium text-ink">{{ cm.nombre }}</p>
-                  <p v-if="cm.instagram_handle" class="text-[10px] text-muted">@{{ cm.instagram_handle }} · {{ cm.seguidores_instagram?.toLocaleString() }} seg.</p>
-                </div>
-              </div>
-              <button
-                :disabled="actionLoading"
-                class="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-gold text-white hover:bg-gold/90 transition-all disabled:opacity-50"
-                @click="selectCM(cm.id)"
-              >
-                Seleccionar
-              </button>
-            </div>
-          </div>
-          <div v-else-if="cmSearchQuery.trim() && !cmSearching" class="text-center py-4">
-            <p class="text-xs text-muted">No se encontraron resultados</p>
-          </div>
+          <!-- Find CM button -->
+          <button
+            class="w-full py-3 rounded-xl bg-gold text-white font-medium text-sm hover:bg-gold/90 transition-all flex items-center justify-center gap-2"
+            @click="openCMBrowser"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            Encuentra a tu Content Maker
+          </button>
         </div>
 
         <!-- CM candidates (visible to admins/employees) -->
@@ -865,8 +860,11 @@ onMounted(() => {
             class="flex items-center justify-between p-3 rounded-xl border border-border/40 bg-panel/30"
           >
             <NuxtLink :to="`/dashboard/content-makers/${cm.content_maker_id}`" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
-              <div class="w-8 h-8 rounded-lg bg-panel flex items-center justify-center text-[10px] font-bold text-muted">
-                {{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
+              <div class="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
+                <img v-if="cm.foto_url" :src="cm.foto_url" :alt="cm.nombre" class="w-full h-full object-cover" />
+                <div v-else class="w-full h-full bg-panel flex items-center justify-center text-[10px] font-bold text-muted">
+                  {{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}
+                </div>
               </div>
               <div>
                 <p class="text-xs font-medium text-ink hover:text-gold transition-colors">{{ cm.nombre }}</p>
@@ -1000,6 +998,138 @@ onMounted(() => {
             >
               Confirmar
             </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+    <!-- CM Browser Modal -->
+    <Teleport to="body">
+      <div v-if="showCMBrowser" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="showCMBrowser = false" />
+        <div class="relative w-full max-w-2xl max-h-[80vh] bg-white rounded-2xl shadow-elevated flex flex-col animate-scale-in">
+          <!-- Header -->
+          <div class="p-5 border-b border-border/40 flex items-center justify-between flex-shrink-0">
+            <div v-if="!selectedCMProfile" class="flex items-center gap-3">
+              <h3 class="text-sm font-semibold text-ink">Encuentra a tu Content Maker</h3>
+            </div>
+            <div v-else class="flex items-center gap-3">
+              <button class="p-1.5 rounded-lg hover:bg-panel transition-colors" @click="backToGrid">
+                <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                </svg>
+              </button>
+              <h3 class="text-sm font-semibold text-ink">{{ selectedCMProfile.nombre }}</h3>
+            </div>
+            <button class="p-1.5 rounded-lg hover:bg-panel transition-colors" @click="showCMBrowser = false">
+              <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Grid View -->
+          <div v-if="!selectedCMProfile" class="flex-1 overflow-auto p-5 space-y-4">
+            <!-- Search bar inside modal -->
+            <div class="relative">
+              <div class="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg class="w-4 h-4 text-muted/50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+              </div>
+              <input
+                v-model="cmBrowserSearch"
+                type="text"
+                placeholder="Buscar por nombre o Instagram..."
+                class="w-full h-10 pl-10 pr-4 rounded-xl border border-border/60 bg-panel/30 text-sm text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40 transition-all"
+                @input="onCMBrowserSearchInput"
+              />
+            </div>
+
+            <!-- Loading -->
+            <div v-if="cmBrowserLoading" class="flex justify-center py-8">
+              <div class="w-6 h-6 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
+            </div>
+
+            <!-- Photo Grid -->
+            <div v-else-if="cmBrowserResults.length > 0" class="grid grid-cols-3 sm:grid-cols-4 gap-3">
+              <div
+                v-for="cm in cmBrowserResults"
+                :key="cm.id"
+                class="group cursor-pointer"
+                @click="viewCMProfile(cm)"
+              >
+                <div class="aspect-square rounded-xl overflow-hidden border border-border/40 group-hover:border-gold/60 group-hover:shadow-md transition-all">
+                  <img
+                    v-if="cm.foto_url"
+                    :src="cm.foto_url"
+                    :alt="cm.nombre"
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <div v-else class="w-full h-full bg-gradient-to-br from-gold/10 to-gold/5 flex items-center justify-center">
+                    <span class="text-lg font-bold text-gold/60">{{ cm.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}</span>
+                  </div>
+                </div>
+                <p class="mt-1.5 text-[11px] font-medium text-ink text-center truncate group-hover:text-gold transition-colors">{{ cm.nombre }}</p>
+              </div>
+            </div>
+
+            <!-- No results -->
+            <div v-else class="text-center py-8">
+              <p class="text-xs text-muted">No se encontraron Content Makers</p>
+            </div>
+          </div>
+
+          <!-- CM Profile View -->
+          <div v-else class="flex-1 overflow-auto p-5">
+            <div class="flex flex-col items-center text-center space-y-4">
+              <!-- Photo -->
+              <div class="w-32 h-32 rounded-2xl overflow-hidden border-2 border-gold/20 shadow-lg">
+                <img
+                  v-if="selectedCMProfile.foto_url"
+                  :src="selectedCMProfile.foto_url"
+                  :alt="selectedCMProfile.nombre"
+                  class="w-full h-full object-cover"
+                />
+                <div v-else class="w-full h-full bg-gradient-to-br from-gold/10 to-gold/5 flex items-center justify-center">
+                  <span class="text-3xl font-bold text-gold/60">{{ selectedCMProfile.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) }}</span>
+                </div>
+              </div>
+
+              <!-- Name -->
+              <div>
+                <h4 class="text-lg font-semibold text-ink">{{ selectedCMProfile.nombre }}</h4>
+                <p v-if="selectedCMProfile.instagram_handle" class="text-sm text-muted mt-1">@{{ selectedCMProfile.instagram_handle }}</p>
+              </div>
+
+              <!-- Stats -->
+              <div v-if="selectedCMProfile.seguidores_instagram" class="flex items-center gap-1 text-sm text-muted">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                </svg>
+                <span>{{ selectedCMProfile.seguidores_instagram?.toLocaleString() }} seguidores</span>
+              </div>
+
+              <!-- Action buttons -->
+              <div class="mt-4 flex items-center gap-3">
+                <NuxtLink
+                  :to="`/dashboard/content-makers/${selectedCMProfile.id}?fromProject=${route.params.id}`"
+                  class="px-5 py-2.5 rounded-xl text-sm font-medium border border-border/60 text-muted hover:text-ink hover:border-ink/20 transition-all"
+                >
+                  Ver perfil
+                </NuxtLink>
+                <button
+                  v-if="!selectedCMIds.includes(selectedCMProfile.id)"
+                  :disabled="actionLoading"
+                  class="px-6 py-2.5 rounded-xl text-sm font-medium bg-gold text-white hover:bg-gold/90 shadow-gold-sm transition-all disabled:opacity-50"
+                  @click="selectCM(selectedCMProfile.id)"
+                >
+                  Seleccionar
+                </button>
+                <span v-else class="px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  ✓ Invitación enviada
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

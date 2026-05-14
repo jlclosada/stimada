@@ -16,6 +16,8 @@ const canCreate = computed(() =>
   auth.user?.role === "admin" || auth.user?.role === "stimada_employee"
 );
 
+const isClient = computed(() => auth.user?.role === "client");
+
 // Filters
 const search = ref("");
 const filterStatus = ref("");
@@ -122,7 +124,7 @@ function formatDate(d: string | null) {
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-border/60 bg-panel/50">
-              <th v-for="col in ['ID', 'Proyecto', 'Cliente', 'Servicio', 'Estado', 'Total', 'Fecha venta', 'CM']"
+              <th v-for="col in (isClient ? ['Proyecto', 'Servicio', 'Estado', 'Total', 'Fecha venta', 'CM'] : ['ID', 'Proyecto', 'Cliente', 'Servicio', 'Estado', 'Total', 'Fecha venta', 'CM'])"
                   :key="col"
                   class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider">
                 {{ col }}
@@ -136,9 +138,9 @@ function formatDate(d: string | null) {
               class="border-b border-border/30 last:border-0 table-row-hover cursor-pointer"
               @click="router.push(`/proyectos/${p.id}`)"
             >
-              <td class="px-5 py-3.5 text-xs font-mono text-muted">{{ p.project_id }}</td>
+              <td v-if="!isClient" class="px-5 py-3.5 text-xs font-mono text-muted">{{ formatProjectId(p.project_id) }}</td>
               <td class="px-5 py-3.5 font-medium text-ink">{{ p.nombre }}</td>
-              <td class="px-5 py-3.5 text-muted">{{ p.client_name }}</td>
+              <td v-if="!isClient" class="px-5 py-3.5 text-muted">{{ p.client_name }}</td>
               <td class="px-5 py-3.5">
                 <span v-if="p.service_type_name" class="px-2 py-0.5 rounded-md text-xs bg-blue-50 text-blue-700 font-medium">{{ p.service_type_name }}</span>
                 <span v-else class="text-muted">—</span>
@@ -157,7 +159,10 @@ function formatDate(d: string | null) {
               </td>
               <td class="px-5 py-3.5 font-medium text-ink">{{ p.precio_total }} €</td>
               <td class="px-5 py-3.5 text-muted text-xs">{{ formatDate(p.fecha_venta) }}</td>
-              <td class="px-5 py-3.5 text-xs text-muted">{{ p.content_maker_name || '—' }}</td>
+              <td class="px-5 py-3.5 text-xs">
+                <span v-if="p.content_maker_name" class="text-muted">{{ p.content_maker_name }}</span>
+                <span v-else class="px-2 py-0.5 rounded-md text-xs font-medium bg-red-50 text-red-600">Sin content maker</span>
+              </td>
             </tr>
           </tbody>
         </table>

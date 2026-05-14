@@ -36,6 +36,8 @@ export const useAuthStore = defineStore("auth", {
     isAuthenticated: (state) => !!state.accessToken && !!state.user,
     isAdmin: (state) => state.user?.role === "admin",
     isEmployee: (state) => state.user?.role === "stimada_employee",
+    isAdminOrEmployee: (state) =>
+      state.user?.role === "admin" || state.user?.role === "stimada_employee",
     isClient: (state) => state.user?.role === "client",
     isContentMaker: (state) => state.user?.role === "content_maker",
     canCreateUsers: (state) =>

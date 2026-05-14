@@ -28,6 +28,7 @@ class ProjectContentMakerSerializer(serializers.ModelSerializer):
     content_maker_id = serializers.IntegerField(source="content_maker.id", read_only=True)
     user_id = serializers.IntegerField(source="content_maker.user_id", read_only=True)
     nombre = serializers.SerializerMethodField()
+    foto_url = serializers.SerializerMethodField()
     instagram_handle = serializers.CharField(
         source="content_maker.instagram_handle", read_only=True
     )
@@ -42,6 +43,7 @@ class ProjectContentMakerSerializer(serializers.ModelSerializer):
             "content_maker_id",
             "user_id",
             "nombre",
+            "foto_url",
             "instagram_handle",
             "seguidores_instagram",
             "status",
@@ -52,6 +54,15 @@ class ProjectContentMakerSerializer(serializers.ModelSerializer):
     def get_nombre(self, obj):
         cm = obj.content_maker
         return f"{cm.nombre} {cm.apellidos}".strip()
+
+    def get_foto_url(self, obj):
+        cm = obj.content_maker
+        if cm.foto:
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(cm.foto.url)
+            return cm.foto.url
+        return None
 
 
 class ProjectListSerializer(serializers.ModelSerializer):
@@ -190,9 +201,16 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             "defined_cms",
             "is_draft",
         ]
+        extra_kwargs = {
+            "project_id": {"required": False, "allow_blank": True},
+        }
 
     def get_fields(self):
         fields = super().get_fields()
+        # project_id is always optional (auto-generated)
+        if "project_id" in fields:
+            fields["project_id"].required = False
+            fields["project_id"].allow_blank = True
         # Check if this is a draft request
         request = self.context.get("request")
         is_draft = False
@@ -200,7 +218,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             is_draft = request.data.get("is_draft", False)
         if is_draft:
             # Make required fields optional for drafts
-            for field_name in ("project_id", "nombre", "client"):
+            for field_name in ("nombre", "client"):
                 if field_name in fields:
                     fields[field_name].required = False
                     fields[field_name].allow_null = True

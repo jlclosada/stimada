@@ -29,7 +29,7 @@ class ClientProfile(models.Model):
 
     # Identificación
     nombre_cliente = models.CharField(max_length=200)
-    cliente_id = models.CharField(max_length=50, unique=True)
+    cliente_id = models.CharField(max_length=50, unique=True, blank=True)
     tipo_cliente = models.ForeignKey(
         ClientType,
         null=True,
@@ -57,6 +57,13 @@ class ClientProfile(models.Model):
         help_text="Si es agencia, puede tener múltiples marcas asociadas.",
     )
 
+    # Content Makers favoritas
+    favorite_cms = models.ManyToManyField(
+        "content_makers.ContentMakerProfile",
+        blank=True,
+        related_name="favorited_by_clients",
+    )
+
     # Metadatos
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -72,6 +79,20 @@ class ClientProfile(models.Model):
         verbose_name = "Cliente"
         verbose_name_plural = "Clientes"
         ordering = ["nombre_cliente"]
+
+    @staticmethod
+    def generate_next_id():
+        """Generate the next sequential numeric client ID (zero-padded to 4 digits)."""
+        import re
+        ids = ClientProfile.objects.values_list("cliente_id", flat=True)
+        nums = [int(m.group()) for cid in ids if (m := re.search(r"\d+", cid))]
+        next_num = (max(nums) if nums else 0) + 1
+        return f"{next_num:04d}"
+
+    def save(self, *args, **kwargs):
+        if not self.cliente_id:
+            self.cliente_id = self.generate_next_id()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.cliente_id} — {self.nombre_cliente}"

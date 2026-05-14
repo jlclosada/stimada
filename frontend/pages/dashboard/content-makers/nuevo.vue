@@ -193,9 +193,9 @@ function fieldError(field: string) {
       <div v-show="currentStep === 0" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-4" >
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-medium text-muted mb-1.5">ID Stimada *</label>
-            <input v-model="form.stimada_id" type="text" required class="input-field font-mono" />
-            <p v-if="fieldError('stimada_id')" class="text-xs text-red-400 mt-1">{{ fieldError('stimada_id') }}</p>
+            <label class="block text-xs font-medium text-muted mb-1.5">ID Stimada</label>
+            <input :value="'CM-' + (form.stimada_id || '…')" type="text" disabled class="input-field font-mono opacity-60 cursor-not-allowed" />
+            <p class="text-xs text-muted/60 mt-1">Se asigna automáticamente</p>
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5">Tipo de CM *</label>
