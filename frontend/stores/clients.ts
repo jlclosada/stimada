@@ -16,31 +16,38 @@ export interface ClientProfile {
   ciudad: string;
   pais: string;
   contrato_firmado: boolean;
+  es_agencia: boolean;
+  estado: string;
+  semaforo_cliente: number | null;
   created_by_name: string | null;
   created_at: string;
 }
 
-export interface ClientProject {
+export interface ClientBrand {
   id: number;
-  project_id: string;
+  brand_id: string;
   nombre: string;
-  brand_name: string | null;
-  status_name: string | null;
-  fecha_servicio: string | null;
-  content_maker_name: string | null;
+  tipo_marca_nombre: string | null;
+  web_instagram: string;
+  estado: string;
 }
 
 export interface ClientProfileDetail extends ClientProfile {
   tipo_cliente: number | null;
+  web_instagram: string;
+  persona_contacto: string;
+  email_contacto: string;
+  telefono: string;
   nombre_facturacion: string;
   email_facturacion: string;
   direccion_facturacion: string;
   codigo_postal: string;
   contrato_url: string | null;
+  notas_internas: string;
   user_email: string | null;
   user_name: string | null;
   has_account: boolean;
-  proyectos_asociados: ClientProject[];
+  marcas: ClientBrand[];
 }
 
 export const useClientsStore = defineStore("clients", {
@@ -135,6 +142,40 @@ export const useClientsStore = defineStore("clients", {
       return $fetch(`${config.public.apiBase}/clients/${id}/create-account/`, {
         method: "POST",
         body: data,
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+      });
+    },
+
+    async createBrand(
+      data: { client: number; nombre: string; tipo_marca?: number | null; web_instagram?: string }
+    ): Promise<ClientBrand> {
+      const auth = useAuthStore();
+      const config = useRuntimeConfig();
+      return $fetch<ClientBrand>(`${config.public.apiBase}/brands/`, {
+        method: "POST",
+        body: data,
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+      });
+    },
+
+    async updateBrand(
+      id: number,
+      data: Record<string, unknown>
+    ): Promise<ClientBrand> {
+      const auth = useAuthStore();
+      const config = useRuntimeConfig();
+      return $fetch<ClientBrand>(`${config.public.apiBase}/brands/${id}/`, {
+        method: "PATCH",
+        body: data,
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+      });
+    },
+
+    async deleteBrand(id: number): Promise<void> {
+      const auth = useAuthStore();
+      const config = useRuntimeConfig();
+      await $fetch(`${config.public.apiBase}/brands/${id}/`, {
+        method: "DELETE",
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       });
     },

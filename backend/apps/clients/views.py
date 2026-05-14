@@ -10,6 +10,9 @@ from apps.accounts.models import CustomUser
 from apps.accounts.permissions import IsAdminOrEmployee, IsClient
 from apps.clients.models import Brand, ClientProfile, ClientType
 from apps.clients.serializers import (
+    BrandCreateSerializer,
+    BrandDetailSerializer,
+    BrandListSerializer,
     ClientProfileCreateSerializer,
     ClientProfileDetailSerializer,
     ClientProfileListSerializer,
@@ -43,8 +46,8 @@ class ClientMeView(APIView):
         profile = request.user.client_profile
         data = ClientProfileDetailSerializer(profile, context={"request": request}).data
         data["brands"] = [
-            {"id": b.id, "nombre": b.nombre, "descripcion": b.descripcion}
-            for b in profile.brands.filter(activo=True)
+            {"id": b.id, "brand_id": b.brand_id, "nombre": b.nombre, "estado": b.estado}
+            for b in profile.brands.filter(estado="activa")
         ]
         return Response(data)
 
@@ -141,8 +144,8 @@ class ClientProfileViewSet(ModelViewSet):
     @action(detail=True, methods=["get"])
     def brands(self, request, pk=None):
         client = self.get_object()
-        brand_list = Brand.objects.filter(client=client, activo=True)
-        data = [{"id": b.id, "nombre": b.nombre} for b in brand_list]
+        brand_list = Brand.objects.filter(client=client, estado="activa")
+        data = [{"id": b.id, "brand_id": b.brand_id, "nombre": b.nombre} for b in brand_list]
         return Response(data)
 
 
@@ -230,3 +233,38 @@ class ClientFavoriteCMsView(APIView):
             )
         profile.favorite_cms.remove(cm)
         return Response({"status": "removed"})
+
+
+class BrandViewSet(ModelViewSet):
+    permission_classes = [IsAdminOrEmployee]
+    queryset = Brand.objects.select_related("client", "tipo_marca").order_by("nombre")
+
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return BrandCreateSerializer
+        if self.action == "retrieve":
+            return BrandDetailSerializer
+        return BrandListSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        q = self.request.query_params.get("q", "").strip()
+        client_id = self.request.query_params.get("client", "").strip()
+        if q:
+            qs = qs.filter(nombre__icontains=q)
+        if client_id:
+            qs = qs.filter(client_id=client_id)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        return Response(
+            BrandDetailSerializer(instance).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=["get"])
+    def next_id(self, request):
+        return Response({"next_id": Brand.generate_next_id()})

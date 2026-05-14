@@ -203,6 +203,8 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             "project_id": {"required": False, "allow_blank": True},
+            "client": {"required": False, "allow_null": True},
+            "brand": {"required": True},
         }
 
     def get_fields(self):
@@ -218,7 +220,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             is_draft = request.data.get("is_draft", False)
         if is_draft:
             # Make required fields optional for drafts
-            for field_name in ("nombre", "client"):
+            for field_name in ("nombre", "brand"):
                 if field_name in fields:
                     fields[field_name].required = False
                     fields[field_name].allow_null = True
@@ -229,7 +231,15 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     def validate(self, data):
         is_draft = data.get("is_draft", False)
         if is_draft:
+            # Auto-inherit client from brand even for drafts
+            brand = data.get("brand")
+            if brand:
+                data["client"] = brand.client
             return data
+        # Auto-inherit client from brand (always)
+        brand = data.get("brand")
+        if brand:
+            data["client"] = brand.client
         mode = data.get("cm_selection_mode", Project.CM_SELECTION_CLIENT_CHOOSES)
         if mode == Project.CM_SELECTION_DEFINED:
             has_single = data.get("content_maker")
@@ -359,7 +369,6 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "nombre",
             "descripcion",
-            "client",
             "brand",
             "status",
             "service_type",
@@ -376,6 +385,10 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
+        # Auto-inherit client from brand
+        brand = data.get("brand")
+        if brand:
+            data["client"] = brand.client
         mode = data.get("cm_selection_mode", self.instance.cm_selection_mode if self.instance else None)
         if mode == Project.CM_SELECTION_DEFINED:
             has_defined = "defined_cms" in data and data["defined_cms"]

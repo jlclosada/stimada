@@ -2,7 +2,7 @@
 import { useAuthStore } from "~/stores/auth";
 import type { ClientProfileDetail } from "~/stores/clients";
 import { useClientsStore } from "~/stores/clients";
-import { formatClientId } from "~/utils/formatId";
+import { formatBrandId, formatClientId } from "~/utils/formatId";
 
 definePageMeta({ middleware: ["auth", "role"] });
 
@@ -24,6 +24,37 @@ const saveError = ref("");
 // Delete state
 const showDeleteModal = ref(false);
 const isDeleting = ref(false);
+
+// Brand editing state
+const newBrandName = ref("");
+const isBrandSaving = ref(false);
+
+async function addBrandToClient() {
+  const name = newBrandName.value.trim();
+  if (!name || !client.value) return;
+  isBrandSaving.value = true;
+  try {
+    await store.createBrand({ client: client.value.id, nombre: name });
+    newBrandName.value = "";
+    client.value = await store.fetchDetail(route.params.id as string);
+  } catch {
+    // silent
+  } finally {
+    isBrandSaving.value = false;
+  }
+}
+
+async function removeBrandFromClient(brandId: number) {
+  isBrandSaving.value = true;
+  try {
+    await store.deleteBrand(brandId);
+    client.value = await store.fetchDetail(route.params.id as string);
+  } catch {
+    // silent
+  } finally {
+    isBrandSaving.value = false;
+  }
+}
 
 // Account creation state
 const showAccountModal = ref(false);
@@ -472,55 +503,51 @@ load();
         <!-- Proyectos asociados -->
         <div class="group rounded-3xl border border-border/60 bg-white shadow-card p-6 space-y-4 transition-all duration-300 hover:border-border hover:shadow-soft">
           <div class="flex items-center gap-2">
-            <div class="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center">
-              <svg class="w-3.5 h-3.5 text-gold" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+            <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
               </svg>
             </div>
-            <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">Proyectos asociados</h3>
+            <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">Marcas asociadas</h3>
+            <span v-if="client.marcas && client.marcas.length" class="ml-auto text-[10px] text-muted/60 bg-panel px-2 py-0.5 rounded-full border border-border/40">{{ client.marcas.length }}</span>
           </div>
-          <div v-if="client.proyectos_asociados && client.proyectos_asociados.length > 0" class="space-y-2">
-            <NuxtLink
-              v-for="project in client.proyectos_asociados"
-              :key="project.id"
-              :to="`/proyectos/${project.id}`"
-              class="flex items-center justify-between p-3.5 rounded-xl border border-border/50 hover:border-gold/30 hover:bg-gold/[0.02] transition-all duration-200 group/item"
+          <div v-if="client.marcas && client.marcas.length > 0" class="space-y-2">
+            <div
+              v-for="brand in client.marcas"
+              :key="brand.id"
+              class="flex items-center justify-between p-3.5 rounded-xl border border-border/50 hover:border-indigo-400/30 hover:bg-indigo-400/[0.02] transition-all duration-200"
             >
               <div class="flex items-center gap-3 min-w-0">
-                <div class="w-9 h-9 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-4 h-4 text-gold" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-                  </svg>
+                <div class="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-400/20 flex items-center justify-center flex-shrink-0">
+                  <span class="text-[11px] font-bold text-indigo-400">{{ brand.nombre.charAt(0) }}</span>
                 </div>
                 <div class="min-w-0">
-                  <p class="text-sm font-medium text-ink truncate group-hover/item:text-gold transition-colors duration-200">{{ project.nombre }}</p>
+                  <p class="text-sm font-medium text-ink truncate">{{ brand.nombre }}</p>
                   <div class="flex items-center gap-2 mt-0.5">
-                    <span class="text-[11px] text-muted/70 font-mono">{{ project.project_id }}</span>
-                    <span v-if="project.brand_name" class="text-[11px] text-muted/70">· {{ project.brand_name }}</span>
-                    <span v-if="project.content_maker_name" class="text-[11px] text-muted/70">· {{ project.content_maker_name }}</span>
+                    <span class="text-[11px] text-muted/70 font-mono">{{ formatBrandId(brand.brand_id) }}</span>
+                    <span v-if="brand.tipo_marca_nombre" class="text-[11px] text-muted/70">· {{ brand.tipo_marca_nombre }}</span>
                   </div>
                 </div>
               </div>
-              <div class="flex items-center gap-3 flex-shrink-0 ml-3">
+              <div class="flex items-center gap-2 flex-shrink-0 ml-3">
+                <a v-if="brand.web_instagram" :href="brand.web_instagram" target="_blank" class="text-[11px] text-gold hover:text-gold/80 transition-colors">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                </a>
                 <span
-                  v-if="project.status_name"
-                  class="text-[11px] font-medium px-2 py-0.5 rounded-full border border-border bg-panel text-muted"
+                  class="text-[11px] font-medium px-2 py-0.5 rounded-full border"
+                  :class="brand.estado === 'activa' ? 'text-emerald-400 bg-emerald-400/[0.06] border-emerald-400/15' : 'text-muted/60 bg-panel border-border/40'"
                 >
-                  {{ project.status_name }}
+                  {{ brand.estado === 'activa' ? 'Activa' : 'Inactiva' }}
                 </span>
-                <span v-if="project.fecha_servicio" class="text-[11px] text-muted/60 hidden sm:inline">
-                  {{ new Date(project.fecha_servicio).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) }}
-                </span>
-                <svg class="w-4 h-4 text-muted/40 group-hover/item:text-gold transition-colors duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                </svg>
               </div>
-            </NuxtLink>
+            </div>
           </div>
           <div v-else class="py-4 text-center">
-            <p class="text-xs text-muted/60">Este cliente no tiene proyectos asociados.</p>
+            <p class="text-xs text-muted/60">Este cliente no tiene marcas asociadas.</p>
           </div>
         </div>
+
       </template>
 
       <!-- ============ EDIT MODE ============ -->
@@ -611,6 +638,64 @@ load();
               <input v-model="editData.contrato_firmado" type="checkbox" class="w-4 h-4 rounded border-border bg-raised accent-gold" />
               <span class="text-sm text-ink">Contrato firmado</span>
             </label>
+          </div>
+
+          <!-- Marcas -->
+          <div class="rounded-3xl border border-border/60 bg-white shadow-card p-6 space-y-4" >
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+                </svg>
+              </div>
+              <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-gold">Marcas asociadas</h3>
+            </div>
+            <!-- Current brands -->
+            <div v-if="client!.marcas && client!.marcas.length" class="space-y-2">
+              <div
+                v-for="brand in client!.marcas"
+                :key="brand.id"
+                class="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-panel/30"
+              >
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
+                    <span class="text-[11px] font-bold text-indigo-400">{{ brand.nombre.charAt(0) }}</span>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-ink truncate">{{ brand.nombre }}</p>
+                    <span class="text-[10px] text-muted/60 font-mono">{{ formatBrandId(brand.brand_id) }}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  :disabled="isBrandSaving"
+                  class="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+                  @click="removeBrandFromClient(brand.id)"
+                >
+                  Quitar
+                </button>
+              </div>
+            </div>
+            <p v-else class="text-xs text-muted/50 italic">Sin marcas asociadas.</p>
+            <!-- Add new brand -->
+            <div class="flex gap-2 pt-2">
+              <input
+                v-model="newBrandName"
+                type="text"
+                class="input-field flex-1"
+                placeholder="Nombre de la nueva marca"
+                @keydown.enter.prevent="addBrandToClient"
+              />
+              <button
+                type="button"
+                :disabled="isBrandSaving || !newBrandName.trim()"
+                class="h-9 px-4 rounded-xl bg-gold/10 text-gold text-xs font-medium border border-gold/20 hover:bg-gold/20 transition-colors disabled:opacity-50"
+                @click="addBrandToClient"
+              >
+                + Añadir
+              </button>
+            </div>
           </div>
         </div>
       </template>

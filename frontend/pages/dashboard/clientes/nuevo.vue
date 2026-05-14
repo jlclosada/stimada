@@ -11,6 +11,11 @@ onMounted(() => store.fetchTypes());
 const form = reactive({
   nombre_cliente: "",
   tipo_cliente: "" as string | number,
+  web_instagram: "",
+  persona_contacto: "",
+  email_contacto: "",
+  telefono: "",
+  es_agencia: false,
   nombre_facturacion: "",
   cif: "",
   email_facturacion: "",
@@ -61,7 +66,9 @@ async function handleSubmit() {
 
 const SECTIONS = [
   { id: "identificacion", label: "Identificación" },
+  { id: "contacto", label: "Contacto" },
   { id: "facturacion", label: "Facturación" },
+  { id: "marcas", label: "Marcas" },
   { id: "contrato", label: "Contrato" },
 ];
 
@@ -108,7 +115,7 @@ const activeSection = ref("identificacion");
       <div v-show="activeSection === 'identificacion'" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-5" >
         <div class="grid grid-cols-2 gap-4">
           <div class="col-span-2">
-            <label class="block text-xs font-medium text-muted mb-1.5">Nombre del cliente *</label>
+            <label class="block text-xs font-medium text-muted mb-1.5">Nombre comercial del cliente *</label>
             <input v-model="form.nombre_cliente" type="text" required class="input-field" placeholder="Ej: Brand Company S.L." />
             <p v-if="errors.nombre_cliente" class="text-xs text-red-400 mt-1">{{ errors.nombre_cliente }}</p>
           </div>
@@ -121,11 +128,57 @@ const activeSection = ref("identificacion");
             <p v-if="errors.tipo_cliente" class="text-xs text-red-400 mt-1">{{ errors.tipo_cliente }}</p>
           </div>
           <div>
+            <label class="block text-xs font-medium text-muted mb-1.5">Web / Instagram</label>
+            <input v-model="form.web_instagram" type="url" class="input-field" placeholder="https://..." />
+          </div>
+          <div class="col-span-2">
+            <label class="flex items-center gap-3 cursor-pointer group">
+              <div
+                class="w-5 h-5 rounded-md border flex-shrink-0 flex items-center justify-center transition-colors"
+                :class="form.es_agencia ? 'bg-gold border-gold' : 'border-border group-hover:border-subtle'"
+                @click="form.es_agencia = !form.es_agencia"
+              >
+                <svg v-if="form.es_agencia" class="w-3 h-3 text-ink" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              </div>
+              <span class="text-sm text-ink">Es una agencia (representa a varias marcas)</span>
+            </label>
+          </div>
+          <div class="col-span-2">
             <p class="block text-xs font-medium text-muted mb-1.5">ID del cliente</p>
             <p class="text-xs text-muted/60 italic mt-2">Se asignará automáticamente</p>
           </div>
         </div>
         <div class="flex justify-end pt-2">
+          <button type="button" class="h-9 px-5 rounded-xl bg-white/6 text-ink text-xs font-medium hover:bg-white/10 transition-colors" @click="activeSection = 'contacto'">
+            Siguiente →
+          </button>
+        </div>
+      </div>
+
+      <!-- CONTACTO -->
+      <div v-show="activeSection === 'contacto'" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-5" >
+        <div class="grid grid-cols-2 gap-4">
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-muted mb-1.5">Persona de contacto *</label>
+            <input v-model="form.persona_contacto" type="text" class="input-field" placeholder="Nombre y apellidos" />
+            <p v-if="errors.persona_contacto" class="text-xs text-red-400 mt-1">{{ errors.persona_contacto }}</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-muted mb-1.5">Email de contacto *</label>
+            <input v-model="form.email_contacto" type="email" class="input-field" placeholder="contacto@empresa.com" />
+            <p v-if="errors.email_contacto" class="text-xs text-red-400 mt-1">{{ errors.email_contacto }}</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-muted mb-1.5">Teléfono</label>
+            <input v-model="form.telefono" type="text" class="input-field" placeholder="+34 600 000 000" />
+          </div>
+        </div>
+        <div class="flex justify-between pt-2">
+          <button type="button" class="h-9 px-5 rounded-xl border border-border/60 bg-white text-xs text-muted hover:text-ink transition-colors" @click="activeSection = 'identificacion'">
+            ← Anterior
+          </button>
           <button type="button" class="h-9 px-5 rounded-xl bg-white/6 text-ink text-xs font-medium hover:bg-white/10 transition-colors" @click="activeSection = 'facturacion'">
             Siguiente →
           </button>
@@ -171,7 +224,38 @@ const activeSection = ref("identificacion");
           </div>
         </div>
         <div class="flex justify-between pt-2">
-          <button type="button" class="h-9 px-5 rounded-xl border border-border/60 bg-white text-xs text-muted hover:text-ink transition-colors" @click="activeSection = 'identificacion'">
+          <button type="button" class="h-9 px-5 rounded-xl border border-border/60 bg-white text-xs text-muted hover:text-ink transition-colors" @click="activeSection = 'contacto'">
+            ← Anterior
+          </button>
+          <button type="button" class="h-9 px-5 rounded-xl bg-white/6 text-ink text-xs font-medium hover:bg-white/10 transition-colors" @click="activeSection = 'marcas'">
+            Siguiente →
+          </button>
+        </div>
+      </div>
+
+      <!-- MARCAS -->
+      <div v-show="activeSection === 'marcas'" class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-5" >
+        <div class="py-6 text-center space-y-3">
+          <div class="w-12 h-12 mx-auto rounded-xl bg-gold/10 flex items-center justify-center">
+            <svg class="w-6 h-6 text-gold" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+            </svg>
+          </div>
+          <p class="text-sm text-ink font-medium">Las marcas se gestionan de forma independiente</p>
+          <p class="text-xs text-muted max-w-sm mx-auto">Una vez creado el cliente, podrás asociarle marcas desde la sección de Marcas.</p>
+          <NuxtLink
+            to="/dashboard/marcas"
+            class="inline-flex items-center gap-1.5 text-xs text-gold hover:text-gold/80 transition-colors mt-2"
+          >
+            Ir a Marcas
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </NuxtLink>
+        </div>
+        <div class="flex justify-between pt-2">
+          <button type="button" class="h-9 px-5 rounded-xl border border-border/60 bg-white text-xs text-muted hover:text-ink transition-colors" @click="activeSection = 'facturacion'">
             ← Anterior
           </button>
           <button type="button" class="h-9 px-5 rounded-xl bg-white/6 text-ink text-xs font-medium hover:bg-white/10 transition-colors" @click="activeSection = 'contrato'">
@@ -218,7 +302,7 @@ const activeSection = ref("identificacion");
         </div>
 
         <div class="flex justify-between pt-2">
-          <button type="button" class="h-9 px-5 rounded-xl border border-border/60 bg-white text-xs text-muted hover:text-ink transition-colors" @click="activeSection = 'facturacion'">
+          <button type="button" class="h-9 px-5 rounded-xl border border-border/60 bg-white text-xs text-muted hover:text-ink transition-colors" @click="activeSection = 'marcas'">
             ← Anterior
           </button>
           <button

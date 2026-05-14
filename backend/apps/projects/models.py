@@ -126,18 +126,21 @@ class Project(models.Model):
 
     @staticmethod
     def generate_next_id():
-        """Generate the next sequential numeric project ID (zero-padded to 4 digits)."""
+        """Generate the next sequential numeric project ID (zero-padded to 5 digits)."""
         import re
         ids = Project.objects.values_list("project_id", flat=True)
         nums = [int(m.group()) for pid in ids if (m := re.search(r"\d+", pid))]
         next_num = (max(nums) if nums else 0) + 1
-        return f"{next_num:04d}"
+        return f"{next_num:05d}"
 
     def save(self, *args, **kwargs):
         if not self.project_id:
             self.project_id = self.generate_next_id()
         if not self.fecha_fin and self.fecha_servicio:
             self.fecha_fin = self.fecha_servicio + timedelta(days=14)
+        # Auto-inherit client from brand
+        if self.brand_id and not self.client_id:
+            self.client = self.brand.client
         super().save(*args, **kwargs)
 
 

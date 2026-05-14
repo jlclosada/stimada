@@ -1,17 +1,6 @@
 from rest_framework import serializers
 
-from apps.clients.models import ClientProfile, ClientType
-
-
-class ClientProjectSerializer(serializers.Serializer):
-    """Lightweight project info for the client detail view."""
-    id = serializers.IntegerField()
-    project_id = serializers.CharField()
-    nombre = serializers.CharField()
-    brand_name = serializers.CharField(allow_null=True)
-    status_name = serializers.CharField(allow_null=True)
-    fecha_servicio = serializers.DateField(allow_null=True)
-    content_maker_name = serializers.CharField(allow_null=True)
+from apps.clients.models import Brand, ClientProfile, ClientType
 
 
 class ClientTypeSerializer(serializers.ModelSerializer):
@@ -27,8 +16,9 @@ class ClientProfileListSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClientProfile
         fields = [
-            "id", "cliente_id", "nombre_cliente", "tipo_nombre",
-            "cif", "ciudad", "pais", "contrato_firmado", "es_agencia",
+            "id", "cliente_id", "nombre_cliente", "tipo_cliente", "tipo_nombre",
+            "web_instagram", "cif", "ciudad", "pais", "contrato_firmado", "es_agencia",
+            "estado", "semaforo_cliente",
             "created_by_name", "created_at",
         ]
 
@@ -46,7 +36,7 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
     user_email = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField()
     has_account = serializers.SerializerMethodField()
-    proyectos_asociados = serializers.SerializerMethodField()
+    marcas = serializers.SerializerMethodField()
 
     class Meta:
         model = ClientProfile
@@ -73,22 +63,21 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
     def get_has_account(self, obj):
         return obj.user_id is not None
 
-    def get_proyectos_asociados(self, obj):
-        from apps.projects.models import Project
-
-        projects = Project.objects.filter(client=obj).select_related("brand", "status", "content_maker").order_by("-created_at")
-        return ClientProjectSerializer([
+    def get_marcas(self, obj):
+        brands = obj.brands.select_related("tipo_marca").all()
+        return [
             {
-                "id": p.id,
-                "project_id": p.project_id,
-                "nombre": p.nombre,
-                "brand_name": p.brand.nombre if p.brand else None,
-                "status_name": p.status.nombre if p.status else None,
-                "fecha_servicio": p.fecha_servicio,
-                "content_maker_name": f"{p.content_maker.nombre} {p.content_maker.apellidos}".strip() if p.content_maker else None,
+                "id": b.id,
+                "brand_id": b.brand_id,
+                "nombre": b.nombre,
+                "tipo_marca_nombre": b.tipo_marca.nombre if b.tipo_marca_id else None,
+                "web_instagram": b.web_instagram,
+                "estado": b.estado,
             }
-            for p in projects
-        ], many=True).data
+            for b in brands
+        ]
+
+
 
 
 class ClientProfileCreateSerializer(serializers.ModelSerializer):
@@ -102,3 +91,56 @@ class ClientProfileCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data["created_by"] = self.context["request"].user
         return super().create(validated_data)
+
+
+class BrandListSerializer(serializers.ModelSerializer):
+    client_name = serializers.CharField(source="client.nombre_cliente", read_only=True)
+    tipo_marca_nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Brand
+        fields = [
+            "id", "brand_id", "nombre", "client", "client_name",
+            "tipo_marca", "tipo_marca_nombre", "web_instagram",
+            "estado", "created_at",
+        ]
+
+    def get_tipo_marca_nombre(self, obj):
+        return obj.tipo_marca.nombre if obj.tipo_marca_id else None
+
+
+class BrandDetailSerializer(serializers.ModelSerializer):
+    client_name = serializers.CharField(source="client.nombre_cliente", read_only=True)
+    tipo_marca_nombre = serializers.SerializerMethodField()
+    proyectos = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Brand
+        fields = [
+            "id", "brand_id", "nombre", "client", "client_name",
+            "tipo_marca", "tipo_marca_nombre", "web_instagram",
+            "notas", "estado", "created_at", "proyectos",
+        ]
+
+    def get_tipo_marca_nombre(self, obj):
+        return obj.tipo_marca.nombre if obj.tipo_marca_id else None
+
+    def get_proyectos(self, obj):
+        projects = obj.projects.select_related("status", "content_maker").order_by("-created_at")
+        return [
+            {
+                "id": p.id,
+                "project_id": p.project_id,
+                "nombre": p.nombre,
+                "status_name": p.status.nombre if p.status else None,
+                "fecha_servicio": p.fecha_servicio,
+                "content_maker_name": f"{p.content_maker.nombre} {p.content_maker.apellidos}".strip() if p.content_maker else None,
+            }
+            for p in projects
+        ]
+
+
+class BrandCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Brand
+        fields = ["nombre", "client", "tipo_marca", "web_instagram", "notas", "estado"]

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from "~/stores/auth";
 import { useProjectsStore } from "~/stores/projects";
-import { formatClientId } from "~/utils/formatId";
+import { formatBrandId } from "~/utils/formatId";
 
 const emit = defineEmits<{ close: []; created: [] }>();
 
@@ -15,32 +15,50 @@ const totalSteps = 4;
 const isSubmitting = ref(false);
 const error = ref("");
 
-// Step 1: Client & Brand
-const clients = ref<{ id: number; nombre_cliente: string; cliente_id: string; es_agencia: boolean }[]>([]);
-const brands = ref<{ id: number; nombre: string }[]>([]);
-const clientSearch = ref("");
-const selectedClient = ref<number | null>(null);
+// Step 1: Brand selection (project → brand → client auto-inherited)
+const brandSearch = ref("");
+const brandResults = ref<{ id: number; brand_id: string; nombre: string; client: number; client_name: string }[]>([]);
 const selectedBrand = ref<number | null>(null);
-const clientSearchResults = computed(() => {
-  if (!clientSearch.value.trim()) return clients.value.slice(0, 10);
-  const q = clientSearch.value.toLowerCase();
-  return clients.value.filter(
-    (c) => c.nombre_cliente.toLowerCase().includes(q) || c.cliente_id.toLowerCase().includes(q)
-  );
-});
+const selectedBrandName = ref("");
+const inheritedClientName = ref("");
 
-watch(selectedClient, async (id) => {
-  if (!id) { brands.value = []; return; }
-  try {
-    const data = await $fetch<{ id: number; nombre: string }[]>(
-      `${config.public.apiBase}/clients/${id}/brands/`,
-      { headers: { Authorization: `Bearer ${auth.accessToken}` } }
-    );
-    brands.value = data;
-  } catch {
-    brands.value = [];
+let brandSearchTimeout: ReturnType<typeof setTimeout>;
+watch(brandSearch, (val) => {
+  clearTimeout(brandSearchTimeout);
+  if (val.trim().length >= 1 && !selectedBrand.value) {
+    brandSearchTimeout = setTimeout(searchBrands, 300);
+  } else if (!val.trim()) {
+    brandResults.value = [];
   }
 });
+
+async function searchBrands() {
+  try {
+    const data = await $fetch<{ results: typeof brandResults.value }>(
+      `${config.public.apiBase}/brands/?q=${encodeURIComponent(brandSearch.value)}&page_size=10`,
+      { headers: { Authorization: `Bearer ${auth.accessToken}` } }
+    );
+    brandResults.value = data.results;
+  } catch {
+    brandResults.value = [];
+  }
+}
+
+function selectBrand(brand: typeof brandResults.value[0]) {
+  selectedBrand.value = brand.id;
+  selectedBrandName.value = brand.nombre;
+  inheritedClientName.value = brand.client_name;
+  brandSearch.value = brand.nombre;
+  brandResults.value = [];
+}
+
+function clearBrand() {
+  selectedBrand.value = null;
+  selectedBrandName.value = "";
+  inheritedClientName.value = "";
+  brandSearch.value = "";
+  brandResults.value = [];
+}
 
 // Step 2: Project details
 const form = reactive({
@@ -125,20 +143,6 @@ watch(cmSearch, (val) => {
 
 // Load data
 onMounted(async () => {
-  try {
-    const [clientsData, statusData, typesData] = await Promise.all([
-      $fetch<{ results: typeof clients.value }>(`${config.public.apiBase}/clients/?page_size=500`, {
-        headers: { Authorization: `Bearer ${auth.accessToken}` },
-      }),
-      $fetch<typeof statuses.value>(`${config.public.apiBase}/projects/filters/`, {
-        headers: { Authorization: `Bearer ${auth.accessToken}` },
-      }),
-      Promise.resolve(null),
-    ]);
-    clients.value = clientsData.results;
-  } catch {
-    // silent
-  }
   // Load statuses and service types for dropdowns
   try {
     const data = await $fetch<{ statuses: { id: number; nombre: string }[]; service_types: { id: number; nombre: string }[] }>(
@@ -155,8 +159,8 @@ onMounted(async () => {
 // Navigation
 function nextStep() {
   error.value = "";
-  if (currentStep.value === 1 && !selectedClient.value) {
-    error.value = "Debes seleccionar un cliente.";
+  if (currentStep.value === 1 && !selectedBrand.value) {
+    error.value = "Debes seleccionar una marca.";
     return;
   }
   if (currentStep.value === 2 && !form.nombre) {
@@ -190,8 +194,7 @@ async function submit() {
     const payload: Record<string, unknown> = {
       nombre: form.nombre,
       descripcion: form.descripcion,
-      client: selectedClient.value,
-      brand: selectedBrand.value || null,
+      brand: selectedBrand.value,
       status: form.status,
       service_type: form.service_type,
       base_imponible: form.base_imponible || "0",
@@ -220,14 +223,14 @@ async function submit() {
   }
 }
 
-const stepLabels = ["Cliente", "Detalles", "Content Maker", "Resumen"];
+const stepLabels = ["Marca", "Detalles", "Content Maker", "Resumen"];
 
 // Exit warning
 const showExitWarning = ref(false);
 
 const hasFormData = computed(() => {
   return !!(
-    selectedClient.value ||
+    selectedBrand.value ||
     form.nombre ||
     form.descripcion ||
     selectedCMs.value.length ||
@@ -251,7 +254,6 @@ async function saveDraftAndClose() {
     const payload: Record<string, unknown> = {
       nombre: form.nombre || "",
       descripcion: form.descripcion,
-      client: selectedClient.value,
       brand: selectedBrand.value || null,
       status: form.status,
       service_type: form.service_type,
@@ -334,40 +336,38 @@ function discardAndClose() {
           <!-- Error -->
           <p v-if="error" class="text-xs text-red-500 bg-red-50 rounded-xl px-4 py-2.5 mb-4">{{ error }}</p>
 
-          <!-- Step 1: Client & Brand -->
+          <!-- Step 1: Brand -->
           <div v-if="currentStep === 1" class="space-y-5 animate-fade-up">
             <div>
-              <label class="block text-xs font-medium text-muted mb-1.5">Buscar cliente *</label>
+              <label class="block text-xs font-medium text-muted mb-1.5">Buscar marca *</label>
               <input
-                v-model="clientSearch"
+                v-model="brandSearch"
                 type="text"
-                placeholder="Nombre o ID del cliente…"
+                placeholder="Nombre de la marca…"
                 class="input-field"
+                :disabled="!!selectedBrand"
               />
-              <div v-if="clientSearchResults.length && !selectedClient" class="mt-2 rounded-xl border border-border/60 max-h-48 overflow-auto">
+              <div v-if="brandResults.length && !selectedBrand" class="mt-2 rounded-xl border border-border/60 max-h-48 overflow-auto">
                 <button
-                  v-for="c in clientSearchResults"
-                  :key="c.id"
+                  v-for="b in brandResults"
+                  :key="b.id"
                   class="w-full text-left px-4 py-2.5 text-sm hover:bg-panel/60 transition-colors border-b border-border/20 last:border-0"
-                  @click="selectedClient = c.id; clientSearch = c.nombre_cliente"
+                  @click="selectBrand(b)"
                 >
-                  <span class="font-medium text-ink">{{ c.nombre_cliente }}</span>
-                  <span class="text-muted ml-2 text-xs">{{ formatClientId(c.cliente_id) }}</span>
-                  <span v-if="c.es_agencia" class="ml-2 text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium">Agencia</span>
+                  <span class="font-medium text-ink">{{ b.nombre }}</span>
+                  <span class="text-muted ml-2 text-xs">{{ formatBrandId(b.brand_id) }}</span>
+                  <span class="text-muted/60 ml-2 text-xs">— {{ b.client_name }}</span>
                 </button>
               </div>
-              <div v-if="selectedClient" class="mt-2 flex items-center gap-2">
-                <span class="text-xs text-gold font-medium">✓ Cliente seleccionado</span>
-                <button class="text-xs text-muted hover:text-red-500 transition-colors" @click="selectedClient = null; selectedBrand = null; clientSearch = ''">Cambiar</button>
+              <div v-if="selectedBrand" class="mt-2 flex items-center gap-2">
+                <span class="text-xs text-gold font-medium">✓ Marca seleccionada</span>
+                <button class="text-xs text-muted hover:text-red-500 transition-colors" @click="clearBrand">Cambiar</button>
               </div>
             </div>
 
-            <div v-if="selectedClient && brands.length > 0">
-              <label class="block text-xs font-medium text-muted mb-1.5">Marca (opcional)</label>
-              <select v-model="selectedBrand" class="select-field">
-                <option :value="null">Sin marca específica</option>
-                <option v-for="b in brands" :key="b.id" :value="b.id">{{ b.nombre }}</option>
-              </select>
+            <div v-if="selectedBrand" class="rounded-xl border border-border/60 bg-panel/30 p-4 space-y-2">
+              <p class="text-xs text-muted font-medium">Cliente asociado (automático)</p>
+              <p class="text-sm text-ink font-medium">{{ inheritedClientName }}</p>
             </div>
           </div>
 
@@ -519,8 +519,12 @@ function discardAndClose() {
           <div v-if="currentStep === 4" class="space-y-4 animate-fade-up">
             <div class="rounded-xl border border-border/60 divide-y divide-border/40">
               <div class="px-4 py-3 flex justify-between">
-                <span class="text-xs text-muted">Cliente</span>
-                <span class="text-xs text-ink font-medium">{{ clientSearch }}</span>
+                <span class="text-xs text-muted">Marca</span>
+                <span class="text-xs text-ink font-medium">{{ selectedBrandName }}</span>
+              </div>
+              <div class="px-4 py-3 flex justify-between">
+                <span class="text-xs text-muted">Cliente (heredado)</span>
+                <span class="text-xs text-ink font-medium">{{ inheritedClientName }}</span>
               </div>
               <div class="px-4 py-3 flex justify-between">
                 <span class="text-xs text-muted">ID Proyecto</span>

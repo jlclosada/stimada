@@ -136,6 +136,26 @@ async function handleChangePassword() {
 const favoriteCMs = ref<any[]>([]);
 const loadingFavorites = ref(false);
 
+// Client brands
+const clientBrands = ref<{ id: number; brand_id: string; nombre: string; estado: string }[]>([]);
+const loadingBrands = ref(false);
+
+async function fetchClientBrands() {
+  if (!isClient.value) return;
+  loadingBrands.value = true;
+  try {
+    const data = await $fetch<any>(
+      `${config.public.apiBase}/clients/me/`,
+      { headers: { Authorization: `Bearer ${auth.accessToken}` } }
+    );
+    clientBrands.value = data.brands ?? [];
+  } catch {
+    clientBrands.value = [];
+  } finally {
+    loadingBrands.value = false;
+  }
+}
+
 async function fetchFavoriteCMs() {
   if (!isClient.value) return;
   loadingFavorites.value = true;
@@ -180,6 +200,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 onMounted(() => {
   fetchFavoriteCMs();
+  fetchClientBrands();
 });
 </script>
 
@@ -305,6 +326,51 @@ onMounted(() => {
             {{ isLoading ? "Guardando…" : "Guardar cambios" }}
           </button>
         </form>
+      </div>
+
+      <!-- Client Brands -->
+      <div v-if="isClient" class="rounded-2xl border border-border/60 bg-white shadow-card p-6">
+        <h2 class="text-sm font-semibold text-ink mb-5 flex items-center gap-2">
+          <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+          </svg>
+          Mis marcas
+        </h2>
+
+        <div v-if="loadingBrands" class="flex justify-center py-6">
+          <div class="w-5 h-5 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
+        </div>
+
+        <div v-else-if="clientBrands.length" class="space-y-2">
+          <div
+            v-for="brand in clientBrands"
+            :key="brand.id"
+            class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-panel/40 transition-colors"
+          >
+            <div class="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
+              <span class="text-[11px] font-bold text-indigo-400">{{ brand.nombre.charAt(0) }}</span>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-medium text-ink truncate">{{ brand.nombre }}</p>
+              <p class="text-[10px] text-muted/60 font-mono">{{ brand.brand_id }}</p>
+            </div>
+            <span
+              class="text-[10px] font-medium px-2 py-0.5 rounded-full border"
+              :class="brand.estado === 'activa' ? 'text-emerald-500 bg-emerald-50 border-emerald-200' : 'text-muted bg-panel border-border/40'"
+            >
+              {{ brand.estado === 'activa' ? 'Activa' : 'Inactiva' }}
+            </span>
+          </div>
+        </div>
+
+        <div v-else class="text-center py-6">
+          <svg class="w-8 h-8 text-muted/20 mx-auto mb-2" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+          </svg>
+          <p class="text-[11px] text-muted">No hay marcas asociadas a tu cuenta.</p>
+        </div>
       </div>
 
       <!-- Favorite CMs (client only) -->
