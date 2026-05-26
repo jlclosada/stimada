@@ -4,11 +4,22 @@ from apps.clients.models import Brand, ClientProfile
 from apps.content_makers.models import ContentMakerProfile
 from apps.projects.models import (
     Briefing,
+    BriefingLink,
+    BriefingPhoto,
+    Entregable,
+    LogisticaProducto,
+    ModalidadEconomica,
     Notification,
     Project,
     ProjectContentMaker,
     ProjectStatus,
+    QuienGraba,
+    QuienPublica,
+    QuienRevisa,
+    RecogidaProducto,
     ServiceType,
+    StatusChangeLog,
+    WinStatus,
 )
 
 
@@ -21,6 +32,48 @@ class ProjectStatusSerializer(serializers.ModelSerializer):
 class ServiceTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceType
+        fields = ["id", "nombre"]
+
+
+class ModalidadEconomicaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ModalidadEconomica
+        fields = ["id", "nombre"]
+
+
+class LogisticaProductoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LogisticaProducto
+        fields = ["id", "nombre"]
+
+
+class RecogidaProductoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RecogidaProducto
+        fields = ["id", "nombre"]
+
+
+class QuienGrabaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuienGraba
+        fields = ["id", "nombre"]
+
+
+class QuienRevisaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuienRevisa
+        fields = ["id", "nombre"]
+
+
+class QuienPublicaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuienPublica
+        fields = ["id", "nombre"]
+
+
+class WinStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WinStatus
         fields = ["id", "nombre"]
 
 
@@ -48,7 +101,9 @@ class ProjectContentMakerSerializer(serializers.ModelSerializer):
             "seguidores_instagram",
             "status",
             "is_recommended",
+            "is_suplente",
             "note",
+            "responded_at",
         ]
 
     def get_nombre(self, obj):
@@ -72,8 +127,15 @@ class ProjectListSerializer(serializers.ModelSerializer):
     service_type_name = serializers.CharField(
         source="service_type.nombre", read_only=True, default=None
     )
+    modalidad_economica_name = serializers.CharField(
+        source="modalidad_economica.nombre", read_only=True, default=None
+    )
+    win_status_name = serializers.CharField(
+        source="win_status.nombre", read_only=True, default=None
+    )
     precio_total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     content_maker_name = serializers.SerializerMethodField()
+    is_active = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Project
@@ -85,6 +147,9 @@ class ProjectListSerializer(serializers.ModelSerializer):
             "brand_name",
             "status_name",
             "service_type_name",
+            "modalidad_economica_name",
+            "win_status_name",
+            "semaforo_proyecto",
             "base_imponible",
             "impuestos",
             "precio_total",
@@ -93,7 +158,9 @@ class ProjectListSerializer(serializers.ModelSerializer):
             "fecha_fin",
             "cm_selection_mode",
             "content_maker_name",
+            "retrasado",
             "is_draft",
+            "is_active",
             "created_at",
         ]
 
@@ -115,7 +182,29 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
     service_type_name = serializers.CharField(
         source="service_type.nombre", read_only=True, default=None
     )
+    modalidad_economica_name = serializers.CharField(
+        source="modalidad_economica.nombre", read_only=True, default=None
+    )
+    logistica_producto_name = serializers.CharField(
+        source="logistica_producto.nombre", read_only=True, default=None
+    )
+    recogida_producto_name = serializers.CharField(
+        source="recogida_producto.nombre", read_only=True, default=None
+    )
+    quien_graba_name = serializers.CharField(
+        source="quien_graba.nombre", read_only=True, default=None
+    )
+    quien_revisa_name = serializers.CharField(
+        source="quien_revisa.nombre", read_only=True, default=None
+    )
+    quien_publica_name = serializers.CharField(
+        source="quien_publica.nombre", read_only=True, default=None
+    )
+    win_status_name = serializers.CharField(
+        source="win_status.nombre", read_only=True, default=None
+    )
     precio_total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    is_active = serializers.BooleanField(read_only=True)
     content_makers = ProjectContentMakerSerializer(many=True, read_only=True)
     content_maker_name = serializers.SerializerMethodField()
     created_by_name = serializers.CharField(
@@ -138,17 +227,44 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
             "status_name",
             "service_type",
             "service_type_name",
+            # Modalidad operativa
+            "modalidad_economica",
+            "modalidad_economica_name",
+            "logistica_producto",
+            "logistica_producto_name",
+            "recogida_producto",
+            "recogida_producto_name",
+            "quien_graba",
+            "quien_graba_name",
+            "quien_revisa",
+            "quien_revisa_name",
+            "quien_publica",
+            "quien_publica_name",
+            "devolucion_producto",
+            # Estado y pipeline
+            "win_status",
+            "win_status_name",
+            "semaforo_proyecto",
+            "retrasado",
+            "is_active",
+            # Económica
             "base_imponible",
             "impuestos",
             "precio_total",
+            # Fechas
             "fecha_venta",
             "fecha_servicio",
+            "fecha_llegada_producto",
+            "fecha_limite_entrega",
             "fecha_fin",
+            # CMs
             "cm_selection_mode",
             "content_maker",
             "content_maker_name",
             "content_makers",
             "briefings",
+            # Meta
+            "comentarios",
             "is_draft",
             "created_by_name",
             "created_at",
@@ -178,6 +294,12 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         write_only=True,
         default=[],
     )
+    suplente_cms = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        write_only=True,
+        default=[],
+    )
     is_draft = serializers.BooleanField(required=False, default=False)
 
     class Meta:
@@ -190,15 +312,33 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             "brand",
             "status",
             "service_type",
+            # Modalidad operativa
+            "modalidad_economica",
+            "logistica_producto",
+            "recogida_producto",
+            "quien_graba",
+            "quien_revisa",
+            "quien_publica",
+            "devolucion_producto",
+            # Estado y pipeline
+            "win_status",
+            "semaforo_proyecto",
+            "comentarios",
+            # Económica
             "base_imponible",
             "impuestos",
+            # Fechas
             "fecha_venta",
             "fecha_servicio",
+            "fecha_llegada_producto",
+            "fecha_limite_entrega",
             "fecha_fin",
+            # CM
             "cm_selection_mode",
             "content_maker",
             "recommended_cms",
             "defined_cms",
+            "suplente_cms",
             "is_draft",
         ]
         extra_kwargs = {
@@ -259,6 +399,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
         recommended_cms = validated_data.pop("recommended_cms", [])
         defined_cms = validated_data.pop("defined_cms", [])
+        suplente_cms = validated_data.pop("suplente_cms", [])
         is_draft = validated_data.pop("is_draft", False)
 
         if is_draft:
@@ -289,14 +430,14 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                 for cm in cms
             ])
 
-        # Handle defined CMs (multiple)
+        # Handle defined CMs (multiple) - Principales
         if defined_cms:
             cms = ContentMakerProfile.objects.filter(id__in=defined_cms)
             for cm in cms:
                 ProjectContentMaker.objects.get_or_create(
                     project=project,
                     content_maker=cm,
-                    defaults={"status": ProjectContentMaker.STATUS_PENDING},
+                    defaults={"status": ProjectContentMaker.STATUS_PENDING, "is_suplente": False},
                 )
         # Legacy single CM support
         elif project.content_maker:
@@ -306,9 +447,26 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                 defaults={"status": ProjectContentMaker.STATUS_PENDING},
             )
 
+        # Handle suplente CMs
+        if suplente_cms:
+            cms = ContentMakerProfile.objects.filter(id__in=suplente_cms)
+            for cm in cms:
+                ProjectContentMaker.objects.get_or_create(
+                    project=project,
+                    content_maker=cm,
+                    defaults={
+                        "status": ProjectContentMaker.STATUS_PENDING,
+                        "is_suplente": True,
+                    },
+                )
+
         # Create notifications based on selection mode (skip for drafts)
         if not project.is_draft:
             self._create_notifications(project, defined_cms)
+
+            # Evaluate automatic state transition based on assigned CMs
+            from apps.projects.services import transition_project_status
+            transition_project_status(project)
 
         return project
 
@@ -363,6 +521,11 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
         required=False,
         write_only=True,
     )
+    suplente_cms = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        write_only=True,
+    )
 
     class Meta:
         model = Project
@@ -372,15 +535,33 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
             "brand",
             "status",
             "service_type",
+            # Modalidad operativa
+            "modalidad_economica",
+            "logistica_producto",
+            "recogida_producto",
+            "quien_graba",
+            "quien_revisa",
+            "quien_publica",
+            "devolucion_producto",
+            # Estado y pipeline
+            "win_status",
+            "semaforo_proyecto",
+            "comentarios",
+            # Económica
             "base_imponible",
             "impuestos",
+            # Fechas
             "fecha_venta",
             "fecha_servicio",
+            "fecha_llegada_producto",
+            "fecha_limite_entrega",
             "fecha_fin",
+            # CM
             "cm_selection_mode",
             "content_maker",
             "recommended_cms",
             "defined_cms",
+            "suplente_cms",
             "is_draft",
         ]
 
@@ -490,8 +671,31 @@ class NotificationSerializer(serializers.ModelSerializer):
         read_only_fields = ["notification_type", "title", "message", "project", "created_at"]
 
 
+class BriefingLinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BriefingLink
+        fields = ["id", "url", "titulo", "orden"]
+
+
+class BriefingPhotoSerializer(serializers.ModelSerializer):
+    imagen_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BriefingPhoto
+        fields = ["id", "imagen", "imagen_url", "descripcion", "orden"]
+        extra_kwargs = {"imagen": {"write_only": True}}
+
+    def get_imagen_url(self, obj):
+        request = self.context.get("request")
+        if obj.imagen and request:
+            return request.build_absolute_uri(obj.imagen.url)
+        return obj.imagen.url if obj.imagen else None
+
+
 class BriefingSerializer(serializers.ModelSerializer):
     content_maker_name = serializers.SerializerMethodField()
+    links = BriefingLinkSerializer(many=True, read_only=True)
+    photos = BriefingPhotoSerializer(many=True, read_only=True)
 
     class Meta:
         model = Briefing
@@ -500,8 +704,9 @@ class BriefingSerializer(serializers.ModelSerializer):
             "project",
             "content_maker",
             "content_maker_name",
-            "link_referencia",
             "comentarios",
+            "links",
+            "photos",
             "created_at",
             "updated_at",
         ]
@@ -510,3 +715,74 @@ class BriefingSerializer(serializers.ModelSerializer):
     def get_content_maker_name(self, obj):
         cm = obj.content_maker
         return f"{cm.nombre} {cm.apellidos}".strip()
+
+
+class EntregableSerializer(serializers.ModelSerializer):
+    content_maker_name = serializers.SerializerMethodField()
+    reviewed_by_name = serializers.SerializerMethodField()
+    can_request_revision = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Entregable
+        fields = [
+            "id",
+            "project",
+            "content_maker",
+            "content_maker_name",
+            "archivo",
+            "descripcion",
+            "status",
+            "revision_round",
+            "revision_notes",
+            "reviewed_by",
+            "reviewed_by_name",
+            "reviewed_at",
+            "published_at",
+            "uploaded_at",
+            "can_request_revision",
+        ]
+        read_only_fields = [
+            "uploaded_at", "reviewed_at", "reviewed_by",
+            "revision_round", "can_request_revision",
+        ]
+
+    def get_content_maker_name(self, obj):
+        cm = obj.content_maker
+        return f"{cm.nombre} {cm.apellidos}".strip()
+
+    def get_reviewed_by_name(self, obj):
+        if obj.reviewed_by:
+            return obj.reviewed_by.full_name
+        return None
+
+
+class StatusChangeLogSerializer(serializers.ModelSerializer):
+    from_status_name = serializers.SerializerMethodField()
+    to_status_name = serializers.SerializerMethodField()
+    changed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StatusChangeLog
+        fields = [
+            "id",
+            "from_status",
+            "from_status_name",
+            "to_status",
+            "to_status_name",
+            "is_manual",
+            "reason",
+            "changed_by",
+            "changed_by_name",
+            "timestamp",
+        ]
+
+    def get_from_status_name(self, obj):
+        return obj.from_status.nombre if obj.from_status else None
+
+    def get_to_status_name(self, obj):
+        return obj.to_status.nombre if obj.to_status else None
+
+    def get_changed_by_name(self, obj):
+        if obj.changed_by:
+            return obj.changed_by.full_name
+        return "Sistema"

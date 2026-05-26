@@ -3,6 +3,8 @@ from rest_framework.routers import DefaultRouter
 
 from apps.accounts.views import (
     ChangePasswordView,
+    GiveAccessClientView,
+    GiveAccessCMView,
     LoginView,
     LogoutView,
     MeView,
@@ -30,4 +32,6 @@ auth_urlpatterns = [
 urlpatterns = [
     path("auth/", include(auth_urlpatterns)),
     path("", include(router.urls)),
+    path("content-makers/<int:cm_id>/give-access/", GiveAccessCMView.as_view(), name="cm-give-access"),
+    path("clients/<int:client_id>/give-access/", GiveAccessClientView.as_view(), name="client-give-access"),
 ]

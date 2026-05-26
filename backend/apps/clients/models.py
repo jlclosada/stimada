@@ -148,6 +148,12 @@ class Brand(models.Model):
     )
     web_instagram = models.URLField(max_length=300, blank=True, verbose_name="Web / Instagram")
     notas = models.TextField(blank=True)
+
+    # Contacto propio de la marca (si vacío, hereda del cliente)
+    persona_contacto = models.CharField(max_length=200, blank=True, verbose_name="Persona de contacto")
+    email_contacto = models.EmailField(blank=True, verbose_name="Email de contacto")
+    telefono = models.CharField(max_length=30, blank=True, verbose_name="Teléfono")
+
     estado = models.CharField(
         max_length=10, choices=ESTADO_CHOICES, default=ESTADO_ACTIVA
     )

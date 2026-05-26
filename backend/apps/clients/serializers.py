@@ -113,13 +113,17 @@ class BrandDetailSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source="client.nombre_cliente", read_only=True)
     tipo_marca_nombre = serializers.SerializerMethodField()
     proyectos = serializers.SerializerMethodField()
+    cliente_datos = serializers.SerializerMethodField()
+    contacto_efectivo = serializers.SerializerMethodField()
 
     class Meta:
         model = Brand
         fields = [
             "id", "brand_id", "nombre", "client", "client_name",
             "tipo_marca", "tipo_marca_nombre", "web_instagram",
+            "persona_contacto", "email_contacto", "telefono",
             "notas", "estado", "created_at", "proyectos",
+            "cliente_datos", "contacto_efectivo",
         ]
 
     def get_tipo_marca_nombre(self, obj):
@@ -139,8 +143,46 @@ class BrandDetailSerializer(serializers.ModelSerializer):
             for p in projects
         ]
 
+    def get_cliente_datos(self, obj):
+        """Return inherited client data for the brand detail view."""
+        c = obj.client
+        return {
+            "id": c.id,
+            "cliente_id": c.cliente_id,
+            "nombre_cliente": c.nombre_cliente,
+            "es_agencia": c.es_agencia,
+            "tipo_nombre": c.tipo_cliente.nombre if c.tipo_cliente_id else None,
+            "web_instagram": c.web_instagram,
+            "persona_contacto": c.persona_contacto,
+            "email_contacto": c.email_contacto,
+            "telefono": c.telefono,
+            "nombre_facturacion": c.nombre_facturacion,
+            "cif": c.cif,
+            "email_facturacion": c.email_facturacion,
+            "direccion_facturacion": c.direccion_facturacion,
+            "codigo_postal": c.codigo_postal,
+            "ciudad": c.ciudad,
+            "pais": c.pais,
+            "estado": c.estado,
+        }
+
+    def get_contacto_efectivo(self, obj):
+        """Return effective contact: brand's own if set, otherwise inherited from client."""
+        c = obj.client
+        has_own = bool(obj.persona_contacto or obj.email_contacto or obj.telefono)
+        return {
+            "persona_contacto": obj.persona_contacto or c.persona_contacto,
+            "email_contacto": obj.email_contacto or c.email_contacto,
+            "telefono": obj.telefono or c.telefono,
+            "es_propio": has_own,
+        }
+
 
 class BrandCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
-        fields = ["nombre", "client", "tipo_marca", "web_instagram", "notas", "estado"]
+        fields = [
+            "nombre", "client", "tipo_marca", "web_instagram",
+            "persona_contacto", "email_contacto", "telefono",
+            "notas", "estado",
+        ]

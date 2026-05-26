@@ -237,7 +237,7 @@ class ClientFavoriteCMsView(APIView):
 
 class BrandViewSet(ModelViewSet):
     permission_classes = [IsAdminOrEmployee]
-    queryset = Brand.objects.select_related("client", "tipo_marca").order_by("nombre")
+    queryset = Brand.objects.select_related("client", "client__tipo_cliente", "tipo_marca").order_by("nombre")
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):

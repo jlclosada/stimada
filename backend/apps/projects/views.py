@@ -8,21 +8,50 @@ from rest_framework.response import Response
 from apps.content_makers.models import ContentMakerProfile
 from apps.projects.models import (
     Briefing,
+    BriefingLink,
+    BriefingPhoto,
+    Entregable,
+    LogisticaProducto,
+    ModalidadEconomica,
     Notification,
     Project,
     ProjectContentMaker,
     ProjectStatus,
+    QuienGraba,
+    QuienPublica,
+    QuienRevisa,
+    RecogidaProducto,
     ServiceType,
+    StatusChangeLog,
+    WinStatus,
 )
 from apps.projects.serializers import (
     BriefingSerializer,
+    EntregableSerializer,
+    LogisticaProductoSerializer,
+    ModalidadEconomicaSerializer,
     NotificationSerializer,
     ProjectCreateSerializer,
     ProjectDetailSerializer,
     ProjectListSerializer,
     ProjectStatusSerializer,
     ProjectUpdateSerializer,
+    QuienGrabaSerializer,
+    QuienPublicaSerializer,
+    QuienRevisaSerializer,
+    RecogidaProductoSerializer,
     ServiceTypeSerializer,
+    StatusChangeLogSerializer,
+    WinStatusSerializer,
+)
+from apps.projects.services import (
+    handle_briefing_submitted,
+    handle_cm_accept,
+    handle_cm_reject,
+    handle_entregable_review,
+    handle_entregable_upload,
+    override_project_status,
+    transition_project_status,
 )
 from config.pagination import FlexiblePageNumberPagination
 
@@ -114,42 +143,16 @@ class ProjectViewSet(viewsets.ModelViewSet):
         project = self.get_object()
         user = request.user
 
-        # Find the CM profile for this user
         if not hasattr(user, "content_maker_profile"):
             return Response({"detail": "No eres una content maker."}, status=status.HTTP_403_FORBIDDEN)
 
         cm_profile = user.content_maker_profile
+        success = handle_cm_accept(project, cm_profile, user=user)
 
-        # Update ProjectContentMaker status
-        pcm = ProjectContentMaker.objects.filter(project=project, content_maker=cm_profile).first()
-        if pcm:
-            pcm.status = ProjectContentMaker.STATUS_ACCEPTED
-            pcm.save()
-
-        # Transition project to Briefing phase
-        briefing_status = ProjectStatus.objects.filter(nombre="Briefing").first()
-        if briefing_status:
-            project.status = briefing_status
-            project.save()
-
-        # Notify the admin/creator
-        if project.created_by:
-            Notification.objects.create(
-                recipient=project.created_by,
-                notification_type=Notification.TYPE_PROJECT_CM_ACCEPTED,
-                title="Content Maker aceptó el proyecto",
-                message=f'{cm_profile.nombre} {cm_profile.apellidos} ha aceptado el proyecto "{project.nombre}".',
-                project=project,
-            )
-
-        # Notify client — tell them to fill in the briefing
-        if project.client.user:
-            Notification.objects.create(
-                recipient=project.client.user,
-                notification_type=Notification.TYPE_PROJECT_CM_ACCEPTED,
-                title="Content Maker confirmada — Completa el briefing",
-                message=f'{cm_profile.nombre} {cm_profile.apellidos} ha aceptado participar en "{project.nombre}". Por favor, completa el briefing.',
-                project=project,
+        if not success:
+            return Response(
+                {"detail": "No estás asignada a este proyecto."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         return Response({"status": "accepted"})
@@ -163,51 +166,345 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No eres una content maker."}, status=status.HTTP_403_FORBIDDEN)
 
         cm_profile = user.content_maker_profile
+        success = handle_cm_reject(project, cm_profile, user=user)
 
-        # Update ProjectContentMaker status
-        pcm = ProjectContentMaker.objects.filter(project=project, content_maker=cm_profile).first()
-        if pcm:
-            pcm.status = ProjectContentMaker.STATUS_REJECTED
-            pcm.save()
+        if not success:
+            return Response(
+                {"detail": "No estás asignada a este proyecto."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        # If this was the assigned CM, unassign
-        if project.content_maker == cm_profile:
-            project.content_maker = None
-            project.save()
+        return Response({"status": "rejected"})
 
-        # Notify the admin/creator
-        if project.created_by:
+    @action(detail=True, methods=["post"], url_path="override_status")
+    def override_status(self, request, pk=None):
+        """Manual status override by Admin/Employee with mandatory reason."""
+        project = self.get_object()
+        user = request.user
+
+        if user.role not in ("admin", "stimada_employee"):
+            return Response(
+                {"detail": "Solo administradores y empleados pueden cambiar el estado manualmente."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        new_status_name = request.data.get("status")
+        reason = request.data.get("reason", "").strip()
+
+        if not new_status_name:
+            return Response({"detail": "Debes indicar el estado destino."}, status=status.HTTP_400_BAD_REQUEST)
+        if not reason:
+            return Response({"detail": "El motivo del cambio es obligatorio."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            result = override_project_status(project, new_status_name, user, reason)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"status": "overridden", "new_status": result})
+
+    @action(detail=True, methods=["get"], url_path="status_history")
+    def status_history(self, request, pk=None):
+        """Get status change history for a project."""
+        project = self.get_object()
+        changes = StatusChangeLog.objects.filter(project=project).select_related(
+            "from_status", "to_status", "changed_by"
+        )
+        data = StatusChangeLogSerializer(changes, many=True).data
+        return Response(data)
+
+    @action(detail=True, methods=["post"], url_path="upload_entregable")
+    def upload_entregable(self, request, pk=None):
+        """CM uploads a deliverable for the project."""
+        project = self.get_object()
+        user = request.user
+
+        if not hasattr(user, "content_maker_profile"):
+            return Response({"detail": "No eres una content maker."}, status=status.HTTP_403_FORBIDDEN)
+
+        cm_profile = user.content_maker_profile
+
+        # Verify CM is accepted on this project
+        pcm = ProjectContentMaker.objects.filter(
+            project=project, content_maker=cm_profile, status=ProjectContentMaker.STATUS_ACCEPTED
+        ).first()
+        if not pcm:
+            return Response({"detail": "No estás confirmada en este proyecto."}, status=status.HTTP_403_FORBIDDEN)
+
+        archivo = request.FILES.get("archivo")
+        if not archivo:
+            return Response({"detail": "Debes subir un archivo."}, status=status.HTTP_400_BAD_REQUEST)
+
+        descripcion = request.data.get("descripcion", "")
+
+        entregable = Entregable.objects.create(
+            project=project,
+            content_maker=cm_profile,
+            archivo=archivo,
+            descripcion=descripcion,
+        )
+
+        handle_entregable_upload(project, entregable)
+        return Response(EntregableSerializer(entregable).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="reupload_entregable")
+    def reupload_entregable(self, request, pk=None):
+        """CM reuploads a deliverable after revision request."""
+        project = self.get_object()
+        user = request.user
+
+        if not hasattr(user, "content_maker_profile"):
+            return Response({"detail": "No eres una content maker."}, status=status.HTTP_403_FORBIDDEN)
+
+        cm_profile = user.content_maker_profile
+
+        entregable_id = request.data.get("entregable_id")
+        if not entregable_id:
+            return Response({"detail": "Debes indicar entregable_id."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            entregable = Entregable.objects.get(id=entregable_id, project=project, content_maker=cm_profile)
+        except Entregable.DoesNotExist:
+            return Response({"detail": "Entregable no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        if entregable.status != Entregable.STATUS_REVISION:
+            return Response(
+                {"detail": "Solo puedes resubir un entregable en estado de revisión."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        archivo = request.FILES.get("archivo")
+        if not archivo:
+            return Response({"detail": "Debes subir un archivo."}, status=status.HTTP_400_BAD_REQUEST)
+
+        entregable.archivo = archivo
+        entregable.status = Entregable.STATUS_PENDING
+        entregable.revision_round += 1
+        entregable.reviewed_by = None
+        entregable.reviewed_at = None
+        entregable.save()
+
+        handle_entregable_upload(project, entregable)
+        return Response(EntregableSerializer(entregable).data)
+
+    @action(detail=True, methods=["post"], url_path="review_entregable")
+    def review_entregable(self, request, pk=None):
+        """PM reviews a deliverable (approve or request revision)."""
+        project = self.get_object()
+        user = request.user
+
+        if user.role not in ("admin", "stimada_employee"):
+            return Response(
+                {"detail": "Solo administradores y empleados pueden revisar entregables."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        entregable_id = request.data.get("entregable_id")
+        approved = request.data.get("approved")
+        notes = request.data.get("notes", "")
+
+        if entregable_id is None or approved is None:
+            return Response(
+                {"detail": "Debes indicar entregable_id y approved (true/false)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            entregable = Entregable.objects.get(id=entregable_id, project=project)
+        except Entregable.DoesNotExist:
+            return Response({"detail": "Entregable no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            handle_entregable_review(entregable, user, approved=bool(approved), notes=notes)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(EntregableSerializer(entregable).data)
+
+    @action(detail=True, methods=["get"], url_path="entregables")
+    def list_entregables(self, request, pk=None):
+        """List all deliverables for a project."""
+        project = self.get_object()
+        entregables = project.entregables.select_related("content_maker", "reviewed_by")
+        return Response(EntregableSerializer(entregables, many=True).data)
+
+    @action(detail=True, methods=["post"], url_path="mark_published")
+    def mark_published(self, request, pk=None):
+        """Mark an approved entregable as published (set published_at)."""
+        project = self.get_object()
+        user = request.user
+
+        if user.role not in ("admin", "stimada_employee"):
+            return Response(
+                {"detail": "Solo administradores y empleados pueden marcar como publicado."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        entregable_id = request.data.get("entregable_id")
+        if not entregable_id:
+            return Response({"detail": "Debes indicar entregable_id."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            entregable = Entregable.objects.get(id=entregable_id, project=project)
+        except Entregable.DoesNotExist:
+            return Response({"detail": "Entregable no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        if entregable.status != Entregable.STATUS_APPROVED:
+            return Response(
+                {"detail": "Solo se pueden marcar como publicados entregables aprobados."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from django.utils import timezone as tz
+        entregable.published_at = tz.now()
+        entregable.save(update_fields=["published_at"])
+
+        # Notify the CM that her content was published
+        if entregable.content_maker.user:
             Notification.objects.create(
-                recipient=project.created_by,
-                notification_type=Notification.TYPE_PROJECT_CM_REJECTED,
-                title="Content Maker rechazó el proyecto",
-                message=f'{cm_profile.nombre} {cm_profile.apellidos} ha rechazado el proyecto "{project.nombre}".',
+                recipient=entregable.content_maker.user,
+                notification_type=Notification.TYPE_DELIVERY_APPROVED,
+                title="Tu contenido ha sido publicado",
+                message=f'Tu entregable para "{project.nombre}" ha sido publicado.',
                 project=project,
             )
 
-        # Notify client — different message depending on mode
-        if project.client.user:
-            if project.cm_selection_mode in (
-                Project.CM_SELECTION_CLIENT_CHOOSES,
-                Project.CM_SELECTION_RECOMMENDED,
-            ):
+        # Notify client
+        if project.client and project.client.user:
+            Notification.objects.create(
+                recipient=project.client.user,
+                notification_type=Notification.TYPE_STATUS_CHANGED,
+                title="Contenido publicado",
+                message=f'Se ha publicado contenido en el proyecto "{project.nombre}".',
+                project=project,
+            )
+
+        # Evaluate state transition (may move to Publicado → Finalizado)
+        transition_project_status(project, user=user)
+
+        return Response(EntregableSerializer(entregable).data)
+
+    @action(detail=True, methods=["post"], url_path="delete_entregable")
+    def delete_entregable(self, request, pk=None):
+        """Admin/Employee can delete an entregable."""
+        project = self.get_object()
+        user = request.user
+
+        if user.role not in ("admin", "stimada_employee"):
+            return Response(
+                {"detail": "Solo administradores y empleados pueden eliminar entregables."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        entregable_id = request.data.get("entregable_id")
+        if not entregable_id:
+            return Response({"detail": "Debes indicar entregable_id."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            entregable = Entregable.objects.get(id=entregable_id, project=project)
+        except Entregable.DoesNotExist:
+            return Response({"detail": "Entregable no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        entregable.delete()
+        return Response({"status": "deleted"}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="change_entregable_status")
+    def change_entregable_status(self, request, pk=None):
+        """Admin/Employee can change an entregable's status freely."""
+        project = self.get_object()
+        user = request.user
+
+        if user.role not in ("admin", "stimada_employee"):
+            return Response(
+                {"detail": "Solo administradores y empleados pueden cambiar el estado."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        entregable_id = request.data.get("entregable_id")
+        new_status = request.data.get("status")
+
+        if not entregable_id or not new_status:
+            return Response(
+                {"detail": "Debes indicar entregable_id y status."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        valid_statuses = [c[0] for c in Entregable.STATUS_CHOICES]
+        if new_status not in valid_statuses:
+            return Response(
+                {"detail": f"Estado no válido. Opciones: {valid_statuses}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            entregable = Entregable.objects.get(id=entregable_id, project=project)
+        except Entregable.DoesNotExist:
+            return Response({"detail": "Entregable no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        entregable.status = new_status
+        if new_status == Entregable.STATUS_APPROVED:
+            entregable.reviewed_by = user
+        entregable.save()
+
+        transition_project_status(project, user=user)
+
+        return Response(EntregableSerializer(entregable).data)
+
+    @action(detail=True, methods=["post"], url_path="confirm_pickup")
+    def confirm_pickup(self, request, pk=None):
+        """Confirm product has been picked up (for devolucion_producto=True projects)."""
+        project = self.get_object()
+        user = request.user
+
+        if user.role not in ("admin", "stimada_employee"):
+            return Response(
+                {"detail": "Solo administradores y empleados pueden confirmar la recogida."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not project.devolucion_producto:
+            return Response(
+                {"detail": "Este proyecto no requiere devolución de producto."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Move to Proyecto Finalizado
+        from apps.projects.models import ProjectStatus as PS
+        finalizado = PS.objects.filter(nombre="Proyecto Finalizado").first()
+        if finalizado and project.status != finalizado:
+            old_status = project.status
+            project.status = finalizado
+            project.save(update_fields=["status", "updated_at"])
+            StatusChangeLog.objects.create(
+                project=project,
+                from_status=old_status,
+                to_status=finalizado,
+                is_manual=False,
+                reason="Recogida de producto confirmada.",
+                changed_by=user,
+            )
+
+            # Notify all involved parties
+            recipients = set()
+            if project.created_by:
+                recipients.add(project.created_by)
+            if project.client and project.client.user:
+                recipients.add(project.client.user)
+            # Notify accepted CMs
+            for pcm in project.content_makers.filter(status=ProjectContentMaker.STATUS_ACCEPTED).select_related("content_maker__user"):
+                if pcm.content_maker.user:
+                    recipients.add(pcm.content_maker.user)
+
+            for recipient in recipients:
                 Notification.objects.create(
-                    recipient=project.client.user,
-                    notification_type=Notification.TYPE_PROJECT_CM_SELECT,
-                    title="Debes seleccionar otra Content Maker",
-                    message=f'{cm_profile.nombre} {cm_profile.apellidos} no puede participar en "{project.nombre}". Por favor, elige otra Content Maker.',
-                    project=project,
-                )
-            else:
-                Notification.objects.create(
-                    recipient=project.client.user,
-                    notification_type=Notification.TYPE_PROJECT_CM_REJECTED,
-                    title="Content Maker no disponible",
-                    message=f'{cm_profile.nombre} {cm_profile.apellidos} no puede participar en el proyecto "{project.nombre}". Se buscará otra opción.',
+                    recipient=recipient,
+                    notification_type=Notification.TYPE_STATUS_CHANGED,
+                    title="Proyecto finalizado",
+                    message=f'El proyecto "{project.nombre}" ha sido finalizado. Producto recogido correctamente.',
                     project=project,
                 )
 
-        return Response({"status": "rejected"})
+        return Response({"status": "confirmed", "new_status": "Proyecto Finalizado"})
 
     @action(detail=True, methods=["post"], url_path="select_cm")
     def select_cm(self, request, pk=None):
@@ -335,9 +632,26 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def filters(self, request):
-        statuses = list(ProjectStatus.objects.values("id", "nombre"))
-        service_types = list(ServiceType.objects.values("id", "nombre"))
-        return Response({"statuses": statuses, "service_types": service_types})
+        statuses = ProjectStatusSerializer(ProjectStatus.objects.filter(activo=True), many=True).data
+        service_types = ServiceTypeSerializer(ServiceType.objects.filter(activo=True), many=True).data
+        modalidades_economicas = ModalidadEconomicaSerializer(ModalidadEconomica.objects.filter(activo=True), many=True).data
+        logistica_producto = LogisticaProductoSerializer(LogisticaProducto.objects.filter(activo=True), many=True).data
+        recogida_producto = RecogidaProductoSerializer(RecogidaProducto.objects.filter(activo=True), many=True).data
+        quien_graba = QuienGrabaSerializer(QuienGraba.objects.filter(activo=True), many=True).data
+        quien_revisa = QuienRevisaSerializer(QuienRevisa.objects.filter(activo=True), many=True).data
+        quien_publica = QuienPublicaSerializer(QuienPublica.objects.filter(activo=True), many=True).data
+        win_statuses = WinStatusSerializer(WinStatus.objects.filter(activo=True), many=True).data
+        return Response({
+            "statuses": statuses,
+            "service_types": service_types,
+            "modalidades_economicas": modalidades_economicas,
+            "logistica_producto": logistica_producto,
+            "recogida_producto": recogida_producto,
+            "quien_graba": quien_graba,
+            "quien_revisa": quien_revisa,
+            "quien_publica": quien_publica,
+            "win_statuses": win_statuses,
+        })
 
     @action(detail=False, methods=["get"])
     def next_id(self, request):
@@ -805,7 +1119,7 @@ class BriefingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Briefing.objects.select_related("project", "content_maker")
+        qs = Briefing.objects.select_related("project", "content_maker").prefetch_related("links", "photos")
 
         # CMs only see their own briefings
         if user.role == "content_maker" and hasattr(user, "content_maker_profile"):
@@ -821,8 +1135,15 @@ class BriefingViewSet(viewsets.ModelViewSet):
 
         return qs
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx["request"] = self.request
+        return ctx
+
     def create(self, request, *args, **kwargs):
         """Only clients (project owners) or admins can create briefings."""
+        import json
+
         user = request.user
         project_id = request.data.get("project")
 
@@ -851,15 +1172,109 @@ class BriefingViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         briefing = serializer.save(created_by=user)
 
-        # Notify the content maker
-        cm = briefing.content_maker
-        if cm.user:
-            Notification.objects.create(
-                recipient=cm.user,
-                notification_type=Notification.TYPE_BRIEFING_SUBMITTED,
-                title="Nuevo briefing recibido",
-                message=f'Has recibido el briefing para el proyecto "{project.nombre}".',
-                project=project,
+        # Create links from JSON array
+        links_raw = request.data.get("links", "[]")
+        if isinstance(links_raw, str):
+            try:
+                links_data = json.loads(links_raw)
+            except (json.JSONDecodeError, TypeError):
+                links_data = []
+        else:
+            links_data = links_raw if isinstance(links_raw, list) else []
+
+        for i, link in enumerate(links_data):
+            if isinstance(link, dict) and link.get("url"):
+                BriefingLink.objects.create(
+                    briefing=briefing,
+                    url=link["url"],
+                    titulo=link.get("titulo", ""),
+                    orden=i,
+                )
+
+        # Create photos from uploaded files
+        photos = request.FILES.getlist("photos")
+        for i, photo in enumerate(photos):
+            BriefingPhoto.objects.create(
+                briefing=briefing,
+                imagen=photo,
+                descripcion=request.data.get(f"photo_descripcion_{i}", ""),
+                orden=i,
             )
 
-        return Response(BriefingSerializer(briefing).data, status=status.HTTP_201_CREATED)
+        # Use service for notifications and state transitions
+        handle_briefing_submitted(briefing)
+
+        # Re-fetch to include nested data
+        briefing.refresh_from_db()
+        return Response(
+            BriefingSerializer(briefing, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        """Only admins/employees can modify an existing briefing."""
+        import json
+
+        user = request.user
+        if user.role not in ("admin", "stimada_employee"):
+            return Response(
+                {"detail": "Solo administradores y empleados pueden modificar briefings."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        briefing = self.get_object()
+
+        # Update comentarios if provided
+        if "comentarios" in request.data:
+            briefing.comentarios = request.data["comentarios"]
+            briefing.save(update_fields=["comentarios", "updated_at"])
+
+        # Update links: replace all with new set
+        links_raw = request.data.get("links")
+        if links_raw is not None:
+            if isinstance(links_raw, str):
+                try:
+                    links_data = json.loads(links_raw)
+                except (json.JSONDecodeError, TypeError):
+                    links_data = []
+            else:
+                links_data = links_raw if isinstance(links_raw, list) else []
+
+            briefing.links.all().delete()
+            for i, link in enumerate(links_data):
+                if isinstance(link, dict) and link.get("url"):
+                    BriefingLink.objects.create(
+                        briefing=briefing,
+                        url=link["url"],
+                        titulo=link.get("titulo", ""),
+                        orden=i,
+                    )
+
+        # Add new photos (existing photos are kept unless explicitly removed)
+        new_photos = request.FILES.getlist("photos")
+        existing_count = briefing.photos.count()
+        for i, photo in enumerate(new_photos):
+            BriefingPhoto.objects.create(
+                briefing=briefing,
+                imagen=photo,
+                descripcion=request.data.get(f"photo_descripcion_{i}", ""),
+                orden=existing_count + i,
+            )
+
+        # Remove specific photos by ID
+        remove_photos_raw = request.data.get("remove_photos")
+        if remove_photos_raw:
+            if isinstance(remove_photos_raw, str):
+                try:
+                    remove_ids = json.loads(remove_photos_raw)
+                except (json.JSONDecodeError, TypeError):
+                    remove_ids = []
+            else:
+                remove_ids = remove_photos_raw if isinstance(remove_photos_raw, list) else []
+            if remove_ids:
+                briefing.photos.filter(id__in=remove_ids).delete()
+
+        briefing.refresh_from_db()
+        return Response(
+            BriefingSerializer(briefing, context={"request": request}).data,
+        )

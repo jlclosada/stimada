@@ -269,3 +269,54 @@ class UserViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class GiveAccessCMView(APIView):
+    """Admin/Employee creates a user account for a Content Maker."""
+    permission_classes = [IsAdminOrEmployee]
+
+    def post(self, request, cm_id):
+        from apps.accounts.services import create_content_maker_account
+        from apps.content_makers.models import ContentMakerProfile
+
+        try:
+            cm_profile = ContentMakerProfile.objects.get(id=cm_id)
+        except ContentMakerProfile.DoesNotExist:
+            return Response({"detail": "Content Maker no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            user = create_content_maker_account(cm_profile, created_by=request.user)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"detail": "Cuenta creada y email enviado.", "user_id": user.id},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class GiveAccessClientView(APIView):
+    """
+    Admin/Employee creates a user account for a Client.
+    Requires: contrato_firmado = True and contrato file uploaded.
+    """
+    permission_classes = [IsAdminOrEmployee]
+
+    def post(self, request, client_id):
+        from apps.accounts.services import create_client_account
+        from apps.clients.models import ClientProfile
+
+        try:
+            client_profile = ClientProfile.objects.get(id=client_id)
+        except ClientProfile.DoesNotExist:
+            return Response({"detail": "Cliente no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            user = create_client_account(client_profile, created_by=request.user)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"detail": "Cuenta creada y email enviado.", "user_id": user.id},
+            status=status.HTTP_201_CREATED,
+        )
