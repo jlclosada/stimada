@@ -49,6 +49,7 @@ from apps.projects.services import (
     handle_cm_accept,
     handle_cm_reject,
     handle_entregable_review,
+    handle_entregable_status_change,
     handle_entregable_upload,
     override_project_status,
     transition_project_status,
@@ -441,13 +442,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
         except Entregable.DoesNotExist:
             return Response({"detail": "Entregable no encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
-        entregable.status = new_status
-        if new_status == Entregable.STATUS_APPROVED:
-            entregable.reviewed_by = user
-        entregable.save()
+        notes = request.data.get("notes", "")
+        handle_entregable_status_change(entregable, new_status, user=user, notes=notes)
 
-        transition_project_status(project, user=user)
-
+        entregable.refresh_from_db()
         return Response(EntregableSerializer(entregable).data)
 
     @action(detail=True, methods=["post"], url_path="confirm_pickup")

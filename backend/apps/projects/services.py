@@ -519,6 +519,116 @@ def handle_entregable_review(entregable, reviewer, approved: bool, notes: str = 
             )
 
 
+def handle_entregable_status_change(entregable, new_status: str, user=None, notes: str = ""):
+    """
+    Handle a manual entregable status change by admin/employee.
+    Updates the entregable, sends appropriate notifications, and
+    re-evaluates the project state (including going backwards if needed).
+    """
+    old_status = entregable.status
+    project = entregable.project
+
+    entregable.status = new_status
+    if new_status == Entregable.STATUS_APPROVED:
+        entregable.reviewed_by = user
+        entregable.reviewed_at = timezone.now()
+    elif new_status == Entregable.STATUS_REVISION:
+        entregable.reviewed_by = user
+        entregable.reviewed_at = timezone.now()
+        if notes:
+            entregable.revision_notes = notes
+    entregable.save()
+
+    # ─── Notifications based on the new status ───
+    cm_user = entregable.content_maker.user if entregable.content_maker else None
+
+    if new_status == Entregable.STATUS_REVISION and cm_user:
+        Notification.objects.create(
+            recipient=cm_user,
+            notification_type=Notification.TYPE_REVISION_REQUESTED,
+            title="Se requieren cambios en tu entregable",
+            message=f'Se han solicitado cambios en tu entrega para "{project.nombre}".{" Motivo: " + entregable.revision_notes if entregable.revision_notes else ""}',
+            project=project,
+        )
+    elif new_status == Entregable.STATUS_APPROVED and cm_user:
+        Notification.objects.create(
+            recipient=cm_user,
+            notification_type=Notification.TYPE_DELIVERY_APPROVED,
+            title="Entregable aprobado",
+            message=f'Tu entregable para "{project.nombre}" ha sido aprobado.',
+            project=project,
+        )
+    elif new_status == Entregable.STATUS_REJECTED and cm_user:
+        Notification.objects.create(
+            recipient=cm_user,
+            notification_type=Notification.TYPE_REVISION_REQUESTED,
+            title="Entregable rechazado",
+            message=f'Tu entregable para "{project.nombre}" ha sido rechazado.',
+            project=project,
+        )
+    elif new_status == Entregable.STATUS_PENDING and cm_user:
+        Notification.objects.create(
+            recipient=cm_user,
+            notification_type=Notification.TYPE_STATUS_CHANGED,
+            title="Entregable pendiente de revisión",
+            message=f'Tu entregable para "{project.nombre}" ha sido marcado como pendiente de revisión.',
+            project=project,
+        )
+
+    # ─── Re-evaluate the project status (bidirectional) ───
+    _reevaluate_project_from_entregables(project, user=user)
+
+
+def _reevaluate_project_from_entregables(project: Project, user=None):
+    """
+    Re-evaluate the project status based on entregable states.
+    Unlike `transition_project_status`, this can move the project BACKWARDS
+    when entregables are no longer in a higher state (e.g., approved → revision).
+
+    Logic:
+    - All entregables approved + published → Publicado / Proyecto Finalizado / Producto a Recoger
+    - All entregables approved (not all published) → Publicado
+    - Any entregable pending or in revision → Revisión (content uploaded, under review)
+    - No entregables → don't touch status
+    """
+    entregables = project.entregables.all()
+    if not entregables.exists():
+        return
+
+    all_approved = not entregables.exclude(status=Entregable.STATUS_APPROVED).exists()
+    all_published = all_approved and not entregables.filter(published_at__isnull=True).exists()
+    any_revision = entregables.filter(status=Entregable.STATUS_REVISION).exists()
+    any_pending = entregables.filter(status=Entregable.STATUS_PENDING).exists()
+
+    current_name = project.status.nombre if project.status else ""
+
+    # Determine the correct entregable-related status
+    target_name = None
+
+    if all_published:
+        if project.devolucion_producto:
+            if current_name == "Proyecto Finalizado":
+                return  # Already finalized, don't go back
+            target_name = "Producto a Recoger"
+        else:
+            target_name = "Proyecto Finalizado"
+    elif all_approved:
+        target_name = "Publicado"
+    elif any_revision or any_pending:
+        # Entregables exist but not all approved → project is in review phase
+        target_name = "Revisión"
+
+    if not target_name or target_name == current_name:
+        return
+
+    new_status = _get_status(target_name)
+    if not new_status:
+        return
+
+    old_status = project.status
+    _apply_transition(project, old_status, new_status, user=user, is_manual=False)
+
+
 # ─── Briefing Logic (6.6) ──────────────────────────────────────────────────────
 
 def handle_briefing_submitted(briefing):
