@@ -22,6 +22,7 @@ from apps.accounts.serializers import (
     UserDetailSerializer,
     UserUpdateSerializer,
 )
+from config.pagination import FlexiblePageNumberPagination
 
 
 def get_client_ip(request):
@@ -80,6 +81,35 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(UserDetailSerializer(request.user).data)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        current_password = request.data.get("current_password", "")
+        new_password = request.data.get("new_password", "")
+        confirm_password = request.data.get("confirm_password", "")
+
+        if not request.user.check_password(current_password):
+            return Response(
+                {"current_password": ["La contraseña actual es incorrecta."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(new_password) < 8:
+            return Response(
+                {"new_password": ["La contraseña debe tener al menos 8 caracteres."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if new_password != confirm_password:
+            return Response(
+                {"confirm_password": ["Las contraseñas no coinciden."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request.user.set_password(new_password)
+        request.user.save(update_fields=["password"])
+        return Response({"detail": "Contraseña actualizada correctamente."})
 
 
 class PasswordResetRequestView(APIView):
@@ -181,11 +211,23 @@ class UserViewSet(viewsets.ViewSet):
         return [IsAuthenticated()]
 
     def list(self, request):
-        qs = CustomUser.objects.all()
+        qs = CustomUser.objects.all().order_by("-created_at")
         if request.user.role == CustomUser.EMPLOYEE:
             qs = qs.filter(role__in=[CustomUser.CLIENT, CustomUser.CONTENT_MAKER])
-        serializer = UserDetailSerializer(qs, many=True)
-        return Response(serializer.data)
+
+        role = request.query_params.get("role")
+        if role:
+            qs = qs.filter(role=role)
+        status_filter = request.query_params.get("status")
+        if status_filter == "active":
+            qs = qs.filter(is_active=True)
+        elif status_filter == "inactive":
+            qs = qs.filter(is_active=False)
+
+        paginator = FlexiblePageNumberPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = UserDetailSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     def create(self, request):
         serializer = CreateUserSerializer(data=request.data, context={"request": request})
@@ -207,7 +249,13 @@ class UserViewSet(viewsets.ViewSet):
             user = CustomUser.objects.get(pk=pk)
         except CustomUser.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        if not (request.user.is_admin or str(request.user.pk) == pk):
+        # Admin can update anyone; employees can update clients/CMs; users can update themselves
+        is_self = str(request.user.pk) == pk
+        is_employee_managing = (
+            request.user.is_employee
+            and user.role in (CustomUser.CLIENT, CustomUser.CONTENT_MAKER)
+        )
+        if not (request.user.is_admin or is_employee_managing or is_self):
             return Response(status=status.HTTP_403_FORBIDDEN)
         serializer = UserUpdateSerializer(user, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -221,3 +269,54 @@ class UserViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class GiveAccessCMView(APIView):
+    """Admin/Employee creates a user account for a Content Maker."""
+    permission_classes = [IsAdminOrEmployee]
+
+    def post(self, request, cm_id):
+        from apps.accounts.services import create_content_maker_account
+        from apps.content_makers.models import ContentMakerProfile
+
+        try:
+            cm_profile = ContentMakerProfile.objects.get(id=cm_id)
+        except ContentMakerProfile.DoesNotExist:
+            return Response({"detail": "Content Maker no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            user = create_content_maker_account(cm_profile, created_by=request.user)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"detail": "Cuenta creada y email enviado.", "user_id": user.id},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class GiveAccessClientView(APIView):
+    """
+    Admin/Employee creates a user account for a Client.
+    Requires: contrato_firmado = True and contrato file uploaded.
+    """
+    permission_classes = [IsAdminOrEmployee]
+
+    def post(self, request, client_id):
+        from apps.accounts.services import create_client_account
+        from apps.clients.models import ClientProfile
+
+        try:
+            client_profile = ClientProfile.objects.get(id=client_id)
+        except ClientProfile.DoesNotExist:
+            return Response({"detail": "Cliente no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            user = create_client_account(client_profile, created_by=request.user)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"detail": "Cuenta creada y email enviado.", "user_id": user.id},
+            status=status.HTTP_201_CREATED,
+        )

@@ -8,7 +8,10 @@ urlpatterns = [
     path("api/", include("apps.accounts.urls")),
     path("api/", include("apps.content_makers.urls")),
     path("api/", include("apps.clients.urls")),
+    path("api/", include("apps.projects.urls")),
+    path("api/", include("apps.audit.urls")),
 ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

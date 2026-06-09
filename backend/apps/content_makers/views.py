@@ -5,15 +5,18 @@ from django.core.mail import send_mail
 from django.conf import settings
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.accounts.models import CustomUser
 from apps.accounts.permissions import IsAdminOrEmployee
-from apps.content_makers.models import ContentMakerProfile
+from apps.content_makers.models import ContentMakerProfile, ContentMakerStatus, ContentMakerType, DesempenoOption, TallajeCategory, TallajeOption
 from apps.content_makers.serializers import (
     ContentMakerCreateSerializer,
     ContentMakerDetailSerializer,
     ContentMakerListSerializer,
+    ContentMakerPublicSerializer,
 )
 
 
@@ -30,13 +33,89 @@ def _generate_password(length: int = 14) -> str:
             return pwd
 
 
+# Fields a Content Maker can NOT edit on their own profile
+CM_NON_EDITABLE_FIELDS = [
+    "nombre", "apellidos", "stimada_id",
+    "fee_instagram", "fee_tiktok",
+    "status", "tipo", "tipo_cm",
+    "categorias_contenido",
+    # Valoración interna (solo admin/empleados)
+    "desempeno", "calidad_contenido", "apariencia",
+    # Notas internas
+    "comentarios",
+    # DNI solo editable por admin
+    "dni_cif",
+    # Links y categorías de seguidores se autogeneran en el modelo
+    "link_instagram", "link_tiktok",
+    "categoria_seguidores_ig", "categoria_seguidores_tt",
+    "user", "created_at", "updated_at",
+]
+
+
+class ContentMakerMeView(APIView):
+    """Endpoint for content maker users to view and edit their own profile."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_content_maker:
+            return Response(
+                {"detail": "Solo content makers pueden acceder a este recurso."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not hasattr(request.user, "content_maker_profile") or not request.user.content_maker_profile:
+            return Response(
+                {"detail": "No tienes un perfil de content maker asociado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        profile = request.user.content_maker_profile
+        return Response(ContentMakerDetailSerializer(profile, context={"request": request}).data)
+
+    def patch(self, request):
+        if not request.user.is_content_maker:
+            return Response(
+                {"detail": "Solo content makers pueden acceder a este recurso."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not hasattr(request.user, "content_maker_profile") or not request.user.content_maker_profile:
+            return Response(
+                {"detail": "No tienes un perfil de content maker asociado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        profile = request.user.content_maker_profile
+
+        # Handle file uploads (foto)
+        update_data = {}
+        for k, v in request.data.items():
+            if k not in CM_NON_EDITABLE_FIELDS:
+                update_data[k] = v
+        # Include uploaded files
+        for k, v in request.FILES.items():
+            if k not in CM_NON_EDITABLE_FIELDS:
+                update_data[k] = v
+
+        serializer = ContentMakerDetailSerializer(profile, data=update_data, partial=True, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(ContentMakerDetailSerializer(profile, context={"request": request}).data)
+
+
 class ContentMakerViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrEmployee]
     queryset = ContentMakerProfile.objects.select_related("user").order_by("stimada_id")
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
+    def get_permissions(self):
+        # Allow clients read-only access to retrieve, list, filters, and tallaje_options
+        if self.action in ("retrieve", "list", "filters", "tallaje_options", "desempeno_options"):
+            from rest_framework.permissions import IsAuthenticated
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
     def get_serializer_class(self):
-        if self.action in ("create", "retrieve"):
+        # Clients see a limited public view
+        if self.request.user.is_client:
+            return ContentMakerPublicSerializer
+        if self.action in ("create", "retrieve", "update", "partial_update"):
             return ContentMakerDetailSerializer
         return ContentMakerListSerializer
 
@@ -49,19 +128,69 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    TALLAJE_FIELDS = ["talla_arriba", "talla_abajo", "talla_pie", "altura_medidas"]
+    FISCAL_FIELDS = ["dni_cif", "direccion_facturacion", "codigo_postal", "provincia", "pais", "iban"]
+
+    def partial_update(self, request, *args, **kwargs):
+        # Employees cannot modify tallaje or fiscal/banking fields
+        if request.user.is_employee:
+            for field in self.TALLAJE_FIELDS + self.FISCAL_FIELDS:
+                request.data.pop(field, None)
+        return super().partial_update(request, *args, **kwargs)
+
     @action(detail=False, methods=["get"])
     def next_id(self, request):
-        import re
-        ids = ContentMakerProfile.objects.values_list("stimada_id", flat=True)
-        nums = [int(m.group()) for sid in ids if (m := re.search(r"\d+", sid))]
-        next_num = (max(nums) if nums else 0) + 1
-        return Response({"next_id": f"[CM] - {next_num:05d}"})
+        next_num = ContentMakerProfile.generate_next_id()
+        return Response({"next_id": next_num})
+
+    @action(detail=False, methods=["get"])
+    def tallaje_options(self, request):
+        categories = TallajeCategory.objects.prefetch_related("opciones").all()
+        result = {}
+        for cat in categories:
+            result[cat.campo] = {
+                "label": cat.nombre,
+                "options": [opt.valor for opt in cat.opciones.all()],
+            }
+        return Response(result)
+
+    @action(detail=False, methods=["get"])
+    def desempeno_options(self, request):
+        options = DesempenoOption.objects.all()
+        return Response([{"id": o.id, "nombre": o.nombre} for o in options])
+
+    @action(detail=False, methods=["get"])
+    def filters(self, request):
+        def distinct_values(field, empty_value=""):
+            qs = ContentMakerProfile.objects.exclude(**{f"{field}__isnull": True})
+            if empty_value is not None:
+                qs = qs.exclude(**{field: empty_value})
+            return list(
+                qs.values_list(field, flat=True)
+                .distinct()
+                .order_by(field)
+            )
+
+        return Response({
+            "statuses": list(ContentMakerStatus.objects.values_list("nombre", flat=True)),
+            "tipos": distinct_values("tipo_cm"),
+            "tipo_choices": [
+                {"value": value, "label": label}
+                for value, label in ContentMakerProfile.TIPO_CHOICES
+            ],
+            "sexos": distinct_values("sexo"),
+            "calidad_contenido": distinct_values("calidad_contenido", empty_value=None),
+            "apariencia": distinct_values("apariencia"),
+            "categoria_seguidores_ig": distinct_values("categoria_seguidores_ig"),
+            "categoria_seguidores_tt": distinct_values("categoria_seguidores_tt"),
+        })
 
     def get_queryset(self):
         qs = super().get_queryset()
         search = self.request.query_params.get("q", "").strip()
         status_filter = self.request.query_params.get("status", "").strip()
         tipo_filter = self.request.query_params.get("tipo", "").strip()
+        tipo_cm_filter = self.request.query_params.get("tipo_cm", "").strip()
         tiene_cuenta = self.request.query_params.get("tiene_cuenta", "").strip()
 
         if search:
@@ -69,7 +198,9 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
         if status_filter:
             qs = qs.filter(status=status_filter)
         if tipo_filter:
-            qs = qs.filter(tipo_cm=tipo_filter)
+            qs = qs.filter(tipo=tipo_filter)
+        if tipo_cm_filter:
+            qs = qs.filter(tipo_cm=tipo_cm_filter)
         if tiene_cuenta == "true":
             qs = qs.filter(user__isnull=False)
         elif tiene_cuenta == "false":

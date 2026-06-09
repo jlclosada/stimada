@@ -38,19 +38,19 @@ function onBackdrop(e: MouseEvent) {
     <Transition name="modal">
       <div
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style="background: rgba(0,0,0,0.72); backdrop-filter: blur(6px)"
+        style="background: rgba(0,0,0,0.4); backdrop-filter: blur(4px)"
         @click="onBackdrop"
       >
         <Transition name="modal-content" appear>
           <div
-            class="w-full max-w-sm rounded-2xl border border-border p-7 shadow-card"
-            style="background: #141417"
+            class="w-full max-w-sm rounded-2xl border border-border/60 bg-white p-7 shadow-elevated"
+
           >
             <!-- Close -->
             <div class="flex items-center justify-between mb-6">
-              <h2 class="text-base font-semibold text-cream">Recuperar acceso</h2>
+              <h2 class="text-base font-semibold text-ink">Recuperar acceso</h2>
               <button
-                class="text-muted hover:text-cream transition-colors rounded-lg p-1"
+                class="text-muted hover:text-ink transition-colors rounded-lg p-1"
                 @click="emit('close')"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -66,7 +66,7 @@ function onBackdrop(e: MouseEvent) {
                   <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                 </svg>
               </div>
-              <p class="text-sm font-medium text-cream">Solicitud enviada</p>
+              <p class="text-sm font-medium text-ink">Solicitud enviada</p>
               <p class="text-xs text-muted leading-relaxed">
                 Hemos notificado a los administradores de Stimada.<br/>
                 Recibirás tus nuevas credenciales pronto.
@@ -113,7 +113,7 @@ function onBackdrop(e: MouseEvent) {
                 <div class="flex gap-2 pt-1">
                   <button
                     type="button"
-                    class="flex-1 h-10 rounded-xl border border-border text-sm text-muted hover:text-cream hover:border-subtle transition-colors"
+                    class="flex-1 h-10 rounded-xl border border-border text-sm text-muted hover:text-ink hover:border-subtle transition-colors"
                     @click="emit('close')"
                   >
                     Cancelar
