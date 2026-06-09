@@ -37,7 +37,7 @@ def _generate_password(length: int = 14) -> str:
 CM_NON_EDITABLE_FIELDS = [
     "nombre", "apellidos", "stimada_id",
     "fee_instagram", "fee_tiktok",
-    "status", "tipo_cm",
+    "status", "tipo", "tipo_cm",
     "categorias_contenido",
     # Valoración interna (solo admin/empleados)
     "desempeno", "calidad_contenido", "apariencia",
@@ -45,6 +45,9 @@ CM_NON_EDITABLE_FIELDS = [
     "comentarios",
     # DNI solo editable por admin
     "dni_cif",
+    # Links y categorías de seguidores se autogeneran en el modelo
+    "link_instagram", "link_tiktok",
+    "categoria_seguidores_ig", "categoria_seguidores_tt",
     "user", "created_at", "updated_at",
 ]
 
@@ -158,10 +161,12 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def filters(self, request):
-        def distinct_values(field):
+        def distinct_values(field, empty_value=""):
+            qs = ContentMakerProfile.objects.exclude(**{f"{field}__isnull": True})
+            if empty_value is not None:
+                qs = qs.exclude(**{field: empty_value})
             return list(
-                ContentMakerProfile.objects.exclude(**{field: ""})
-                .values_list(field, flat=True)
+                qs.values_list(field, flat=True)
                 .distinct()
                 .order_by(field)
             )
@@ -169,8 +174,12 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
         return Response({
             "statuses": list(ContentMakerStatus.objects.values_list("nombre", flat=True)),
             "tipos": distinct_values("tipo_cm"),
+            "tipo_choices": [
+                {"value": value, "label": label}
+                for value, label in ContentMakerProfile.TIPO_CHOICES
+            ],
             "sexos": distinct_values("sexo"),
-            "calidad_contenido": distinct_values("calidad_contenido"),
+            "calidad_contenido": distinct_values("calidad_contenido", empty_value=None),
             "apariencia": distinct_values("apariencia"),
             "categoria_seguidores_ig": distinct_values("categoria_seguidores_ig"),
             "categoria_seguidores_tt": distinct_values("categoria_seguidores_tt"),
@@ -181,6 +190,7 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
         search = self.request.query_params.get("q", "").strip()
         status_filter = self.request.query_params.get("status", "").strip()
         tipo_filter = self.request.query_params.get("tipo", "").strip()
+        tipo_cm_filter = self.request.query_params.get("tipo_cm", "").strip()
         tiene_cuenta = self.request.query_params.get("tiene_cuenta", "").strip()
 
         if search:
@@ -188,7 +198,9 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
         if status_filter:
             qs = qs.filter(status=status_filter)
         if tipo_filter:
-            qs = qs.filter(tipo_cm=tipo_filter)
+            qs = qs.filter(tipo=tipo_filter)
+        if tipo_cm_filter:
+            qs = qs.filter(tipo_cm=tipo_cm_filter)
         if tiene_cuenta == "true":
             qs = qs.filter(user__isnull=False)
         elif tiene_cuenta == "false":

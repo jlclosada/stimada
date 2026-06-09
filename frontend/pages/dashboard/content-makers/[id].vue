@@ -33,6 +33,47 @@ const isCreating = ref(false);
 const createError = ref("");
 const createdCredentials = ref<{ email: string; password: string } | null>(null);
 
+// ─── Auto-categorization & link generation (mirrors backend logic) ──────────
+function normalizeHandle(value: string | null | undefined): string {
+  if (!value) return "";
+  return String(value).trim().replace(/^@+/, "").trim();
+}
+function buildInstagramUrl(handle: string): string {
+  const h = normalizeHandle(handle);
+  return h ? `https://www.instagram.com/${h}/` : "";
+}
+function buildTiktokUrl(handle: string): string {
+  const h = normalizeHandle(handle);
+  return h ? `https://www.tiktok.com/@${h}` : "";
+}
+function computeFollowersCategory(count: number | null | undefined): string {
+  if (count == null || isNaN(Number(count))) return "";
+  const n = Number(count);
+  if (n < 1000) return "<1k";
+  if (n < 4000) return "1k – 4k";
+  if (n < 8000) return "4k – 8k";
+  if (n < 14000) return "8k – 14k";
+  if (n < 19000) return "14k – 19k";
+  if (n < 28000) return "19k – 28k";
+  if (n < 35000) return "28k – 35k";
+  if (n < 50000) return "35k – 50k";
+  if (n < 100000) return "50k – 100k";
+  return ">100k";
+}
+
+const previewInstagramCategory = computed(() =>
+  computeFollowersCategory(editData.value.seguidores_instagram as number | null | undefined)
+);
+const previewTiktokCategory = computed(() =>
+  computeFollowersCategory(editData.value.seguidores_tiktok as number | null | undefined)
+);
+const previewInstagramUrl = computed(() =>
+  buildInstagramUrl(String(editData.value.instagram_handle ?? ""))
+);
+const previewTiktokUrl = computed(() =>
+  buildTiktokUrl(String(editData.value.tiktok_handle ?? ""))
+);
+
 // Send credentials state
 const isSending = ref(false);
 const sendSuccess = ref(false);
@@ -170,6 +211,7 @@ function startEditing() {
   saveError.value = "";
   loadTallajeOptions();
   loadDesempenoOptions();
+  store.fetchFilters();
 }
 
 function cancelEditing() {
@@ -349,6 +391,15 @@ load();
               <div class="flex items-center gap-2 mt-1 flex-wrap">
                 <span v-if="canEdit" class="text-xs text-muted">{{ formatContentMakerId(cm.stimada_id) }}</span>
                 <span v-if="canEdit" class="text-border">·</span>
+                <span
+                  v-if="cm.tipo_display"
+                  class="text-xs font-medium px-2 py-0.5 rounded-full border"
+                  :class="cm.tipo === 'colaborador'
+                    ? 'text-indigo-600 bg-indigo-50 border-indigo-200'
+                    : 'text-gold bg-gold/10 border-gold/20'"
+                >
+                  {{ cm.tipo_display }}
+                </span>
                 <span class="text-xs text-muted">{{ cm.tipo_cm }}</span>
                 <span
                   v-if="cm.status"
@@ -765,6 +816,16 @@ load();
                 <input v-model="editData.apellidos" type="text" class="input-field" />
               </div>
               <div>
+                <label class="block text-xs font-medium text-muted mb-1.5">Tipo</label>
+                <select v-model="editData.tipo" class="select-field">
+                  <option
+                    v-for="t in store.filterOptions.tipo_choices"
+                    :key="t.value"
+                    :value="t.value"
+                  >{{ t.label }}</option>
+                </select>
+              </div>
+              <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Tipo de CM</label>
                 <input v-model="editData.tipo_cm" type="text" class="input-field" />
               </div>
@@ -787,46 +848,71 @@ load();
           <div class="rounded-2xl border border-gold/20 p-5 space-y-4" >
             <h3 class="text-xs font-semibold uppercase tracking-widest text-gold">Redes sociales</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Instagram handle -->
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Instagram Handle</label>
-                <input v-model="editData.instagram_handle" type="text" class="input-field" />
+                <div class="flex items-stretch rounded-xl border border-border/70 focus-within:border-gold/40 focus-within:ring-2 focus-within:ring-gold/20 bg-white overflow-hidden">
+                  <span class="flex items-center px-3 text-sm text-muted bg-panel/60 border-r border-border/60 select-none">@</span>
+                  <input
+                    :value="normalizeHandle(String(editData.instagram_handle ?? ''))"
+                    type="text"
+                    class="flex-1 px-3 py-2 text-sm text-ink placeholder:text-muted/50 bg-transparent focus:outline-none"
+                    placeholder="usuario"
+                    @input="editData.instagram_handle = normalizeHandle(($event.target as HTMLInputElement).value)"
+                  />
+                </div>
+                <p v-if="previewInstagramUrl" class="text-[10px] text-muted mt-1 truncate">
+                  Link generado: <a :href="previewInstagramUrl" target="_blank" class="text-gold/80 hover:text-gold">{{ previewInstagramUrl }}</a>
+                </p>
               </div>
+              <!-- Seguidores Instagram -->
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Seguidores Instagram</label>
-                <input v-model.number="editData.seguidores_instagram" type="number" class="input-field" />
+                <input v-model.number="editData.seguidores_instagram" type="number" min="0" class="input-field" />
+                <p class="text-[10px] text-muted mt-1">
+                  Categoría:
+                  <span v-if="previewInstagramCategory" class="font-semibold text-ink">{{ previewInstagramCategory }}</span>
+                  <span v-else class="italic text-muted/60">se asignará automáticamente</span>
+                </p>
               </div>
-              <div>
-                <label class="block text-xs font-medium text-muted mb-1.5">Link Instagram</label>
-                <input v-model="editData.link_instagram" type="url" class="input-field" />
-              </div>
+              <!-- Fee Instagram -->
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Fee Instagram (€)</label>
                 <input v-model="editData.fee_instagram" type="text" class="input-field" />
               </div>
-              <div>
-                <label class="block text-xs font-medium text-muted mb-1.5">Categoría seguidores IG</label>
-                <input v-model="editData.categoria_seguidores_ig" type="text" class="input-field" />
-              </div>
               <div class="hidden md:block" />
+
+              <!-- TikTok handle -->
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">TikTok Handle</label>
-                <input v-model="editData.tiktok_handle" type="text" class="input-field" />
+                <div class="flex items-stretch rounded-xl border border-border/70 focus-within:border-gold/40 focus-within:ring-2 focus-within:ring-gold/20 bg-white overflow-hidden">
+                  <span class="flex items-center px-3 text-sm text-muted bg-panel/60 border-r border-border/60 select-none">@</span>
+                  <input
+                    :value="normalizeHandle(String(editData.tiktok_handle ?? ''))"
+                    type="text"
+                    class="flex-1 px-3 py-2 text-sm text-ink placeholder:text-muted/50 bg-transparent focus:outline-none"
+                    placeholder="usuario"
+                    @input="editData.tiktok_handle = normalizeHandle(($event.target as HTMLInputElement).value)"
+                  />
+                </div>
+                <p v-if="previewTiktokUrl" class="text-[10px] text-muted mt-1 truncate">
+                  Link generado: <a :href="previewTiktokUrl" target="_blank" class="text-gold/80 hover:text-gold">{{ previewTiktokUrl }}</a>
+                </p>
               </div>
+              <!-- Seguidores TikTok -->
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Seguidores TikTok</label>
-                <input v-model.number="editData.seguidores_tiktok" type="number" class="input-field" />
+                <input v-model.number="editData.seguidores_tiktok" type="number" min="0" class="input-field" />
+                <p class="text-[10px] text-muted mt-1">
+                  Categoría:
+                  <span v-if="previewTiktokCategory" class="font-semibold text-ink">{{ previewTiktokCategory }}</span>
+                  <span v-else class="italic text-muted/60">se asignará automáticamente</span>
+                </p>
               </div>
-              <div>
-                <label class="block text-xs font-medium text-muted mb-1.5">Link TikTok</label>
-                <input v-model="editData.link_tiktok" type="url" class="input-field" />
-              </div>
+              <!-- Fee TikTok -->
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Fee TikTok (€)</label>
                 <input v-model="editData.fee_tiktok" type="text" class="input-field" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-muted mb-1.5">Categoría seguidores TT</label>
-                <input v-model="editData.categoria_seguidores_tt" type="text" class="input-field" />
               </div>
             </div>
           </div>

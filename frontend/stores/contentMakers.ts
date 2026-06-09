@@ -1,5 +1,10 @@
-import { defineStore } from "pinia";
-import { useAuthStore } from "~/stores/auth";
+import { defineStore } from 'pinia';
+import { useAuthStore } from '~/stores/auth';
+
+export interface TipoChoice {
+  value: string;
+  label: string;
+}
 
 export interface ContentMaker {
   id: number;
@@ -7,6 +12,8 @@ export interface ContentMaker {
   nombre_completo: string;
   nombre: string;
   apellidos: string;
+  tipo: string;
+  tipo_display: string;
   tipo_cm: string;
   status: string;
   categorias_contenido: string;
@@ -69,7 +76,7 @@ export interface ContentMakerDetail extends ContentMaker {
   proyectos_asociados: ContentMakerProject[];
 }
 
-export const useContentMakersStore = defineStore("contentMakers", {
+export const useContentMakersStore = defineStore('contentMakers', {
   state: () => ({
     list: [] as ContentMaker[],
     isLoading: false,
@@ -80,6 +87,7 @@ export const useContentMakersStore = defineStore("contentMakers", {
     filterOptions: {
       statuses: [] as string[],
       tipos: [] as string[],
+      tipo_choices: [] as TipoChoice[],
       sexos: [] as string[],
       calidad_contenido: [] as string[],
       apariencia: [] as string[],
@@ -96,7 +104,7 @@ export const useContentMakersStore = defineStore("contentMakers", {
       if (this.filterOptions.statuses.length) return;
       const data = await $fetch<typeof this.filterOptions>(
         `${config.public.apiBase}/content-makers/filters/`,
-        { headers: { Authorization: `Bearer ${auth.accessToken}` } }
+        { headers: { Authorization: `Bearer ${auth.accessToken}` } },
       );
       this.filterOptions = data;
     },
@@ -107,7 +115,7 @@ export const useContentMakersStore = defineStore("contentMakers", {
       if (this.desempenoOptions.length) return;
       const data = await $fetch<DesempenoOption[]>(
         `${config.public.apiBase}/content-makers/desempeno_options/`,
-        { headers: { Authorization: `Bearer ${auth.accessToken}` } }
+        { headers: { Authorization: `Bearer ${auth.accessToken}` } },
       );
       this.desempenoOptions = data;
     },
@@ -125,7 +133,7 @@ export const useContentMakersStore = defineStore("contentMakers", {
         });
         const data = await $fetch<{ count: number; results: ContentMaker[] }>(
           `${config.public.apiBase}/content-makers/?${baseParams.toString()}`,
-          { headers: { Authorization: `Bearer ${auth.accessToken}` } }
+          { headers: { Authorization: `Bearer ${auth.accessToken}` } },
         );
         this.list = data.results;
         this.total = data.count;
@@ -141,59 +149,65 @@ export const useContentMakersStore = defineStore("contentMakers", {
       const config = useRuntimeConfig();
       return $fetch<ContentMakerDetail>(
         `${config.public.apiBase}/content-makers/${id}/`,
-        { headers: { Authorization: `Bearer ${auth.accessToken}` } }
+        { headers: { Authorization: `Bearer ${auth.accessToken}` } },
       );
     },
 
     async createAccount(id: number | string, email?: string) {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
-      return $fetch<{ user_id: number; email: string; password: string; detail: string }>(
-        `${config.public.apiBase}/content-makers/${id}/create_account/`,
-        {
-          method: "POST",
-          body: email ? { email } : {},
-          headers: { Authorization: `Bearer ${auth.accessToken}` },
-        }
-      );
+      return $fetch<{
+        user_id: number;
+        email: string;
+        password: string;
+        detail: string;
+      }>(`${config.public.apiBase}/content-makers/${id}/create_account/`, {
+        method: 'POST',
+        body: email ? { email } : {},
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+      });
     },
 
-    async sendCredentials(id: number | string, email: string, password: string) {
+    async sendCredentials(
+      id: number | string,
+      email: string,
+      password: string,
+    ) {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       return $fetch(
         `${config.public.apiBase}/content-makers/${id}/send_credentials/`,
         {
-          method: "POST",
+          method: 'POST',
           body: { email, password },
           headers: { Authorization: `Bearer ${auth.accessToken}` },
-        }
+        },
       );
     },
 
-    async updateContentMaker(id: number | string, data: Partial<ContentMakerDetail>) {
+    async updateContentMaker(
+      id: number | string,
+      data: Partial<ContentMakerDetail>,
+    ) {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       return $fetch<ContentMakerDetail>(
         `${config.public.apiBase}/content-makers/${id}/`,
         {
-          method: "PATCH",
+          method: 'PATCH',
           body: data,
           headers: { Authorization: `Bearer ${auth.accessToken}` },
-        }
+        },
       );
     },
 
     async deleteContentMaker(id: number | string) {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
-      await $fetch(
-        `${config.public.apiBase}/content-makers/${id}/`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${auth.accessToken}` },
-        }
-      );
+      await $fetch(`${config.public.apiBase}/content-makers/${id}/`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
+      });
     },
   },
 });

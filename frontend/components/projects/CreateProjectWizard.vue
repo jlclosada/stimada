@@ -66,16 +66,35 @@ const form = reactive({
   nombre: "",
   descripcion: "",
   service_type: null as number | null,
+  modalidad_economica: null as number | null,
+  logistica_producto: null as number | null,
+  recogida_producto: null as number | null,
+  quien_graba: null as number | null,
+  quien_revisa: null as number | null,
+  quien_publica: null as number | null,
+  devolucion_producto: false,
   status: null as number | null,
+  win_status: null as number | null,
+  semaforo_proyecto: null as number | null,
   base_imponible: "",
   impuestos: "",
   fecha_venta: "",
   fecha_servicio: "",
+  fecha_llegada_producto: "",
+  fecha_limite_entrega: "",
   fecha_fin: "",
+  comentarios: "",
 });
 
 const statuses = ref<{ id: number; nombre: string }[]>([]);
 const serviceTypes = ref<{ id: number; nombre: string }[]>([]);
+const modalidadesEconomicas = ref<{ id: number; nombre: string }[]>([]);
+const logisticaProductoOpts = ref<{ id: number; nombre: string }[]>([]);
+const recogidaProductoOpts = ref<{ id: number; nombre: string }[]>([]);
+const quienGrabaOpts = ref<{ id: number; nombre: string }[]>([]);
+const quienRevisaOpts = ref<{ id: number; nombre: string }[]>([]);
+const quienPublicaOpts = ref<{ id: number; nombre: string }[]>([]);
+const winStatuses = ref<{ id: number; nombre: string }[]>([]);
 
 // Step 3: Content Maker
 const cmSelectionMode = ref<"defined" | "recommended" | "client_chooses">("client_chooses");
@@ -83,6 +102,7 @@ const cmSearch = ref("");
 const cmResults = ref<{ id: number; nombre: string; apellidos: string; instagram_handle: string; seguidores_instagram: number | null }[]>([]);
 const selectedCMs = ref<{ id: number; nombre: string; apellidos: string; instagram_handle: string }[]>([]);
 const recommendedCMs = ref<{ id: number; nombre: string; apellidos: string; instagram_handle: string }[]>([]);
+const suplenteCMs = ref<{ id: number; nombre: string; apellidos: string; instagram_handle: string }[]>([]);
 
 async function searchCMs() {
   if (!cmSearch.value.trim()) { cmResults.value = []; return; }
@@ -121,12 +141,33 @@ function removeRecommendedCM(id: number) {
   recommendedCMs.value = recommendedCMs.value.filter((r) => r.id !== id);
 }
 
+function addSuplenteCM(cm: typeof cmResults.value[0]) {
+  if (!suplenteCMs.value.find((r) => r.id === cm.id)) {
+    suplenteCMs.value.push({ id: cm.id, nombre: cm.nombre, apellidos: cm.apellidos, instagram_handle: cm.instagram_handle });
+  }
+  cmSearch.value = "";
+  cmResults.value = [];
+}
+
+function removeSuplenteCM(id: number) {
+  suplenteCMs.value = suplenteCMs.value.filter((r) => r.id !== id);
+}
+
 // Auto-calculate fecha_fin
 watch(() => form.fecha_servicio, (val) => {
   if (val && !form.fecha_fin) {
     const d = new Date(val);
     d.setDate(d.getDate() + 14);
     form.fecha_fin = d.toISOString().split("T")[0];
+  }
+});
+
+// Auto-calculate fecha_limite_entrega from fecha_llegada_producto + 14 days (for UGC)
+watch(() => form.fecha_llegada_producto, (val) => {
+  if (val && !form.fecha_limite_entrega) {
+    const d = new Date(val);
+    d.setDate(d.getDate() + 14);
+    form.fecha_limite_entrega = d.toISOString().split("T")[0];
   }
 });
 
@@ -143,14 +184,20 @@ watch(cmSearch, (val) => {
 
 // Load data
 onMounted(async () => {
-  // Load statuses and service types for dropdowns
   try {
-    const data = await $fetch<{ statuses: { id: number; nombre: string }[]; service_types: { id: number; nombre: string }[] }>(
+    const data = await $fetch<Record<string, { id: number; nombre: string }[]>>(
       `${config.public.apiBase}/projects/filters/`,
       { headers: { Authorization: `Bearer ${auth.accessToken}` } }
     );
-    statuses.value = data.statuses;
-    serviceTypes.value = data.service_types;
+    statuses.value = data.statuses || [];
+    serviceTypes.value = data.service_types || [];
+    modalidadesEconomicas.value = data.modalidades_economicas || [];
+    logisticaProductoOpts.value = data.logistica_producto || [];
+    recogidaProductoOpts.value = data.recogida_producto || [];
+    quienGrabaOpts.value = data.quien_graba || [];
+    quienRevisaOpts.value = data.quien_revisa || [];
+    quienPublicaOpts.value = data.quien_publica || [];
+    winStatuses.value = data.win_statuses || [];
   } catch {
     // silent
   }
@@ -197,15 +244,28 @@ async function submit() {
       brand: selectedBrand.value,
       status: form.status,
       service_type: form.service_type,
+      modalidad_economica: form.modalidad_economica,
+      logistica_producto: form.logistica_producto,
+      recogida_producto: form.recogida_producto,
+      quien_graba: form.quien_graba,
+      quien_revisa: form.quien_revisa,
+      quien_publica: form.quien_publica,
+      devolucion_producto: form.devolucion_producto,
+      win_status: form.win_status,
+      semaforo_proyecto: form.semaforo_proyecto,
       base_imponible: form.base_imponible || "0",
       impuestos: form.impuestos || "0",
       fecha_venta: form.fecha_venta || null,
       fecha_servicio: form.fecha_servicio || null,
+      fecha_llegada_producto: form.fecha_llegada_producto || null,
+      fecha_limite_entrega: form.fecha_limite_entrega || null,
       fecha_fin: form.fecha_fin || null,
+      comentarios: form.comentarios,
       cm_selection_mode: cmSelectionMode.value,
       content_maker: null,
       defined_cms: cmSelectionMode.value === "defined" ? selectedCMs.value.map((c) => c.id) : [],
       recommended_cms: cmSelectionMode.value === "recommended" ? recommendedCMs.value.map((c) => c.id) : [],
+      suplente_cms: suplenteCMs.value.map((c) => c.id),
     };
 
     await projectsStore.createProject(payload);
@@ -257,15 +317,28 @@ async function saveDraftAndClose() {
       brand: selectedBrand.value || null,
       status: form.status,
       service_type: form.service_type,
+      modalidad_economica: form.modalidad_economica,
+      logistica_producto: form.logistica_producto,
+      recogida_producto: form.recogida_producto,
+      quien_graba: form.quien_graba,
+      quien_revisa: form.quien_revisa,
+      quien_publica: form.quien_publica,
+      devolucion_producto: form.devolucion_producto,
+      win_status: form.win_status,
+      semaforo_proyecto: form.semaforo_proyecto,
       base_imponible: form.base_imponible || "0",
       impuestos: form.impuestos || "0",
       fecha_venta: form.fecha_venta || null,
       fecha_servicio: form.fecha_servicio || null,
+      fecha_llegada_producto: form.fecha_llegada_producto || null,
+      fecha_limite_entrega: form.fecha_limite_entrega || null,
       fecha_fin: form.fecha_fin || null,
+      comentarios: form.comentarios,
       cm_selection_mode: cmSelectionMode.value,
       content_maker: null,
       defined_cms: cmSelectionMode.value === "defined" ? selectedCMs.value.map((c) => c.id) : [],
       recommended_cms: cmSelectionMode.value === "recommended" ? recommendedCMs.value.map((c) => c.id) : [],
+      suplente_cms: suplenteCMs.value.map((c) => c.id),
       is_draft: true,
     };
 

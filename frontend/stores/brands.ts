@@ -23,9 +23,41 @@ export interface BrandProject {
   content_maker_name: string | null;
 }
 
+export interface BrandClientData {
+  id: number;
+  cliente_id: string;
+  nombre_cliente: string;
+  es_agencia: boolean;
+  tipo_nombre: string | null;
+  web_instagram: string;
+  persona_contacto: string;
+  email_contacto: string;
+  telefono: string;
+  nombre_facturacion: string;
+  cif: string;
+  email_facturacion: string;
+  direccion_facturacion: string;
+  codigo_postal: string;
+  ciudad: string;
+  pais: string;
+  estado: string;
+}
+
+export interface BrandContactoEfectivo {
+  persona_contacto: string;
+  email_contacto: string;
+  telefono: string;
+  es_propio: boolean;
+}
+
 export interface BrandDetail extends BrandListItem {
   notas: string;
+  persona_contacto: string;
+  email_contacto: string;
+  telefono: string;
   proyectos: BrandProject[];
+  cliente_datos: BrandClientData;
+  contacto_efectivo: BrandContactoEfectivo;
 }
 
 export const useBrandsStore = defineStore("brands", {

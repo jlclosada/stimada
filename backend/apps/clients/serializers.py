@@ -12,13 +12,14 @@ class ClientTypeSerializer(serializers.ModelSerializer):
 class ClientProfileListSerializer(serializers.ModelSerializer):
     tipo_nombre = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
+    has_account = serializers.SerializerMethodField()
 
     class Meta:
         model = ClientProfile
         fields = [
             "id", "cliente_id", "nombre_cliente", "tipo_cliente", "tipo_nombre",
             "web_instagram", "cif", "ciudad", "pais", "contrato_firmado", "es_agencia",
-            "estado", "semaforo_cliente",
+            "estado", "semaforo_cliente", "has_account",
             "created_by_name", "created_at",
         ]
 
@@ -27,6 +28,9 @@ class ClientProfileListSerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj):
         return obj.created_by.full_name if obj.created_by_id else None
+
+    def get_has_account(self, obj):
+        return obj.user_id is not None
 
 
 class ClientProfileDetailSerializer(serializers.ModelSerializer):
@@ -90,7 +94,24 @@ class ClientProfileCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data["created_by"] = self.context["request"].user
-        return super().create(validated_data)
+        instance = super().create(validated_data)
+
+        # Si el cliente NO es agencia, se crea automáticamente una marca
+        # homónima con los datos heredados del cliente (marca propia).
+        if not instance.es_agencia:
+            Brand.objects.get_or_create(
+                client=instance,
+                nombre=instance.nombre_cliente,
+                defaults={
+                    "tipo_marca": instance.tipo_cliente,
+                    "web_instagram": instance.web_instagram,
+                    "persona_contacto": instance.persona_contacto,
+                    "email_contacto": instance.email_contacto,
+                    "telefono": instance.telefono,
+                    "estado": Brand.ESTADO_ACTIVA,
+                },
+            )
+        return instance
 
 
 class BrandListSerializer(serializers.ModelSerializer):

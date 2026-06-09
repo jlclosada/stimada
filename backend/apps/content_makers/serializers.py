@@ -17,11 +17,13 @@ class ContentMakerListSerializer(serializers.ModelSerializer):
     nombre_completo = serializers.CharField(read_only=True)
     tiene_cuenta = serializers.BooleanField(read_only=True)
     user_email = serializers.SerializerMethodField()
+    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
 
     class Meta:
         model = ContentMakerProfile
         fields = [
             "id", "stimada_id", "nombre_completo", "nombre", "apellidos",
+            "tipo", "tipo_display",
             "tipo_cm", "status", "categorias_contenido",
             "instagram_handle", "seguidores_instagram",
             "tiktok_handle", "seguidores_tiktok",
@@ -39,6 +41,7 @@ class ContentMakerDetailSerializer(serializers.ModelSerializer):
     user_email = serializers.SerializerMethodField()
     foto_url = serializers.SerializerMethodField()
     proyectos_asociados = serializers.SerializerMethodField()
+    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
     desempeno_opciones = serializers.PrimaryKeyRelatedField(
         many=True, queryset=DesempenoOption.objects.all(), required=False,
     )
@@ -108,11 +111,13 @@ class ContentMakerPublicSerializer(serializers.ModelSerializer):
     """Limited view for clients — hides sensitive/internal data like fees, billing, status."""
     nombre_completo = serializers.CharField(read_only=True)
     foto_url = serializers.SerializerMethodField()
+    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
 
     class Meta:
         model = ContentMakerProfile
         fields = [
             "id", "stimada_id", "nombre", "apellidos", "nombre_completo",
+            "tipo", "tipo_display",
             "tipo_cm", "sexo", "categorias_contenido",
             "es_mama",
             "instagram_handle", "link_instagram",

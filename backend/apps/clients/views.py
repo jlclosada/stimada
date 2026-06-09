@@ -70,10 +70,35 @@ class ClientProfileViewSet(ModelViewSet):
         qs = super().get_queryset()
         q = self.request.query_params.get("q", "").strip()
         tipo = self.request.query_params.get("tipo", "").strip()
+        contrato = self.request.query_params.get("contrato", "").strip()
+        cuenta = self.request.query_params.get("cuenta", "").strip()
+        estado = self.request.query_params.get("estado", "").strip()
+        ordering = self.request.query_params.get("ordering", "").strip()
+
         if q:
             qs = qs.filter(nombre_cliente__icontains=q) | qs.filter(cliente_id__icontains=q)
         if tipo:
             qs = qs.filter(tipo_cliente__slug=tipo)
+        if contrato == "firmado":
+            qs = qs.filter(contrato_firmado=True)
+        elif contrato == "pendiente":
+            qs = qs.filter(contrato_firmado=False)
+        if cuenta == "activa":
+            qs = qs.filter(user__isnull=False)
+        elif cuenta == "sin_cuenta":
+            qs = qs.filter(user__isnull=True)
+        if estado in (ClientProfile.ESTADO_ACTIVO, ClientProfile.ESTADO_INACTIVO):
+            qs = qs.filter(estado=estado)
+
+        # Ordering (whitelist + direction)
+        allowed_ordering = {
+            "nombre_cliente", "cliente_id", "ciudad", "created_at",
+            "contrato_firmado", "tipo_cliente__nombre",
+        }
+        if ordering:
+            field = ordering.lstrip("-")
+            if field in allowed_ordering:
+                qs = qs.order_by(ordering)
         return qs
 
     def create(self, request, *args, **kwargs):

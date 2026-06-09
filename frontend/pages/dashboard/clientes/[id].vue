@@ -513,17 +513,18 @@ load();
             <span v-if="client.marcas && client.marcas.length" class="ml-auto text-[10px] text-muted/60 bg-panel px-2 py-0.5 rounded-full border border-border/40">{{ client.marcas.length }}</span>
           </div>
           <div v-if="client.marcas && client.marcas.length > 0" class="space-y-2">
-            <div
+            <NuxtLink
               v-for="brand in client.marcas"
               :key="brand.id"
-              class="flex items-center justify-between p-3.5 rounded-xl border border-border/50 hover:border-indigo-400/30 hover:bg-indigo-400/[0.02] transition-all duration-200"
+              :to="`/dashboard/marcas/${brand.id}`"
+              class="flex items-center justify-between p-3.5 rounded-xl border border-border/50 hover:border-indigo-400/30 hover:bg-indigo-400/[0.02] transition-all duration-200 group/item"
             >
               <div class="flex items-center gap-3 min-w-0">
                 <div class="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-400/20 flex items-center justify-center flex-shrink-0">
                   <span class="text-[11px] font-bold text-indigo-400">{{ brand.nombre.charAt(0) }}</span>
                 </div>
                 <div class="min-w-0">
-                  <p class="text-sm font-medium text-ink truncate">{{ brand.nombre }}</p>
+                  <p class="text-sm font-medium text-ink truncate group-hover/item:text-indigo-400 transition-colors duration-200">{{ brand.nombre }}</p>
                   <div class="flex items-center gap-2 mt-0.5">
                     <span class="text-[11px] text-muted/70 font-mono">{{ formatBrandId(brand.brand_id) }}</span>
                     <span v-if="brand.tipo_marca_nombre" class="text-[11px] text-muted/70">· {{ brand.tipo_marca_nombre }}</span>
@@ -531,7 +532,7 @@ load();
                 </div>
               </div>
               <div class="flex items-center gap-2 flex-shrink-0 ml-3">
-                <a v-if="brand.web_instagram" :href="brand.web_instagram" target="_blank" class="text-[11px] text-gold hover:text-gold/80 transition-colors">
+                <a v-if="brand.web_instagram" :href="brand.web_instagram" target="_blank" class="text-[11px] text-gold hover:text-gold/80 transition-colors" @click.stop>
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
                 </a>
                 <span
@@ -540,8 +541,11 @@ load();
                 >
                   {{ brand.estado === 'activa' ? 'Activa' : 'Inactiva' }}
                 </span>
+                <svg class="w-4 h-4 text-muted/40 group-hover/item:text-indigo-400 transition-colors duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
               </div>
-            </div>
+            </NuxtLink>
           </div>
           <div v-else class="py-4 text-center">
             <p class="text-xs text-muted/60">Este cliente no tiene marcas asociadas.</p>

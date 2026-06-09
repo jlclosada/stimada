@@ -9,6 +9,9 @@ export interface ProjectListItem {
   brand_name: string | null;
   status_name: string | null;
   service_type_name: string | null;
+  modalidad_economica_name: string | null;
+  win_status_name: string | null;
+  semaforo_proyecto: number | null;
   base_imponible: string;
   impuestos: string;
   precio_total: string;
@@ -17,6 +20,8 @@ export interface ProjectListItem {
   fecha_fin: string | null;
   cm_selection_mode: string;
   content_maker_name: string | null;
+  is_draft: boolean;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -28,6 +33,13 @@ export interface FilterOption {
 export interface ProjectFilters {
   statuses: FilterOption[];
   service_types: FilterOption[];
+  modalidades_economicas: FilterOption[];
+  logistica_producto: FilterOption[];
+  recogida_producto: FilterOption[];
+  quien_graba: FilterOption[];
+  quien_revisa: FilterOption[];
+  quien_publica: FilterOption[];
+  win_statuses: FilterOption[];
 }
 
 interface ProjectsState {
@@ -42,7 +54,17 @@ export const useProjectsStore = defineStore("projects", {
     list: [],
     count: 0,
     isLoading: false,
-    filters: { statuses: [], service_types: [] },
+    filters: {
+      statuses: [],
+      service_types: [],
+      modalidades_economicas: [],
+      logistica_producto: [],
+      recogida_producto: [],
+      quien_graba: [],
+      quien_revisa: [],
+      quien_publica: [],
+      win_statuses: [],
+    },
   }),
 
   actions: {

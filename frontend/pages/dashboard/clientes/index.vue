@@ -1,36 +1,89 @@
 <script setup lang="ts">
-import { useBrandsStore } from "~/stores/brands";
-import { useClientsStore } from "~/stores/clients";
-import { formatBrandId, formatClientId } from "~/utils/formatId";
+import { useBrandsStore } from '~/stores/brands';
+import { useClientsStore } from '~/stores/clients';
+import { formatBrandId, formatClientId } from '~/utils/formatId';
 
-definePageMeta({ middleware: ["auth", "role"] });
+definePageMeta({ middleware: ['auth', 'role'] });
 
 // Tab state
-const activeTab = ref<"clientes" | "marcas">("clientes");
+const activeTab = ref<'clientes' | 'marcas'>('clientes');
 
 // ---------- CLIENTES ----------
 const store = useClientsStore();
-const search = ref("");
-const filterTipo = ref("");
+const search = ref('');
+const filterTipo = ref('');
+const filterContrato = ref('');
+const filterCuenta = ref('');
+const sortBy = ref<string>('');
+const sortDir = ref<'asc' | 'desc'>('asc');
 
 let searchTimer: ReturnType<typeof setTimeout>;
-const debouncedSearch = ref("");
+const debouncedSearch = ref('');
 watch(search, (val) => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => { debouncedSearch.value = val; }, 300);
+  searchTimer = setTimeout(() => {
+    debouncedSearch.value = val;
+  }, 300);
 });
 
 const params = computed(() => {
   const p: Record<string, string> = {};
   if (debouncedSearch.value) p.q = debouncedSearch.value;
   if (filterTipo.value) p.tipo = filterTipo.value;
+  if (filterContrato.value) p.contrato = filterContrato.value;
+  if (filterCuenta.value) p.cuenta = filterCuenta.value;
+  if (sortBy.value)
+    p.ordering = (sortDir.value === 'desc' ? '-' : '') + sortBy.value;
   return p;
 });
 
-watch(params, () => {
-  store.currentPage = 1;
-  store.fetchList(params.value, 1);
-}, { immediate: true });
+watch(
+  params,
+  () => {
+    store.currentPage = 1;
+    store.fetchList(params.value, 1);
+  },
+  { immediate: true },
+);
+
+function toggleSort(field: string) {
+  if (sortBy.value === field) {
+    if (sortDir.value === 'asc') {
+      sortDir.value = 'desc';
+    } else {
+      // 3rd click → clear sort
+      sortBy.value = '';
+      sortDir.value = 'asc';
+    }
+  } else {
+    sortBy.value = field;
+    sortDir.value = 'asc';
+  }
+}
+
+function sortIcon(field: string): string {
+  if (sortBy.value !== field) return '';
+  return sortDir.value === 'asc' ? '▲' : '▼';
+}
+
+function clearFilters() {
+  search.value = '';
+  filterTipo.value = '';
+  filterContrato.value = '';
+  filterCuenta.value = '';
+  sortBy.value = '';
+  sortDir.value = 'asc';
+}
+
+const hasActiveFilters = computed(() =>
+  Boolean(
+    search.value ||
+    filterTipo.value ||
+    filterContrato.value ||
+    filterCuenta.value ||
+    sortBy.value,
+  ),
+);
 
 function goToPage(page: number) {
   if (page < 1 || page > store.totalPages) return;
@@ -45,11 +98,11 @@ const visiblePages = computed(() => {
     for (let i = 1; i <= total; i++) pages.push(i);
   } else {
     pages.push(1);
-    if (current > 3) pages.push("...");
+    if (current > 3) pages.push('...');
     const start = Math.max(2, current - 1);
     const end = Math.min(total - 1, current + 1);
     for (let i = start; i <= end; i++) pages.push(i);
-    if (current < total - 2) pages.push("...");
+    if (current < total - 2) pages.push('...');
     pages.push(total);
   }
   return pages;
@@ -57,7 +110,7 @@ const visiblePages = computed(() => {
 
 // ---------- MARCAS ----------
 const brandsStore = useBrandsStore();
-const brandSearch = ref("");
+const brandSearch = ref('');
 
 let brandSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 function onBrandSearch() {
@@ -88,29 +141,51 @@ onMounted(() => {
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-ink">Clientes y Marcas</h1>
-        <p class="text-sm text-muted mt-0.5">Directorio de clientes y marcas asociadas</p>
+        <h1 class="text-2xl font-semibold tracking-tight text-ink">
+          Clientes y Marcas
+        </h1>
+        <p class="text-sm text-muted mt-0.5">
+          Directorio de clientes y marcas asociadas
+        </p>
       </div>
       <div class="flex items-center gap-2">
         <NuxtLink
           v-if="activeTab === 'clientes'"
           to="/dashboard/clientes/nuevo"
-          class="group flex items-center gap-2 h-10 px-5 rounded-xl bg-ink text-white text-sm font-medium
-                 hover:bg-ink/80 hover:shadow-soft active:scale-[0.97] transition-all duration-200"
+          class="group flex items-center gap-2 h-10 px-5 rounded-xl bg-ink text-white text-sm font-medium hover:bg-ink/80 hover:shadow-soft active:scale-[0.97] transition-all duration-200"
         >
-          <svg class="w-4 h-4 transition-transform duration-200 group-hover:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          <svg
+            class="w-4 h-4 transition-transform duration-200 group-hover:rotate-90"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 4.5v15m7.5-7.5h-15"
+            />
           </svg>
           Dar de alta cliente
         </NuxtLink>
         <NuxtLink
           v-else
           to="/dashboard/marcas/nuevo"
-          class="group flex items-center gap-2 h-10 px-5 rounded-xl bg-ink text-white text-sm font-medium
-                 hover:bg-ink/80 hover:shadow-soft active:scale-[0.97] transition-all duration-200"
+          class="group flex items-center gap-2 h-10 px-5 rounded-xl bg-ink text-white text-sm font-medium hover:bg-ink/80 hover:shadow-soft active:scale-[0.97] transition-all duration-200"
         >
-          <svg class="w-4 h-4 transition-transform duration-200 group-hover:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          <svg
+            class="w-4 h-4 transition-transform duration-200 group-hover:rotate-90"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 4.5v15m7.5-7.5h-15"
+            />
           </svg>
           Añadir marca
         </NuxtLink>
@@ -118,17 +193,27 @@ onMounted(() => {
     </div>
 
     <!-- Tabs -->
-    <div class="flex gap-1 p-1 rounded-xl border border-border/60 bg-white w-fit">
+    <div
+      class="flex gap-1 p-1 rounded-xl border border-border/60 bg-white w-fit"
+    >
       <button
         class="px-5 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-        :class="activeTab === 'clientes' ? 'bg-ink text-white shadow-sm' : 'text-muted hover:text-ink'"
+        :class="
+          activeTab === 'clientes'
+            ? 'bg-ink text-white shadow-sm'
+            : 'text-muted hover:text-ink'
+        "
         @click="activeTab = 'clientes'"
       >
         Clientes
       </button>
       <button
         class="px-5 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-        :class="activeTab === 'marcas' ? 'bg-ink text-white shadow-sm' : 'text-muted hover:text-ink'"
+        :class="
+          activeTab === 'marcas'
+            ? 'bg-ink text-white shadow-sm'
+            : 'text-muted hover:text-ink'
+        "
         @click="activeTab = 'marcas'"
       >
         Marcas
@@ -140,47 +225,151 @@ onMounted(() => {
       <!-- Filters -->
       <div class="flex flex-wrap items-center gap-3 animate-fade-up delay-100">
         <div class="relative flex-1 min-w-[260px] max-w-md group/search">
-          <div class="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 group-focus-within/search:scale-90 group-focus-within/search:text-gold">
-            <svg class="w-4 h-4 text-muted/50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          <div
+            class="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 group-focus-within/search:scale-90 group-focus-within/search:text-gold"
+          >
+            <svg
+              class="w-4 h-4 text-muted/50"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+              />
             </svg>
           </div>
-          <input v-model="search" type="text" placeholder="Buscar cliente o ID…" class="input-field !pl-12" />
+          <input
+            v-model="search"
+            type="text"
+            placeholder="Buscar cliente o ID…"
+            class="input-field !pl-12"
+          />
         </div>
 
-        <select v-model="filterTipo" class="select-field min-w-[180px] max-w-[200px]">
+        <select
+          v-model="filterTipo"
+          class="select-field min-w-[180px] max-w-[200px]"
+        >
           <option value="">Todos los tipos</option>
-          <option v-for="t in store.types" :key="t.slug" :value="t.slug">{{ t.nombre }}</option>
+          <option v-for="t in store.types" :key="t.slug" :value="t.slug">
+            {{ t.nombre }}
+          </option>
+        </select>
+
+        <select
+          v-model="filterContrato"
+          class="select-field min-w-[160px] max-w-[180px]"
+        >
+          <option value="">Contrato (todos)</option>
+          <option value="firmado">Firmado</option>
+          <option value="pendiente">Pendiente</option>
+        </select>
+
+        <select
+          v-model="filterCuenta"
+          class="select-field min-w-[170px] max-w-[190px]"
+        >
+          <option value="">Cuenta (todas)</option>
+          <option value="activa">Con cuenta activa</option>
+          <option value="sin_cuenta">Sin cuenta</option>
         </select>
 
         <button
-          v-if="search || filterTipo"
+          v-if="hasActiveFilters"
           class="h-11 px-4 rounded-xl text-sm text-muted hover:text-ink border border-border/70 hover:border-ink/20 hover:bg-panel/80 hover:shadow-sm active:scale-[0.97] transition-all duration-300"
-          @click="search = ''; filterTipo = ''"
+          @click="clearFilters"
         >
           Limpiar
         </button>
       </div>
 
       <!-- Table -->
-      <div class="rounded-2xl border border-border/60 bg-white shadow-card overflow-hidden">
-        <div v-if="store.isLoading" class="flex justify-center items-center h-48">
-          <div class="w-7 h-7 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
+      <div
+        class="rounded-2xl border border-border/60 bg-white shadow-card overflow-hidden"
+      >
+        <div
+          v-if="store.isLoading"
+          class="flex justify-center items-center h-48"
+        >
+          <div
+            class="w-7 h-7 rounded-full border-2 border-gold/30 border-t-gold animate-spin"
+          />
         </div>
         <template v-else>
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-border/60 bg-panel/50">
-                <th v-for="col in ['Cliente', 'ID', 'Tipo', 'Ciudad', 'Contrato', 'Alta por', 'Fecha']"
-                    :key="col"
-                    class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider">
-                  {{ col }}
+                <th
+                  class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider cursor-pointer select-none hover:text-ink transition-colors"
+                  @click="toggleSort('nombre_cliente')"
+                >
+                  Cliente
+                  <span class="ml-1 text-[10px]">{{
+                    sortIcon('nombre_cliente')
+                  }}</span>
+                </th>
+                <th
+                  class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider cursor-pointer select-none hover:text-ink transition-colors"
+                  @click="toggleSort('cliente_id')"
+                >
+                  ID
+                  <span class="ml-1 text-[10px]">{{
+                    sortIcon('cliente_id')
+                  }}</span>
+                </th>
+                <th
+                  class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider cursor-pointer select-none hover:text-ink transition-colors"
+                  @click="toggleSort('tipo_cliente__nombre')"
+                >
+                  Tipo
+                  <span class="ml-1 text-[10px]">{{
+                    sortIcon('tipo_cliente__nombre')
+                  }}</span>
+                </th>
+                <th
+                  class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider cursor-pointer select-none hover:text-ink transition-colors"
+                  @click="toggleSort('ciudad')"
+                >
+                  Ciudad
+                  <span class="ml-1 text-[10px]">{{ sortIcon('ciudad') }}</span>
+                </th>
+                <th
+                  class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider cursor-pointer select-none hover:text-ink transition-colors"
+                  @click="toggleSort('contrato_firmado')"
+                >
+                  Contrato
+                  <span class="ml-1 text-[10px]">{{
+                    sortIcon('contrato_firmado')
+                  }}</span>
+                </th>
+                <th
+                  class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider"
+                >
+                  Cuenta
+                </th>
+                <th
+                  class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider"
+                >
+                  Alta por
+                </th>
+                <th
+                  class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider cursor-pointer select-none hover:text-ink transition-colors"
+                  @click="toggleSort('created_at')"
+                >
+                  Fecha
+                  <span class="ml-1 text-[10px]">{{
+                    sortIcon('created_at')
+                  }}</span>
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="!store.list.length">
-                <td colspan="7" class="text-center py-16 text-sm text-muted">
+                <td colspan="8" class="text-center py-16 text-sm text-muted">
                   No hay clientes registrados aún.
                 </td>
               </tr>
@@ -191,38 +380,89 @@ onMounted(() => {
                 @click="navigateTo(`/dashboard/clientes/${client.id}`)"
               >
                 <td class="px-5 py-3.5">
-                  <p class="text-sm text-ink font-medium group-hover:text-gold transition-colors duration-150">{{ client.nombre_cliente }}</p>
+                  <p
+                    class="text-sm text-ink font-medium group-hover:text-gold transition-colors duration-150"
+                  >
+                    {{ client.nombre_cliente }}
+                  </p>
                 </td>
-                <td class="px-5 py-3.5 text-xs text-muted">{{ formatClientId(client.cliente_id) }}</td>
+                <td class="px-5 py-3.5 text-xs text-muted">
+                  {{ formatClientId(client.cliente_id) }}
+                </td>
                 <td class="px-5 py-3.5">
-                  <span v-if="client.tipo_nombre" class="text-xs px-2.5 py-1 rounded-lg border border-blue-200 text-blue-600 bg-blue-50 font-medium">
+                  <span
+                    v-if="client.tipo_nombre"
+                    class="text-xs px-2.5 py-1 rounded-lg border border-blue-200 text-blue-600 bg-blue-50 font-medium"
+                  >
                     {{ client.tipo_nombre }}
                   </span>
                   <span v-else class="text-xs text-muted/60">—</span>
                 </td>
-                <td class="px-5 py-3.5 text-sm text-muted">{{ client.ciudad || '—' }}</td>
+                <td class="px-5 py-3.5 text-sm text-muted">
+                  {{ client.ciudad || '—' }}
+                </td>
                 <td class="px-5 py-3.5">
-                  <span v-if="client.contrato_firmado" class="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+                  <span
+                    v-if="client.contrato_firmado"
+                    class="flex items-center gap-1.5 text-xs text-emerald-600 font-medium"
+                  >
                     <div class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     Firmado
                   </span>
-                  <span v-else class="flex items-center gap-1.5 text-xs text-muted">
+                  <span
+                    v-else
+                    class="flex items-center gap-1.5 text-xs text-muted"
+                  >
                     <div class="w-1.5 h-1.5 rounded-full bg-muted/40" />
                     Pendiente
                   </span>
                 </td>
-                <td class="px-5 py-3.5 text-sm text-muted">{{ client.created_by_name || '—' }}</td>
+                <td class="px-5 py-3.5">
+                  <span
+                    v-if="client.has_account"
+                    class="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium"
+                  >
+                    <div class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Activa
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-md bg-panel/60 text-muted border border-border/60"
+                  >
+                    <div class="w-1.5 h-1.5 rounded-full bg-muted/40" />
+                    Sin cuenta
+                  </span>
+                </td>
                 <td class="px-5 py-3.5 text-sm text-muted">
-                  {{ new Date(client.created_at).toLocaleDateString('es-ES', { day:'2-digit', month:'short', year:'numeric' }) }}
+                  {{ client.created_by_name || '—' }}
+                </td>
+                <td class="px-5 py-3.5 text-sm text-muted">
+                  {{
+                    new Date(client.created_at).toLocaleDateString('es-ES', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  }}
                 </td>
               </tr>
             </tbody>
           </table>
 
           <!-- Pagination -->
-          <div v-if="store.totalPages > 1" class="flex items-center justify-between px-5 py-4 border-t border-border/40 bg-panel/30">
+          <div
+            v-if="store.totalPages > 1"
+            class="flex items-center justify-between px-5 py-4 border-t border-border/40 bg-panel/30"
+          >
             <p class="text-sm text-muted">
-              Mostrando <span class="font-medium text-ink">{{ (store.currentPage - 1) * store.pageSize + 1 }}</span>–<span class="font-medium text-ink">{{ Math.min(store.currentPage * store.pageSize, store.total) }}</span> de <span class="font-medium text-ink">{{ store.total }}</span>
+              Mostrando
+              <span class="font-medium text-ink">{{
+                (store.currentPage - 1) * store.pageSize + 1
+              }}</span
+              >–<span class="font-medium text-ink">{{
+                Math.min(store.currentPage * store.pageSize, store.total)
+              }}</span>
+              de <span class="font-medium text-ink">{{ store.total }}</span>
             </p>
             <div class="flex items-center gap-1">
               <button
@@ -230,18 +470,34 @@ onMounted(() => {
                 class="w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all duration-150"
                 @click="goToPage(store.currentPage - 1)"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M15.75 19.5L8.25 12l7.5-7.5"
+                  />
                 </svg>
               </button>
               <template v-for="p in visiblePages" :key="p">
-                <span v-if="p === '...'" class="w-9 h-9 flex items-center justify-center text-xs text-muted">…</span>
+                <span
+                  v-if="p === '...'"
+                  class="w-9 h-9 flex items-center justify-center text-xs text-muted"
+                  >…</span
+                >
                 <button
                   v-else
                   class="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium transition-all duration-150"
-                  :class="p === store.currentPage
-                    ? 'bg-ink text-white shadow-sm'
-                    : 'text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border'"
+                  :class="
+                    p === store.currentPage
+                      ? 'bg-ink text-white shadow-sm'
+                      : 'text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border'
+                  "
                   @click="goToPage(p as number)"
                 >
                   {{ p }}
@@ -252,8 +508,18 @@ onMounted(() => {
                 class="w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all duration-150"
                 @click="goToPage(store.currentPage + 1)"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M8.25 4.5l7.5 7.5-7.5 7.5"
+                  />
                 </svg>
               </button>
             </div>
@@ -267,36 +533,80 @@ onMounted(() => {
       <!-- Search -->
       <div class="flex flex-wrap items-center gap-3 animate-fade-up delay-100">
         <div class="relative flex-1 min-w-[260px] max-w-md group/search">
-          <div class="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 group-focus-within/search:scale-90 group-focus-within/search:text-gold">
-            <svg class="w-4 h-4 text-muted/50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          <div
+            class="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 group-focus-within/search:scale-90 group-focus-within/search:text-gold"
+          >
+            <svg
+              class="w-4 h-4 text-muted/50"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+              />
             </svg>
           </div>
-          <input v-model="brandSearch" type="text" placeholder="Buscar marca…" class="input-field !pl-12" @input="onBrandSearch" />
+          <input
+            v-model="brandSearch"
+            type="text"
+            placeholder="Buscar marca…"
+            class="input-field !pl-12"
+            @input="onBrandSearch"
+          />
         </div>
 
         <button
           v-if="brandSearch"
           class="h-11 px-4 rounded-xl text-sm text-muted hover:text-ink border border-border/70 hover:border-ink/20 hover:bg-panel/80 hover:shadow-sm active:scale-[0.97] transition-all duration-300"
-          @click="brandSearch = ''; loadBrands(1)"
+          @click="
+            brandSearch = '';
+            loadBrands(1);
+          "
         >
           Limpiar
         </button>
       </div>
 
       <!-- Table -->
-      <div class="rounded-2xl border border-border/60 bg-white shadow-card overflow-hidden">
-        <div v-if="brandsStore.isLoading" class="flex justify-center items-center h-48">
-          <div class="w-7 h-7 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
+      <div
+        class="rounded-2xl border border-border/60 bg-white shadow-card overflow-hidden"
+      >
+        <div
+          v-if="brandsStore.isLoading"
+          class="flex justify-center items-center h-48"
+        >
+          <div
+            class="w-7 h-7 rounded-full border-2 border-gold/30 border-t-gold animate-spin"
+          />
         </div>
         <template v-else>
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-border/60 bg-panel/50">
-                <th class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider">Marca</th>
-                <th class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider">Cliente</th>
-                <th class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider">Tipo</th>
-                <th class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider">Estado</th>
+                <th
+                  class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider"
+                >
+                  Marca
+                </th>
+                <th
+                  class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider"
+                >
+                  Cliente
+                </th>
+                <th
+                  class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider"
+                >
+                  Tipo
+                </th>
+                <th
+                  class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider"
+                >
+                  Estado
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -313,18 +623,33 @@ onMounted(() => {
               >
                 <td class="px-5 py-3.5">
                   <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
-                      <span class="text-[11px] font-bold text-indigo-400">{{ brand.nombre.charAt(0) }}</span>
+                    <div
+                      class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center flex-shrink-0"
+                    >
+                      <span class="text-[11px] font-bold text-indigo-400">{{
+                        brand.nombre.charAt(0)
+                      }}</span>
                     </div>
                     <div>
-                      <p class="text-sm font-medium text-ink group-hover:text-gold transition-colors duration-150">{{ brand.nombre }}</p>
-                      <p class="text-[10px] text-muted/60 font-mono">{{ formatBrandId(brand.brand_id) }}</p>
+                      <p
+                        class="text-sm font-medium text-ink group-hover:text-gold transition-colors duration-150"
+                      >
+                        {{ brand.nombre }}
+                      </p>
+                      <p class="text-[10px] text-muted/60 font-mono">
+                        {{ formatBrandId(brand.brand_id) }}
+                      </p>
                     </div>
                   </div>
                 </td>
-                <td class="px-5 py-3.5 text-sm text-muted">{{ brand.client_name }}</td>
+                <td class="px-5 py-3.5 text-sm text-muted">
+                  {{ brand.client_name }}
+                </td>
                 <td class="px-5 py-3.5">
-                  <span v-if="brand.tipo_marca_nombre" class="text-xs px-2.5 py-1 rounded-lg border border-blue-200 text-blue-600 bg-blue-50 font-medium">
+                  <span
+                    v-if="brand.tipo_marca_nombre"
+                    class="text-xs px-2.5 py-1 rounded-lg border border-blue-200 text-blue-600 bg-blue-50 font-medium"
+                  >
                     {{ brand.tipo_marca_nombre }}
                   </span>
                   <span v-else class="text-xs text-muted/60">—</span>
@@ -332,9 +657,20 @@ onMounted(() => {
                 <td class="px-5 py-3.5">
                   <span
                     class="flex items-center gap-1.5 text-xs font-medium"
-                    :class="brand.estado === 'activa' ? 'text-emerald-600' : 'text-muted'"
+                    :class="
+                      brand.estado === 'activa'
+                        ? 'text-emerald-600'
+                        : 'text-muted'
+                    "
                   >
-                    <div class="w-1.5 h-1.5 rounded-full" :class="brand.estado === 'activa' ? 'bg-emerald-500' : 'bg-muted/40'" />
+                    <div
+                      class="w-1.5 h-1.5 rounded-full"
+                      :class="
+                        brand.estado === 'activa'
+                          ? 'bg-emerald-500'
+                          : 'bg-muted/40'
+                      "
+                    />
                     {{ brand.estado === 'activa' ? 'Activa' : 'Inactiva' }}
                   </span>
                 </td>
@@ -343,9 +679,23 @@ onMounted(() => {
           </table>
 
           <!-- Pagination -->
-          <div v-if="brandsStore.totalPages > 1" class="flex items-center justify-between px-5 py-4 border-t border-border/40 bg-panel/30">
+          <div
+            v-if="brandsStore.totalPages > 1"
+            class="flex items-center justify-between px-5 py-4 border-t border-border/40 bg-panel/30"
+          >
             <p class="text-sm text-muted">
-              Mostrando <span class="font-medium text-ink">{{ (brandsStore.currentPage - 1) * brandsStore.pageSize + 1 }}</span>–<span class="font-medium text-ink">{{ Math.min(brandsStore.currentPage * brandsStore.pageSize, brandsStore.total) }}</span> de <span class="font-medium text-ink">{{ brandsStore.total }}</span>
+              Mostrando
+              <span class="font-medium text-ink">{{
+                (brandsStore.currentPage - 1) * brandsStore.pageSize + 1
+              }}</span
+              >–<span class="font-medium text-ink">{{
+                Math.min(
+                  brandsStore.currentPage * brandsStore.pageSize,
+                  brandsStore.total,
+                )
+              }}</span>
+              de
+              <span class="font-medium text-ink">{{ brandsStore.total }}</span>
             </p>
             <div class="flex items-center gap-1">
               <button
@@ -353,18 +703,41 @@ onMounted(() => {
                 class="w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all duration-150"
                 @click="goToBrandPage(brandsStore.currentPage - 1)"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M15.75 19.5L8.25 12l7.5-7.5"
+                  />
                 </svg>
               </button>
-              <span class="text-xs text-muted px-2">{{ brandsStore.currentPage }} / {{ brandsStore.totalPages }}</span>
+              <span class="text-xs text-muted px-2"
+                >{{ brandsStore.currentPage }} /
+                {{ brandsStore.totalPages }}</span
+              >
               <button
                 :disabled="brandsStore.currentPage >= brandsStore.totalPages"
                 class="w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:text-ink hover:bg-white border border-transparent hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all duration-150"
                 @click="goToBrandPage(brandsStore.currentPage + 1)"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M8.25 4.5l7.5 7.5-7.5 7.5"
+                  />
                 </svg>
               </button>
             </div>

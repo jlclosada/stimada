@@ -1,5 +1,5 @@
-import { defineStore } from "pinia";
-import { useAuthStore } from "~/stores/auth";
+import { defineStore } from 'pinia';
+import { useAuthStore } from '~/stores/auth';
 
 export interface ClientType {
   id: number;
@@ -19,6 +19,7 @@ export interface ClientProfile {
   es_agencia: boolean;
   estado: string;
   semaforo_cliente: number | null;
+  has_account: boolean;
   created_by_name: string | null;
   created_at: string;
 }
@@ -50,7 +51,7 @@ export interface ClientProfileDetail extends ClientProfile {
   marcas: ClientBrand[];
 }
 
-export const useClientsStore = defineStore("clients", {
+export const useClientsStore = defineStore('clients', {
   state: () => ({
     list: [] as ClientProfile[],
     types: [] as ClientType[],
@@ -66,9 +67,12 @@ export const useClientsStore = defineStore("clients", {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       if (this.types.length) return;
-      const data = await $fetch<ClientType[]>(`${config.public.apiBase}/client-types/`, {
-        headers: { Authorization: `Bearer ${auth.accessToken}` },
-      });
+      const data = await $fetch<ClientType[]>(
+        `${config.public.apiBase}/client-types/`,
+        {
+          headers: { Authorization: `Bearer ${auth.accessToken}` },
+        },
+      );
       this.types = data;
     },
 
@@ -85,7 +89,7 @@ export const useClientsStore = defineStore("clients", {
         }).toString();
         const data = await $fetch<{ count: number; results: ClientProfile[] }>(
           `${config.public.apiBase}/clients/?${query}`,
-          { headers: { Authorization: `Bearer ${auth.accessToken}` } }
+          { headers: { Authorization: `Bearer ${auth.accessToken}` } },
         );
         this.list = data.results;
         this.total = data.count;
@@ -99,60 +103,76 @@ export const useClientsStore = defineStore("clients", {
     async fetchDetail(id: number | string): Promise<ClientProfileDetail> {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
-      return $fetch<ClientProfileDetail>(`${config.public.apiBase}/clients/${id}/`, {
-        headers: { Authorization: `Bearer ${auth.accessToken}` },
-      });
+      return $fetch<ClientProfileDetail>(
+        `${config.public.apiBase}/clients/${id}/`,
+        {
+          headers: { Authorization: `Bearer ${auth.accessToken}` },
+        },
+      );
     },
 
     async create(formData: FormData): Promise<ClientProfileDetail> {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       return $fetch<ClientProfileDetail>(`${config.public.apiBase}/clients/`, {
-        method: "POST",
+        method: 'POST',
         body: formData,
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       });
     },
 
-    async updateClient(id: number | string, data: Record<string, unknown>): Promise<ClientProfileDetail> {
+    async updateClient(
+      id: number | string,
+      data: Record<string, unknown>,
+    ): Promise<ClientProfileDetail> {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
-      return $fetch<ClientProfileDetail>(`${config.public.apiBase}/clients/${id}/`, {
-        method: "PATCH",
-        body: data,
-        headers: { Authorization: `Bearer ${auth.accessToken}` },
-      });
+      return $fetch<ClientProfileDetail>(
+        `${config.public.apiBase}/clients/${id}/`,
+        {
+          method: 'PATCH',
+          body: data,
+          headers: { Authorization: `Bearer ${auth.accessToken}` },
+        },
+      );
     },
 
     async deleteClient(id: number | string): Promise<void> {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       await $fetch(`${config.public.apiBase}/clients/${id}/`, {
-        method: "DELETE",
+        method: 'DELETE',
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       });
     },
 
     async createClientAccount(
       id: number | string,
-      data: { email: string; full_name?: string; password?: string }
-    ): Promise<{ detail: string; user: { id: number; email: string; full_name: string }; password: string }> {
+      data: { email: string; full_name?: string; password?: string },
+    ): Promise<{
+      detail: string;
+      user: { id: number; email: string; full_name: string };
+      password: string;
+    }> {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       return $fetch(`${config.public.apiBase}/clients/${id}/create-account/`, {
-        method: "POST",
+        method: 'POST',
         body: data,
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       });
     },
 
-    async createBrand(
-      data: { client: number; nombre: string; tipo_marca?: number | null; web_instagram?: string }
-    ): Promise<ClientBrand> {
+    async createBrand(data: {
+      client: number;
+      nombre: string;
+      tipo_marca?: number | null;
+      web_instagram?: string;
+    }): Promise<ClientBrand> {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       return $fetch<ClientBrand>(`${config.public.apiBase}/brands/`, {
-        method: "POST",
+        method: 'POST',
         body: data,
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       });
@@ -160,12 +180,12 @@ export const useClientsStore = defineStore("clients", {
 
     async updateBrand(
       id: number,
-      data: Record<string, unknown>
+      data: Record<string, unknown>,
     ): Promise<ClientBrand> {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       return $fetch<ClientBrand>(`${config.public.apiBase}/brands/${id}/`, {
-        method: "PATCH",
+        method: 'PATCH',
         body: data,
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       });
@@ -175,7 +195,7 @@ export const useClientsStore = defineStore("clients", {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       await $fetch(`${config.public.apiBase}/brands/${id}/`, {
-        method: "DELETE",
+        method: 'DELETE',
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       });
     },

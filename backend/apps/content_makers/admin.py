@@ -41,15 +41,15 @@ class TallajeOptionAdmin(admin.ModelAdmin):
 
 @admin.register(ContentMakerProfile)
 class ContentMakerProfileAdmin(admin.ModelAdmin):
-    list_display = ["stimada_id", "nombre", "apellidos", "tipo_cm", "status", "tiene_cuenta", "email"]
-    list_filter = ["tipo_cm", "status", "contrato_firmado", "es_mama"]
+    list_display = ["stimada_id", "nombre", "apellidos", "tipo", "tipo_cm", "status", "tiene_cuenta", "email"]
+    list_filter = ["tipo", "tipo_cm", "status", "contrato_firmado", "es_mama"]
     search_fields = ["nombre", "apellidos", "email", "stimada_id", "instagram_handle"]
     readonly_fields = ["created_at", "updated_at"]
     filter_horizontal = ["desempeno_opciones"]
 
     fieldsets = (
         ("Identificación", {"fields": ("stimada_id", "user")}),
-        ("Persona", {"fields": ("nombre", "apellidos", "sexo", "tipo_cm", "status")}),
+        ("Persona", {"fields": ("nombre", "apellidos", "sexo", "tipo", "tipo_cm", "status")}),
         ("Valoración interna", {"fields": ("calidad_contenido", "desempeno_opciones", "comentarios", "es_mama", "categorias_contenido", "apariencia", "desempeno")}),
         ("Stimada", {"fields": ("sigue_stimada", "stimada_en_bio", "contrato_firmado")}),
         ("Instagram", {"fields": ("instagram_handle", "link_instagram", "seguidores_instagram", "categoria_seguidores_ig", "fee_instagram")}),

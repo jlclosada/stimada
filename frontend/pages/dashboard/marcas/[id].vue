@@ -59,7 +59,7 @@ async function saveChanges() {
   saveError.value = "";
   try {
     const payload: Record<string, unknown> = {};
-    const editableKeys = ["nombre", "tipo_marca", "web_instagram", "notas", "estado"];
+    const editableKeys = ["nombre", "tipo_marca", "web_instagram", "persona_contacto", "email_contacto", "telefono", "notas", "estado"];
     for (const key of editableKeys) {
       if (editData.value[key] !== (brand.value as Record<string, unknown>)[key]) {
         payload[key] = editData.value[key];
@@ -101,7 +101,7 @@ load();
 </script>
 
 <template>
-  <div class="max-w-3xl animate-fade-up">
+  <div class="max-w-5xl animate-fade-up">
     <!-- Loading -->
     <div v-if="isLoading" class="flex items-center justify-center h-60">
       <div class="w-10 h-10 rounded-full border-2 border-gold/20 border-t-gold animate-spin" />
@@ -171,37 +171,165 @@ load();
       <!-- VIEW MODE -->
       <template v-if="!isEditing">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-3">
-            <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">Datos de la marca</h3>
-            <div class="space-y-2.5 text-xs">
-              <div class="flex justify-between"><span class="text-muted">Nombre</span><span class="text-ink font-medium">{{ brand.nombre }}</span></div>
-              <div class="flex justify-between"><span class="text-muted">Tipo</span><span class="text-ink">{{ brand.tipo_marca_nombre || '—' }}</span></div>
-              <div class="flex justify-between"><span class="text-muted">Web / Instagram</span>
-                <a v-if="brand.web_instagram" :href="brand.web_instagram" target="_blank" class="text-gold hover:text-gold/80 truncate max-w-[200px]">{{ brand.web_instagram }}</a>
-                <span v-else class="text-muted/50">—</span>
+          <!-- Datos de la marca -->
+          <div class="group rounded-3xl border border-border/60 bg-white shadow-card p-6 space-y-4 transition-all duration-300 hover:border-border hover:shadow-soft">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+                </svg>
+              </div>
+              <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">Datos de la marca</h3>
+            </div>
+            <div class="space-y-3">
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Nombre</p>
+                <p class="text-sm text-ink font-medium">{{ brand.nombre }}</p>
+              </div>
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">ID</p>
+                <p class="text-sm text-ink font-mono tracking-wide">{{ formatBrandId(brand.brand_id) }}</p>
+              </div>
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Tipo</p>
+                <p class="text-sm text-ink">{{ brand.tipo_marca_nombre || '—' }}</p>
+              </div>
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Web / IG</p>
+                <a v-if="brand.web_instagram" :href="brand.web_instagram" target="_blank" class="text-sm text-gold hover:text-gold/80 truncate transition-colors">{{ brand.web_instagram }}</a>
+                <p v-else class="text-sm text-muted/50">—</p>
+              </div>
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Estado</p>
+                <span
+                  class="text-[11px] font-medium px-2 py-0.5 rounded-full border"
+                  :class="brand.estado === 'activa' ? 'text-emerald-400 bg-emerald-400/[0.06] border-emerald-400/15' : 'text-muted/60 bg-panel border-border/40'"
+                >
+                  {{ brand.estado === 'activa' ? 'Activa' : 'Inactiva' }}
+                </span>
               </div>
             </div>
           </div>
 
-          <div class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-3">
-            <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">Cliente asociado</h3>
-            <div class="space-y-2.5 text-xs">
-              <div class="flex justify-between"><span class="text-muted">Cliente</span>
-                <NuxtLink :to="`/dashboard/clientes/${brand.client}`" class="text-ink font-medium hover:text-gold transition-colors">
+          <!-- Cliente asociado -->
+          <div class="group rounded-3xl border border-border/60 bg-white shadow-card p-6 space-y-4 transition-all duration-300 hover:border-border hover:shadow-soft">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" />
+                </svg>
+              </div>
+              <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">Cliente asociado</h3>
+              <span v-if="brand.cliente_datos?.es_agencia" class="ml-auto text-[10px] text-amber-400 bg-amber-400/[0.06] px-2 py-0.5 rounded-full border border-amber-400/15 font-medium">Agencia</span>
+              <span v-else class="ml-auto text-[10px] text-blue-400 bg-blue-400/[0.06] px-2 py-0.5 rounded-full border border-blue-400/15 font-medium">Marca directa</span>
+            </div>
+            <div class="space-y-3">
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Cliente</p>
+                <NuxtLink :to="`/dashboard/clientes/${brand.client}`" class="text-sm text-ink font-medium hover:text-gold transition-colors">
                   {{ brand.client_name }}
                 </NuxtLink>
+              </div>
+              <div v-if="brand.cliente_datos" class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">ID Cliente</p>
+                <p class="text-sm text-ink font-mono tracking-wide">{{ brand.cliente_datos.cliente_id }}</p>
+              </div>
+              <div v-if="brand.cliente_datos?.tipo_nombre" class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Tipo</p>
+                <p class="text-sm text-ink">{{ brand.cliente_datos.tipo_nombre }}</p>
+              </div>
+              <div v-if="brand.cliente_datos?.web_instagram" class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Web / IG</p>
+                <a :href="brand.cliente_datos.web_instagram" target="_blank" class="text-sm text-gold hover:text-gold/80 truncate transition-colors">{{ brand.cliente_datos.web_instagram }}</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Contacto -->
+          <div class="group rounded-3xl border border-border/60 bg-white shadow-card p-6 space-y-4 transition-all duration-300 hover:border-border hover:shadow-soft">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                </svg>
+              </div>
+              <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">Contacto</h3>
+              <span v-if="brand.contacto_efectivo?.es_propio" class="ml-auto text-[10px] text-emerald-400 bg-emerald-400/[0.06] px-2 py-0.5 rounded-full border border-emerald-400/15 font-medium">Propio</span>
+              <span v-else class="ml-auto text-[10px] text-muted/50 italic">heredado del cliente</span>
+            </div>
+            <div v-if="brand.contacto_efectivo" class="space-y-3">
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Persona</p>
+                <p class="text-sm text-ink">{{ brand.contacto_efectivo.persona_contacto || '—' }}</p>
+              </div>
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Email</p>
+                <a v-if="brand.contacto_efectivo.email_contacto" :href="`mailto:${brand.contacto_efectivo.email_contacto}`" class="text-sm text-gold hover:text-gold/80 transition-colors">{{ brand.contacto_efectivo.email_contacto }}</a>
+                <p v-else class="text-sm text-muted/50">—</p>
+              </div>
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Teléfono</p>
+                <p class="text-sm text-ink">{{ brand.contacto_efectivo.telefono || '—' }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Facturación (heredado del cliente) -->
+          <div class="group rounded-3xl border border-border/60 bg-white shadow-card p-6 space-y-4 transition-all duration-300 hover:border-border hover:shadow-soft">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                </svg>
+              </div>
+              <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">Facturación</h3>
+              <span class="ml-auto text-[10px] text-muted/50 italic">vía cliente</span>
+            </div>
+            <div v-if="brand.cliente_datos" class="space-y-3">
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Razón social</p>
+                <p class="text-sm text-ink">{{ brand.cliente_datos.nombre_facturacion || '—' }}</p>
+              </div>
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">CIF</p>
+                <p class="text-sm text-ink font-mono tracking-wide">{{ brand.cliente_datos.cif || '—' }}</p>
+              </div>
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Email</p>
+                <p class="text-sm text-ink">{{ brand.cliente_datos.email_facturacion || '—' }}</p>
+              </div>
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">Dirección</p>
+                <p class="text-sm text-ink">{{ brand.cliente_datos.direccion_facturacion || '—' }}</p>
+              </div>
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">C.P. / Ciudad</p>
+                <p class="text-sm text-ink">{{ [brand.cliente_datos.codigo_postal, brand.cliente_datos.ciudad].filter(Boolean).join(', ') || '—' }}</p>
+              </div>
+              <div class="flex items-start gap-3">
+                <p class="text-[11px] text-muted/70 w-24 flex-shrink-0 pt-0.5 uppercase tracking-wider">País</p>
+                <p class="text-sm text-ink">{{ brand.cliente_datos.pais || '—' }}</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div v-if="brand.notas" class="rounded-2xl border border-border/60 bg-white shadow-card p-6">
-          <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted mb-3">Notas</h3>
+        <!-- Notas -->
+        <div v-if="brand.notas" class="rounded-3xl border border-border/60 bg-white shadow-card p-6 transition-all duration-300 hover:border-border hover:shadow-soft">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+              </svg>
+            </div>
+            <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">Notas</h3>
+          </div>
           <p class="text-sm text-muted leading-relaxed whitespace-pre-wrap">{{ brand.notas }}</p>
         </div>
 
         <!-- Proyectos asociados -->
-        <div class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-4">
+        <div class="rounded-3xl border border-border/60 bg-white shadow-card p-6 space-y-4 transition-all duration-300 hover:border-border hover:shadow-soft">
           <div class="flex items-center gap-2">
             <div class="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center">
               <svg class="w-3.5 h-3.5 text-gold" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -284,6 +412,33 @@ load();
             <div class="md:col-span-2">
               <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Notas</label>
               <textarea v-model="editData.notas" rows="3" class="input-field resize-none" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Contacto propio de la marca -->
+        <div class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-4">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+              </svg>
+            </div>
+            <h3 class="text-[11px] font-semibold uppercase tracking-[0.15em] text-gold">Contacto de la marca</h3>
+          </div>
+          <p class="text-xs text-muted/60">Si se dejan vacíos, se heredarán automáticamente del cliente.</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="md:col-span-2">
+              <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Persona de contacto</label>
+              <input v-model="editData.persona_contacto" type="text" class="input-field" :placeholder="brand?.cliente_datos?.persona_contacto || 'Heredado del cliente'" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Email de contacto</label>
+              <input v-model="editData.email_contacto" type="email" class="input-field" :placeholder="brand?.cliente_datos?.email_contacto || 'Heredado del cliente'" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-muted/70 mb-2 uppercase tracking-wider">Teléfono</label>
+              <input v-model="editData.telefono" type="tel" class="input-field" :placeholder="brand?.cliente_datos?.telefono || 'Heredado del cliente'" />
             </div>
           </div>
         </div>

@@ -77,12 +77,26 @@ class TallajeOption(models.Model):
 
 
 class ContentMakerProfile(models.Model):
+    # Tipo de perfil (Content Maker vs Colaborador)
+    TIPO_CONTENT_MAKER = "content_maker"
+    TIPO_COLABORADOR = "colaborador"
+    TIPO_CHOICES = [
+        (TIPO_CONTENT_MAKER, "Content Maker"),
+        (TIPO_COLABORADOR, "Colaborador"),
+    ]
+
     # Identificador Stimada
     stimada_id = models.CharField(max_length=30, unique=True, blank=True)
 
     # Datos personales
     nombre = models.CharField(max_length=100)
     apellidos = models.CharField(max_length=150, blank=True)
+    tipo = models.CharField(
+        max_length=20,
+        choices=TIPO_CHOICES,
+        default=TIPO_CONTENT_MAKER,
+        db_index=True,
+    )
     tipo_cm = models.CharField(max_length=50, blank=True)
     sexo = models.CharField(max_length=20, blank=True)
     status = models.CharField(max_length=50, blank=True)
@@ -170,7 +184,70 @@ class ContentMakerProfile(models.Model):
     def save(self, *args, **kwargs):
         if not self.stimada_id:
             self.stimada_id = self.generate_next_id()
+        # Normalize handles (strip "@" and whitespace) before persisting.
+        self.instagram_handle = self._normalize_handle(self.instagram_handle)
+        self.tiktok_handle = self._normalize_handle(self.tiktok_handle)
+        # Auto-generate links from handles.
+        self.link_instagram = self._build_instagram_url(self.instagram_handle)
+        self.link_tiktok = self._build_tiktok_url(self.tiktok_handle)
+        # Auto-compute follower category from follower count.
+        self.categoria_seguidores_ig = self._compute_followers_category(
+            self.seguidores_instagram
+        )
+        self.categoria_seguidores_tt = self._compute_followers_category(
+            self.seguidores_tiktok
+        )
         super().save(*args, **kwargs)
+
+    # ─── Helpers: handles & links ──────────────────────────────────────────────
+    @staticmethod
+    def _normalize_handle(handle):
+        """Strip leading '@' and whitespace from a social handle."""
+        if not handle:
+            return ""
+        return handle.strip().lstrip("@").strip()
+
+    @staticmethod
+    def _build_instagram_url(handle):
+        if not handle:
+            return ""
+        return f"https://www.instagram.com/{handle}/"
+
+    @staticmethod
+    def _build_tiktok_url(handle):
+        if not handle:
+            return ""
+        return f"https://www.tiktok.com/@{handle}"
+
+    # Follower range definitions (in order). The first range whose `max` is
+    # greater than or equal to the count wins; the last is the open-ended one.
+    FOLLOWER_RANGES = [
+        (1_000, "<1k"),
+        (4_000, "1k – 4k"),
+        (8_000, "4k – 8k"),
+        (14_000, "8k – 14k"),
+        (19_000, "14k – 19k"),
+        (28_000, "19k – 28k"),
+        (35_000, "28k – 35k"),
+        (50_000, "35k – 50k"),
+        (100_000, "50k – 100k"),
+    ]
+    FOLLOWER_RANGE_TOP = ">100k"
+
+    @classmethod
+    def _compute_followers_category(cls, count):
+        if count is None or count == "":
+            return ""
+        try:
+            n = int(count)
+        except (TypeError, ValueError):
+            return ""
+        if n < 1_000:
+            return "<1k"
+        for upper, label in cls.FOLLOWER_RANGES[1:]:
+            if n < upper:
+                return label
+        return cls.FOLLOWER_RANGE_TOP
 
     def __str__(self):
         return f"{self.stimada_id} — {self.nombre} {self.apellidos}"
