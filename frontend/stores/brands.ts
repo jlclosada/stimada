@@ -1,66 +1,66 @@
-import { defineStore } from "pinia";
-import { useAuthStore } from "~/stores/auth";
+import { defineStore } from 'pinia';
+import { useAuthStore } from '~/stores/auth';
 
 export interface BrandListItem {
   id: number;
   brand_id: string;
-  nombre: string;
+  name: string;
   client: number;
   client_name: string;
-  tipo_marca: number | null;
-  tipo_marca_nombre: string | null;
+  brand_type: number | null;
+  brand_type_name: string | null;
   web_instagram: string;
-  estado: string;
+  status: string;
   created_at: string;
 }
 
 export interface BrandProject {
   id: number;
   project_id: string;
-  nombre: string;
+  name: string;
   status_name: string | null;
-  fecha_servicio: string | null;
+  service_date: string | null;
   content_maker_name: string | null;
 }
 
 export interface BrandClientData {
   id: number;
-  cliente_id: string;
-  nombre_cliente: string;
-  es_agencia: boolean;
-  tipo_nombre: string | null;
+  client_id: string;
+  name: string;
+  is_agency: boolean;
+  type_name: string | null;
   web_instagram: string;
-  persona_contacto: string;
-  email_contacto: string;
-  telefono: string;
-  nombre_facturacion: string;
+  contact_person: string;
+  contact_email: string;
+  phone: string;
+  billing_name: string;
   cif: string;
-  email_facturacion: string;
-  direccion_facturacion: string;
-  codigo_postal: string;
-  ciudad: string;
-  pais: string;
-  estado: string;
+  billing_email: string;
+  billing_address: string;
+  postal_code: string;
+  city: string;
+  country: string;
+  status: string;
 }
 
-export interface BrandContactoEfectivo {
-  persona_contacto: string;
-  email_contacto: string;
-  telefono: string;
-  es_propio: boolean;
+export interface BrandEffectiveContact {
+  contact_person: string;
+  contact_email: string;
+  phone: string;
+  is_own: boolean;
 }
 
 export interface BrandDetail extends BrandListItem {
-  notas: string;
-  persona_contacto: string;
-  email_contacto: string;
-  telefono: string;
-  proyectos: BrandProject[];
-  cliente_datos: BrandClientData;
-  contacto_efectivo: BrandContactoEfectivo;
+  notes: string;
+  contact_person: string;
+  contact_email: string;
+  phone: string;
+  projects: BrandProject[];
+  client_data: BrandClientData;
+  effective_contact: BrandEffectiveContact;
 }
 
-export const useBrandsStore = defineStore("brands", {
+export const useBrandsStore = defineStore('brands', {
   state: () => ({
     list: [] as BrandListItem[],
     isLoading: false,
@@ -107,17 +107,20 @@ export const useBrandsStore = defineStore("brands", {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       return $fetch<BrandDetail>(`${config.public.apiBase}/brands/`, {
-        method: "POST",
+        method: 'POST',
         body: data,
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       });
     },
 
-    async update(id: number | string, data: Record<string, unknown>): Promise<BrandDetail> {
+    async update(
+      id: number | string,
+      data: Record<string, unknown>,
+    ): Promise<BrandDetail> {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       return $fetch<BrandDetail>(`${config.public.apiBase}/brands/${id}/`, {
-        method: "PATCH",
+        method: 'PATCH',
         body: data,
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       });
@@ -127,12 +130,22 @@ export const useBrandsStore = defineStore("brands", {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       await $fetch(`${config.public.apiBase}/brands/${id}/`, {
-        method: "DELETE",
+        method: 'DELETE',
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       });
     },
 
-    async searchClients(q: string): Promise<{ id: number; cliente_id: string; nombre_cliente: string; es_agencia: boolean; tipo_cliente: number | null; tipo_nombre: string | null; web_instagram: string }[]> {
+    async searchClients(q: string): Promise<
+      {
+        id: number;
+        client_id: string;
+        name: string;
+        is_agency: boolean;
+        client_type: number | null;
+        type_name: string | null;
+        web_instagram: string;
+      }[]
+    > {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
       const data = await $fetch<{ results: any[] }>(

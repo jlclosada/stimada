@@ -12,28 +12,28 @@ const navItems = computed<NavItem[]>(() => {
     return [
       { label: "Dashboard", href: "/dashboard", icon: "grid" },
       { label: "Content Makers", href: "/dashboard/content-makers", icon: "star" },
-      { label: "Clientes", href: "/dashboard/clientes", icon: "briefcase" },
-      { label: "Usuarios", href: "/dashboard/usuarios", icon: "users" },
+      { label: "Clientes", href: "/dashboard/clients", icon: "briefcase" },
+      { label: "Usuarios", href: "/dashboard/users", icon: "users" },
     ];
   }
   if (role === "stimada_employee") {
     return [
       { label: "Dashboard", href: "/dashboard", icon: "grid" },
       { label: "Content Makers", href: "/dashboard/content-makers", icon: "star" },
-      { label: "Clientes", href: "/dashboard/clientes", icon: "briefcase" },
-      { label: "Usuarios", href: "/dashboard/usuarios", icon: "users" },
+      { label: "Clientes", href: "/dashboard/clients", icon: "briefcase" },
+      { label: "Usuarios", href: "/dashboard/users", icon: "users" },
     ];
   }
   if (role === "client") {
     return [
       { label: "Dashboard", href: "/dashboard", icon: "grid" },
-      { label: "Mis proyectos", href: "/dashboard/mis-proyectos", icon: "folder" },
+      { label: "Mis proyectos", href: "/dashboard/my-projects", icon: "folder" },
     ];
   }
   if (role === "content_maker") {
     return [
       { label: "Dashboard", href: "/dashboard", icon: "grid" },
-      { label: "Mis contenidos", href: "/dashboard/mis-contenidos", icon: "file" },
+      { label: "Mis contenidos", href: "/dashboard/my-contents", icon: "file" },
     ];
   }
   return [{ label: "Dashboard", href: "/dashboard", icon: "grid" }];

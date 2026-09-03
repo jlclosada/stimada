@@ -35,7 +35,7 @@ def create_content_maker_account(cm_profile, created_by=None):
         raise ValueError("La Content Maker no tiene email registrado.")
 
     password = generate_password()
-    full_name = f"{cm_profile.nombre} {cm_profile.apellidos}".strip()
+    full_name = f"{cm_profile.first_name} {cm_profile.last_name}".strip()
 
     user = CustomUser.objects.create_user(
         email=email,
@@ -77,24 +77,24 @@ def create_content_maker_account(cm_profile, created_by=None):
 def create_client_account(client_profile, created_by=None):
     """
     Create a user account for a Client.
-    Prerequisite: contrato_firmado = True and contrato file uploaded.
+    Prerequisite: contract_signed = True and contract file uploaded.
     Returns the created user.
     """
     if client_profile.user:
         raise ValueError("Este cliente ya tiene una cuenta de usuario.")
 
-    if not client_profile.contrato_firmado:
+    if not client_profile.contract_signed:
         raise ValueError("El contrato debe estar firmado antes de crear la cuenta.")
 
-    if not client_profile.contrato:
+    if not client_profile.contract:
         raise ValueError("Debe subirse el archivo del contrato antes de crear la cuenta.")
 
-    email = client_profile.email_contacto
+    email = client_profile.contact_email
     if not email:
         raise ValueError("El cliente no tiene email de contacto registrado.")
 
     password = generate_password()
-    full_name = client_profile.persona_contacto or client_profile.nombre_cliente
+    full_name = client_profile.contact_person or client_profile.name
 
     user = CustomUser.objects.create_user(
         email=email,

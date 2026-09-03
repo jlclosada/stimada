@@ -10,36 +10,40 @@ from apps.projects.models import (
     Briefing,
     BriefingLink,
     BriefingPhoto,
-    Entregable,
-    LogisticaProducto,
-    ModalidadEconomica,
+    Deliverable,
+    Format,
+    ProductLogistics,
+    EconomicModel,
     Notification,
     Project,
     ProjectContentMaker,
     ProjectStatus,
-    QuienGraba,
-    QuienPublica,
-    QuienRevisa,
-    RecogidaProducto,
+    WhoRecords,
+    WhoPublishes,
+    WhoReviews,
+    ProductPickup,
+    SocialNetwork,
     ServiceType,
     StatusChangeLog,
     WinStatus,
 )
 from apps.projects.serializers import (
     BriefingSerializer,
-    EntregableSerializer,
-    LogisticaProductoSerializer,
-    ModalidadEconomicaSerializer,
+    DeliverableSerializer,
+    FormatSerializer,
+    ProductLogisticsSerializer,
+    EconomicModelSerializer,
     NotificationSerializer,
     ProjectCreateSerializer,
     ProjectDetailSerializer,
     ProjectListSerializer,
     ProjectStatusSerializer,
     ProjectUpdateSerializer,
-    QuienGrabaSerializer,
-    QuienPublicaSerializer,
-    QuienRevisaSerializer,
-    RecogidaProductoSerializer,
+    WhoRecordsSerializer,
+    WhoPublishesSerializer,
+    WhoReviewsSerializer,
+    ProductPickupSerializer,
+    SocialNetworkSerializer,
     ServiceTypeSerializer,
     StatusChangeLogSerializer,
     WinStatusSerializer,
@@ -48,9 +52,9 @@ from apps.projects.services import (
     handle_briefing_submitted,
     handle_cm_accept,
     handle_cm_reject,
-    handle_entregable_review,
-    handle_entregable_status_change,
-    handle_entregable_upload,
+    handle_deliverable_review,
+    handle_deliverable_status_change,
+    handle_deliverable_upload,
     override_project_status,
     transition_project_status,
 )
@@ -117,18 +121,18 @@ class ProjectViewSet(viewsets.ModelViewSet):
         search = params.get("search", "").strip()
         if search:
             qs = qs.filter(
-                models.Q(nombre__icontains=search)
+                models.Q(name__icontains=search)
                 | models.Q(project_id__icontains=search)
-                | models.Q(client__nombre_cliente__icontains=search)
+                | models.Q(client__name__icontains=search)
             )
 
         status_filter = params.get("status")
         if status_filter:
-            qs = qs.filter(status__nombre=status_filter)
+            qs = qs.filter(status__name=status_filter)
 
         service_type_filter = params.get("service_type")
         if service_type_filter:
-            qs = qs.filter(service_type__nombre=service_type_filter)
+            qs = qs.filter(service_type__name=service_type_filter)
 
         client_filter = params.get("client")
         if client_filter:
@@ -214,8 +218,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
         data = StatusChangeLogSerializer(changes, many=True).data
         return Response(data)
 
-    @action(detail=True, methods=["post"], url_path="upload_entregable")
-    def upload_entregable(self, request, pk=None):
+    @action(detail=True, methods=["post"], url_path="upload_deliverable")
+    def upload_deliverable(self, request, pk=None):
         """CM uploads a deliverable for the project."""
         project = self.get_object()
         user = request.user
@@ -232,24 +236,24 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if not pcm:
             return Response({"detail": "No estás confirmada en este proyecto."}, status=status.HTTP_403_FORBIDDEN)
 
-        archivo = request.FILES.get("archivo")
-        if not archivo:
+        file = request.FILES.get("file")
+        if not file:
             return Response({"detail": "Debes subir un archivo."}, status=status.HTTP_400_BAD_REQUEST)
 
-        descripcion = request.data.get("descripcion", "")
+        description = request.data.get("description", "")
 
-        entregable = Entregable.objects.create(
+        deliverable = Deliverable.objects.create(
             project=project,
             content_maker=cm_profile,
-            archivo=archivo,
-            descripcion=descripcion,
+            file=file,
+            description=description,
         )
 
-        handle_entregable_upload(project, entregable)
-        return Response(EntregableSerializer(entregable).data, status=status.HTTP_201_CREATED)
+        handle_deliverable_upload(project, deliverable)
+        return Response(DeliverableSerializer(deliverable).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=["post"], url_path="reupload_entregable")
-    def reupload_entregable(self, request, pk=None):
+    @action(detail=True, methods=["post"], url_path="reupload_deliverable")
+    def reupload_deliverable(self, request, pk=None):
         """CM reuploads a deliverable after revision request."""
         project = self.get_object()
         user = request.user
@@ -259,37 +263,37 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         cm_profile = user.content_maker_profile
 
-        entregable_id = request.data.get("entregable_id")
-        if not entregable_id:
-            return Response({"detail": "Debes indicar entregable_id."}, status=status.HTTP_400_BAD_REQUEST)
+        deliverable_id = request.data.get("deliverable_id")
+        if not deliverable_id:
+            return Response({"detail": "Debes indicar deliverable_id."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            entregable = Entregable.objects.get(id=entregable_id, project=project, content_maker=cm_profile)
-        except Entregable.DoesNotExist:
+            deliverable = Deliverable.objects.get(id=deliverable_id, project=project, content_maker=cm_profile)
+        except Deliverable.DoesNotExist:
             return Response({"detail": "Entregable no encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
-        if entregable.status != Entregable.STATUS_REVISION:
+        if deliverable.status != Deliverable.STATUS_REVISION:
             return Response(
                 {"detail": "Solo puedes resubir un entregable en estado de revisión."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        archivo = request.FILES.get("archivo")
-        if not archivo:
+        file = request.FILES.get("file")
+        if not file:
             return Response({"detail": "Debes subir un archivo."}, status=status.HTTP_400_BAD_REQUEST)
 
-        entregable.archivo = archivo
-        entregable.status = Entregable.STATUS_PENDING
-        entregable.revision_round += 1
-        entregable.reviewed_by = None
-        entregable.reviewed_at = None
-        entregable.save()
+        deliverable.file = file
+        deliverable.status = Deliverable.STATUS_PENDING
+        deliverable.revision_round += 1
+        deliverable.reviewed_by = None
+        deliverable.reviewed_at = None
+        deliverable.save()
 
-        handle_entregable_upload(project, entregable)
-        return Response(EntregableSerializer(entregable).data)
+        handle_deliverable_upload(project, deliverable)
+        return Response(DeliverableSerializer(deliverable).data)
 
-    @action(detail=True, methods=["post"], url_path="review_entregable")
-    def review_entregable(self, request, pk=None):
+    @action(detail=True, methods=["post"], url_path="review_deliverable")
+    def review_deliverable(self, request, pk=None):
         """PM reviews a deliverable (approve or request revision)."""
         project = self.get_object()
         user = request.user
@@ -300,38 +304,38 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        entregable_id = request.data.get("entregable_id")
+        deliverable_id = request.data.get("deliverable_id")
         approved = request.data.get("approved")
         notes = request.data.get("notes", "")
 
-        if entregable_id is None or approved is None:
+        if deliverable_id is None or approved is None:
             return Response(
-                {"detail": "Debes indicar entregable_id y approved (true/false)."},
+                {"detail": "Debes indicar deliverable_id y approved (true/false)."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
-            entregable = Entregable.objects.get(id=entregable_id, project=project)
-        except Entregable.DoesNotExist:
+            deliverable = Deliverable.objects.get(id=deliverable_id, project=project)
+        except Deliverable.DoesNotExist:
             return Response({"detail": "Entregable no encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            handle_entregable_review(entregable, user, approved=bool(approved), notes=notes)
+            handle_deliverable_review(deliverable, user, approved=bool(approved), notes=notes)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(EntregableSerializer(entregable).data)
+        return Response(DeliverableSerializer(deliverable).data)
 
-    @action(detail=True, methods=["get"], url_path="entregables")
-    def list_entregables(self, request, pk=None):
+    @action(detail=True, methods=["get"], url_path="deliverables")
+    def list_deliverables(self, request, pk=None):
         """List all deliverables for a project."""
         project = self.get_object()
-        entregables = project.entregables.select_related("content_maker", "reviewed_by")
-        return Response(EntregableSerializer(entregables, many=True).data)
+        deliverables = project.deliverables.select_related("content_maker", "reviewed_by")
+        return Response(DeliverableSerializer(deliverables, many=True).data)
 
     @action(detail=True, methods=["post"], url_path="mark_published")
     def mark_published(self, request, pk=None):
-        """Mark an approved entregable as published (set published_at)."""
+        """Mark an approved deliverable as published (set published_at)."""
         project = self.get_object()
         user = request.user
 
@@ -341,32 +345,32 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        entregable_id = request.data.get("entregable_id")
-        if not entregable_id:
-            return Response({"detail": "Debes indicar entregable_id."}, status=status.HTTP_400_BAD_REQUEST)
+        deliverable_id = request.data.get("deliverable_id")
+        if not deliverable_id:
+            return Response({"detail": "Debes indicar deliverable_id."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            entregable = Entregable.objects.get(id=entregable_id, project=project)
-        except Entregable.DoesNotExist:
+            deliverable = Deliverable.objects.get(id=deliverable_id, project=project)
+        except Deliverable.DoesNotExist:
             return Response({"detail": "Entregable no encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
-        if entregable.status != Entregable.STATUS_APPROVED:
+        if deliverable.status != Deliverable.STATUS_APPROVED:
             return Response(
                 {"detail": "Solo se pueden marcar como publicados entregables aprobados."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         from django.utils import timezone as tz
-        entregable.published_at = tz.now()
-        entregable.save(update_fields=["published_at"])
+        deliverable.published_at = tz.now()
+        deliverable.save(update_fields=["published_at"])
 
         # Notify the CM that her content was published
-        if entregable.content_maker.user:
+        if deliverable.content_maker.user:
             Notification.objects.create(
-                recipient=entregable.content_maker.user,
+                recipient=deliverable.content_maker.user,
                 notification_type=Notification.TYPE_DELIVERY_APPROVED,
                 title="Tu contenido ha sido publicado",
-                message=f'Tu entregable para "{project.nombre}" ha sido publicado.',
+                message=f'Tu entregable para "{project.name}" ha sido publicado.',
                 project=project,
             )
 
@@ -376,18 +380,18 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 recipient=project.client.user,
                 notification_type=Notification.TYPE_STATUS_CHANGED,
                 title="Contenido publicado",
-                message=f'Se ha publicado contenido en el proyecto "{project.nombre}".',
+                message=f'Se ha publicado contenido en el proyecto "{project.name}".',
                 project=project,
             )
 
         # Evaluate state transition (may move to Publicado → Finalizado)
         transition_project_status(project, user=user)
 
-        return Response(EntregableSerializer(entregable).data)
+        return Response(DeliverableSerializer(deliverable).data)
 
-    @action(detail=True, methods=["post"], url_path="delete_entregable")
-    def delete_entregable(self, request, pk=None):
-        """Admin/Employee can delete an entregable."""
+    @action(detail=True, methods=["post"], url_path="delete_deliverable")
+    def delete_deliverable(self, request, pk=None):
+        """Admin/Employee can delete a deliverable."""
         project = self.get_object()
         user = request.user
 
@@ -397,21 +401,21 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        entregable_id = request.data.get("entregable_id")
-        if not entregable_id:
-            return Response({"detail": "Debes indicar entregable_id."}, status=status.HTTP_400_BAD_REQUEST)
+        deliverable_id = request.data.get("deliverable_id")
+        if not deliverable_id:
+            return Response({"detail": "Debes indicar deliverable_id."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            entregable = Entregable.objects.get(id=entregable_id, project=project)
-        except Entregable.DoesNotExist:
+            deliverable = Deliverable.objects.get(id=deliverable_id, project=project)
+        except Deliverable.DoesNotExist:
             return Response({"detail": "Entregable no encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
-        entregable.delete()
+        deliverable.delete()
         return Response({"status": "deleted"}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["post"], url_path="change_entregable_status")
-    def change_entregable_status(self, request, pk=None):
-        """Admin/Employee can change an entregable's status freely."""
+    @action(detail=True, methods=["post"], url_path="change_deliverable_status")
+    def change_deliverable_status(self, request, pk=None):
+        """Admin/Employee can change a deliverable's status freely."""
         project = self.get_object()
         user = request.user
 
@@ -421,16 +425,16 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        entregable_id = request.data.get("entregable_id")
+        deliverable_id = request.data.get("deliverable_id")
         new_status = request.data.get("status")
 
-        if not entregable_id or not new_status:
+        if not deliverable_id or not new_status:
             return Response(
-                {"detail": "Debes indicar entregable_id y status."},
+                {"detail": "Debes indicar deliverable_id y status."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        valid_statuses = [c[0] for c in Entregable.STATUS_CHOICES]
+        valid_statuses = [c[0] for c in Deliverable.STATUS_CHOICES]
         if new_status not in valid_statuses:
             return Response(
                 {"detail": f"Estado no válido. Opciones: {valid_statuses}"},
@@ -438,19 +442,19 @@ class ProjectViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            entregable = Entregable.objects.get(id=entregable_id, project=project)
-        except Entregable.DoesNotExist:
+            deliverable = Deliverable.objects.get(id=deliverable_id, project=project)
+        except Deliverable.DoesNotExist:
             return Response({"detail": "Entregable no encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
         notes = request.data.get("notes", "")
-        handle_entregable_status_change(entregable, new_status, user=user, notes=notes)
+        handle_deliverable_status_change(deliverable, new_status, user=user, notes=notes)
 
-        entregable.refresh_from_db()
-        return Response(EntregableSerializer(entregable).data)
+        deliverable.refresh_from_db()
+        return Response(DeliverableSerializer(deliverable).data)
 
     @action(detail=True, methods=["post"], url_path="confirm_pickup")
     def confirm_pickup(self, request, pk=None):
-        """Confirm product has been picked up (for devolucion_producto=True projects)."""
+        """Confirm product has been picked up (for product_return=True projects)."""
         project = self.get_object()
         user = request.user
 
@@ -460,7 +464,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if not project.devolucion_producto:
+        if not project.product_return:
             return Response(
                 {"detail": "Este proyecto no requiere devolución de producto."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -468,7 +472,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         # Move to Proyecto Finalizado
         from apps.projects.models import ProjectStatus as PS
-        finalizado = PS.objects.filter(nombre="Proyecto Finalizado").first()
+        finalizado = PS.objects.filter(name="Proyecto Finalizado").first()
         if finalizado and project.status != finalizado:
             old_status = project.status
             project.status = finalizado
@@ -498,7 +502,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     recipient=recipient,
                     notification_type=Notification.TYPE_STATUS_CHANGED,
                     title="Proyecto finalizado",
-                    message=f'El proyecto "{project.nombre}" ha sido finalizado. Producto recogido correctamente.',
+                    message=f'El proyecto "{project.name}" ha sido finalizado. Producto recogido correctamente.',
                     project=project,
                 )
 
@@ -562,7 +566,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 recipient=cm_profile.user,
                 notification_type=Notification.TYPE_PROJECT_CM_REQUEST,
                 title="Nuevo proyecto disponible",
-                message=f'Has sido seleccionada para el proyecto "{project.nombre}". ¿Aceptas?',
+                message=f'Has sido seleccionada para el proyecto "{project.name}". ¿Aceptas?',
                 project=project,
             )
 
@@ -609,45 +613,53 @@ class ProjectViewSet(viewsets.ModelViewSet):
         qs = ContentMakerProfile.objects.all()
         if q:
             qs = qs.filter(
-                models.Q(nombre__icontains=q)
-                | models.Q(apellidos__icontains=q)
+                models.Q(first_name__icontains=q)
+                | models.Q(last_name__icontains=q)
                 | models.Q(instagram_handle__icontains=q)
             )
         qs = qs[:20]
         results = []
         for cm in qs:
-            foto_url = None
-            if cm.foto:
-                foto_url = request.build_absolute_uri(cm.foto.url)
+            photo_url = None
+            if cm.photo:
+                photo_url = request.build_absolute_uri(cm.photo.url)
             results.append({
                 "id": cm.id,
-                "nombre": f"{cm.nombre} {cm.apellidos}".strip(),
+                "name": f"{cm.first_name} {cm.last_name}".strip(),
                 "instagram_handle": cm.instagram_handle,
-                "seguidores_instagram": cm.seguidores_instagram,
-                "foto_url": foto_url,
+                "instagram_followers": cm.instagram_followers,
+                "photo_url": photo_url,
             })
         return Response(results)
 
     @action(detail=False, methods=["get"])
     def filters(self, request):
-        statuses = ProjectStatusSerializer(ProjectStatus.objects.filter(activo=True), many=True).data
-        service_types = ServiceTypeSerializer(ServiceType.objects.filter(activo=True), many=True).data
-        modalidades_economicas = ModalidadEconomicaSerializer(ModalidadEconomica.objects.filter(activo=True), many=True).data
-        logistica_producto = LogisticaProductoSerializer(LogisticaProducto.objects.filter(activo=True), many=True).data
-        recogida_producto = RecogidaProductoSerializer(RecogidaProducto.objects.filter(activo=True), many=True).data
-        quien_graba = QuienGrabaSerializer(QuienGraba.objects.filter(activo=True), many=True).data
-        quien_revisa = QuienRevisaSerializer(QuienRevisa.objects.filter(activo=True), many=True).data
-        quien_publica = QuienPublicaSerializer(QuienPublica.objects.filter(activo=True), many=True).data
-        win_statuses = WinStatusSerializer(WinStatus.objects.filter(activo=True), many=True).data
+        statuses = ProjectStatusSerializer(ProjectStatus.objects.filter(is_active=True), many=True).data
+        creation_statuses = ProjectStatusSerializer(
+            ProjectStatus.objects.filter(is_active=True, available_on_creation=True), many=True
+        ).data
+        service_types = ServiceTypeSerializer(ServiceType.objects.filter(is_active=True), many=True).data
+        economic_models = EconomicModelSerializer(EconomicModel.objects.filter(is_active=True), many=True).data
+        social_networks = SocialNetworkSerializer(SocialNetwork.objects.filter(is_active=True), many=True).data
+        formats = FormatSerializer(Format.objects.filter(is_active=True), many=True).data
+        product_logistics = ProductLogisticsSerializer(ProductLogistics.objects.filter(is_active=True), many=True).data
+        product_pickup = ProductPickupSerializer(ProductPickup.objects.filter(is_active=True), many=True).data
+        who_records = WhoRecordsSerializer(WhoRecords.objects.filter(is_active=True), many=True).data
+        who_reviews = WhoReviewsSerializer(WhoReviews.objects.filter(is_active=True), many=True).data
+        who_publishes = WhoPublishesSerializer(WhoPublishes.objects.filter(is_active=True), many=True).data
+        win_statuses = WinStatusSerializer(WinStatus.objects.filter(is_active=True), many=True).data
         return Response({
             "statuses": statuses,
+            "creation_statuses": creation_statuses,
             "service_types": service_types,
-            "modalidades_economicas": modalidades_economicas,
-            "logistica_producto": logistica_producto,
-            "recogida_producto": recogida_producto,
-            "quien_graba": quien_graba,
-            "quien_revisa": quien_revisa,
-            "quien_publica": quien_publica,
+            "economic_models": economic_models,
+            "social_networks": social_networks,
+            "formats": formats,
+            "product_logistics": product_logistics,
+            "product_pickup": product_pickup,
+            "who_records": who_records,
+            "who_reviews": who_reviews,
+            "who_publishes": who_publishes,
             "win_statuses": win_statuses,
         })
 
@@ -671,15 +683,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         total_projects = projects.count()
         active_projects = projects.exclude(
-            status__nombre__in=["Finalizado", "Borrador"]
+            status__name__in=["Finalizado", "Borrador"]
         ).count()
-        completed_projects = projects.filter(status__nombre="Finalizado").count()
+        completed_projects = projects.filter(status__name="Finalizado").count()
 
         # Financial metrics
         from django.db.models import Sum
         financial = projects.aggregate(
-            total_base=Sum("base_imponible"),
-            total_impuestos=Sum("impuestos"),
+            total_base=Sum("tax_base"),
+            total_impuestos=Sum("taxes"),
         )
         total_invertido = (financial["total_base"] or 0) + (financial["total_impuestos"] or 0)
 
@@ -692,14 +704,14 @@ class ProjectViewSet(viewsets.ModelViewSet):
         for entry in cm_entries:
             cm = entry.content_maker
             if cm.id not in unique_cms:
-                foto_url = None
-                if cm.foto:
-                    foto_url = request.build_absolute_uri(cm.foto.url)
+                photo_url = None
+                if cm.photo:
+                    photo_url = request.build_absolute_uri(cm.photo.url)
                 unique_cms[cm.id] = {
                     "id": cm.id,
-                    "nombre": f"{cm.nombre} {cm.apellidos}".strip(),
+                    "name": f"{cm.first_name} {cm.last_name}".strip(),
                     "instagram_handle": cm.instagram_handle,
-                    "foto_url": foto_url,
+                    "photo_url": photo_url,
                     "projects_count": 0,
                 }
             unique_cms[cm.id]["projects_count"] += 1
@@ -708,13 +720,13 @@ class ProjectViewSet(viewsets.ModelViewSet):
         # Projects by status
         status_breakdown = {}
         for p in projects:
-            name = p.status.nombre if p.status else "Sin estado"
+            name = p.status.name if p.status else "Sin estado"
             status_breakdown[name] = status_breakdown.get(name, 0) + 1
 
         # Projects by service type
         service_breakdown = {}
         for p in projects:
-            name = p.service_type.nombre if p.service_type else "Sin tipo"
+            name = p.service_type.name if p.service_type else "Sin tipo"
             service_breakdown[name] = service_breakdown.get(name, 0) + 1
 
         # Calendar events (upcoming dates)
@@ -722,20 +734,20 @@ class ProjectViewSet(viewsets.ModelViewSet):
         today = timezone.now().date()
         calendar_events = []
         for p in projects:
-            if p.fecha_servicio and p.fecha_servicio >= today:
+            if p.service_date and p.service_date >= today:
                 calendar_events.append({
                     "id": p.id,
-                    "nombre": p.nombre,
+                    "name": p.name,
                     "project_id": p.project_id,
-                    "date": str(p.fecha_servicio),
+                    "date": str(p.service_date),
                     "type": "servicio",
                 })
-            if p.fecha_fin and p.fecha_fin >= today:
+            if p.end_date and p.end_date >= today:
                 calendar_events.append({
                     "id": p.id,
-                    "nombre": p.nombre,
+                    "name": p.name,
                     "project_id": p.project_id,
-                    "date": str(p.fecha_fin),
+                    "date": str(p.end_date),
                     "type": "fin",
                 })
         calendar_events.sort(key=lambda x: x["date"])
@@ -743,15 +755,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
         # Project ranges for calendar visualization
         project_ranges = []
         for p in projects:
-            if p.fecha_venta or p.fecha_servicio or p.fecha_fin:
+            if p.sale_date or p.service_date or p.end_date:
                 project_ranges.append({
                     "id": p.id,
-                    "nombre": p.nombre,
+                    "name": p.name,
                     "project_id": p.project_id,
-                    "fecha_inicio": str(p.fecha_venta) if p.fecha_venta else None,
-                    "fecha_servicio": str(p.fecha_servicio) if p.fecha_servicio else None,
-                    "fecha_fin": str(p.fecha_fin) if p.fecha_fin else None,
-                    "status_name": p.status.nombre if p.status else None,
+                    "start_date": str(p.sale_date) if p.sale_date else None,
+                    "service_date": str(p.service_date) if p.service_date else None,
+                    "end_date": str(p.end_date) if p.end_date else None,
+                    "status_name": p.status.name if p.status else None,
                 })
 
         # Recent projects
@@ -760,11 +772,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
             {
                 "id": p.id,
                 "project_id": p.project_id,
-                "nombre": p.nombre,
-                "status_name": p.status.nombre if p.status else None,
-                "fecha_servicio": str(p.fecha_servicio) if p.fecha_servicio else None,
-                "fecha_fin": str(p.fecha_fin) if p.fecha_fin else None,
-                "precio_total": str(p.base_imponible + p.impuestos),
+                "name": p.name,
+                "status_name": p.status.name if p.status else None,
+                "service_date": str(p.service_date) if p.service_date else None,
+                "end_date": str(p.end_date) if p.end_date else None,
+                "total_price": str(p.tax_base + p.taxes),
             }
             for p in recent
         ]
@@ -807,26 +819,26 @@ class ProjectViewSet(viewsets.ModelViewSet):
         total_projects = projects.count()
         draft_projects = projects.filter(is_draft=True).count()
         active_projects = projects.filter(is_draft=False).exclude(
-            status__nombre__in=["Finalizado", "Cancelado"]
+            status__name__in=["Finalizado", "Cancelado"]
         ).count()
-        completed_projects = projects.filter(status__nombre="Finalizado").count()
+        completed_projects = projects.filter(status__name="Finalizado").count()
 
         # --- Status breakdown ---
         status_breakdown = {}
-        for entry in projects.exclude(is_draft=True).values("status__nombre").annotate(count=Count("id")):
-            name = entry["status__nombre"] or "Sin estado"
+        for entry in projects.exclude(is_draft=True).values("status__name").annotate(count=Count("id")):
+            name = entry["status__name"] or "Sin estado"
             status_breakdown[name] = entry["count"]
 
         # --- Service type breakdown ---
         service_breakdown = {}
-        for entry in projects.exclude(is_draft=True).values("service_type__nombre").annotate(count=Count("id")):
-            name = entry["service_type__nombre"] or "Sin tipo"
+        for entry in projects.exclude(is_draft=True).values("service_type__name").annotate(count=Count("id")):
+            name = entry["service_type__name"] or "Sin tipo"
             service_breakdown[name] = entry["count"]
 
         # --- Financial metrics ---
         financial = projects.filter(is_draft=False).aggregate(
-            total_base=Sum("base_imponible"),
-            total_impuestos=Sum("impuestos"),
+            total_base=Sum("tax_base"),
+            total_impuestos=Sum("taxes"),
         )
         total_facturado = (financial["total_base"] or 0) + (financial["total_impuestos"] or 0)
 
@@ -834,7 +846,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         total_clients = ClientProfile.objects.count()
         clients_with_active = ClientProfile.objects.filter(
             projects__is_draft=False
-        ).exclude(projects__status__nombre__in=["Finalizado", "Cancelado"]).distinct().count()
+        ).exclude(projects__status__name__in=["Finalizado", "Cancelado"]).distinct().count()
 
         # --- Content Makers ---
         total_cms = ContentMakerProfile.objects.count()
@@ -856,7 +868,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         projects_without_cm = projects_without_cm_qs.count()
 
         projects_pending_briefing_qs = projects.filter(
-            status__nombre="Briefing"
+            status__name="Briefing"
         ).exclude(briefings__isnull=False)
         projects_pending_briefing = projects_pending_briefing_qs.count()
 
@@ -865,9 +877,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
             items = [
                 {
                     "project_id": e.project.id,
-                    "project_name": e.project.nombre,
+                    "project_name": e.project.name,
                     "project_code": e.project.project_id,
-                    "cm_name": f"{e.content_maker.nombre} {e.content_maker.apellidos}".strip(),
+                    "cm_name": f"{e.content_maker.first_name} {e.content_maker.last_name}".strip(),
                     "cm_id": e.content_maker.id,
                 }
                 for e in pending_cm_entries
@@ -882,9 +894,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
             items = [
                 {
                     "project_id": p.id,
-                    "project_name": p.nombre,
+                    "project_name": p.name,
                     "project_code": p.project_id,
-                    "client_name": p.client.nombre_cliente if p.client else None,
+                    "client_name": p.client.name if p.client else None,
                 }
                 for p in projects_without_cm_qs[:20]
             ]
@@ -898,9 +910,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
             items = [
                 {
                     "project_id": p.id,
-                    "project_name": p.nombre,
+                    "project_name": p.name,
                     "project_code": p.project_id,
-                    "client_name": p.client.nombre_cliente if p.client else None,
+                    "client_name": p.client.name if p.client else None,
                 }
                 for p in projects_pending_briefing_qs[:20]
             ]
@@ -914,75 +926,75 @@ class ProjectViewSet(viewsets.ModelViewSet):
         # --- Calendar: all project date ranges ---
         project_ranges = []
         for p in projects.filter(is_draft=False):
-            if p.fecha_venta or p.fecha_servicio or p.fecha_fin:
+            if p.sale_date or p.service_date or p.end_date:
                 cm_name = None
                 if p.content_maker:
-                    cm_name = f"{p.content_maker.nombre} {p.content_maker.apellidos}".strip()
+                    cm_name = f"{p.content_maker.first_name} {p.content_maker.last_name}".strip()
                 project_ranges.append({
                     "id": p.id,
-                    "nombre": p.nombre,
+                    "name": p.name,
                     "project_id": p.project_id,
-                    "client_name": p.client.nombre_cliente if p.client else None,
+                    "client_name": p.client.name if p.client else None,
                     "cm_name": cm_name,
-                    "fecha_inicio": str(p.fecha_venta) if p.fecha_venta else None,
-                    "fecha_servicio": str(p.fecha_servicio) if p.fecha_servicio else None,
-                    "fecha_fin": str(p.fecha_fin) if p.fecha_fin else None,
-                    "status_name": p.status.nombre if p.status else None,
-                    "service_type": p.service_type.nombre if p.service_type else None,
+                    "start_date": str(p.sale_date) if p.sale_date else None,
+                    "service_date": str(p.service_date) if p.service_date else None,
+                    "end_date": str(p.end_date) if p.end_date else None,
+                    "status_name": p.status.name if p.status else None,
+                    "service_type": p.service_type.name if p.service_type else None,
                 })
 
         # --- Today's tasks: projects with a date today ---
         todays_tasks = []
         for p in projects.filter(is_draft=False):
-            if p.fecha_servicio == today:
+            if p.service_date == today:
                 todays_tasks.append({
                     "id": p.id,
                     "project_id": p.project_id,
-                    "nombre": p.nombre,
+                    "name": p.name,
                     "event": "Fecha de servicio",
-                    "client_name": p.client.nombre_cliente if p.client else None,
-                    "status_name": p.status.nombre if p.status else None,
+                    "client_name": p.client.name if p.client else None,
+                    "status_name": p.status.name if p.status else None,
                 })
-            if p.fecha_fin == today:
+            if p.end_date == today:
                 todays_tasks.append({
                     "id": p.id,
                     "project_id": p.project_id,
-                    "nombre": p.nombre,
+                    "name": p.name,
                     "event": "Fecha de fin",
-                    "client_name": p.client.nombre_cliente if p.client else None,
-                    "status_name": p.status.nombre if p.status else None,
+                    "client_name": p.client.name if p.client else None,
+                    "status_name": p.status.name if p.status else None,
                 })
-            if p.fecha_venta == today:
+            if p.sale_date == today:
                 todays_tasks.append({
                     "id": p.id,
                     "project_id": p.project_id,
-                    "nombre": p.nombre,
+                    "name": p.name,
                     "event": "Fecha de venta",
-                    "client_name": p.client.nombre_cliente if p.client else None,
-                    "status_name": p.status.nombre if p.status else None,
+                    "client_name": p.client.name if p.client else None,
+                    "status_name": p.status.name if p.status else None,
                 })
 
         # --- Upcoming events (next 7 days) ---
         upcoming = []
         week_end = today + timedelta(days=7)
         for p in projects.filter(is_draft=False):
-            if p.fecha_servicio and today < p.fecha_servicio <= week_end:
+            if p.service_date and today < p.service_date <= week_end:
                 upcoming.append({
                     "id": p.id,
                     "project_id": p.project_id,
-                    "nombre": p.nombre,
+                    "name": p.name,
                     "event": "Servicio",
-                    "date": str(p.fecha_servicio),
-                    "client_name": p.client.nombre_cliente if p.client else None,
+                    "date": str(p.service_date),
+                    "client_name": p.client.name if p.client else None,
                 })
-            if p.fecha_fin and today < p.fecha_fin <= week_end:
+            if p.end_date and today < p.end_date <= week_end:
                 upcoming.append({
                     "id": p.id,
                     "project_id": p.project_id,
-                    "nombre": p.nombre,
+                    "name": p.name,
                     "event": "Fin de proyecto",
-                    "date": str(p.fecha_fin),
-                    "client_name": p.client.nombre_cliente if p.client else None,
+                    "date": str(p.end_date),
+                    "client_name": p.client.name if p.client else None,
                 })
         upcoming.sort(key=lambda x: x["date"])
 
@@ -992,11 +1004,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
             {
                 "id": p.id,
                 "project_id": p.project_id,
-                "nombre": p.nombre,
-                "client_name": p.client.nombre_cliente if p.client else None,
-                "status_name": p.status.nombre if p.status else None,
-                "service_type": p.service_type.nombre if p.service_type else None,
-                "fecha_servicio": str(p.fecha_servicio) if p.fecha_servicio else None,
+                "name": p.name,
+                "client_name": p.client.name if p.client else None,
+                "status_name": p.status.name if p.status else None,
+                "service_type": p.service_type.name if p.service_type else None,
+                "service_date": str(p.service_date) if p.service_date else None,
                 "created_at": str(p.created_at.date()),
             }
             for p in recent
@@ -1005,14 +1017,14 @@ class ProjectViewSet(viewsets.ModelViewSet):
         # --- Top content makers (by accepted projects) ---
         top_cms_qs = (
             ProjectContentMaker.objects.filter(status=ProjectContentMaker.STATUS_ACCEPTED)
-            .values("content_maker__id", "content_maker__nombre", "content_maker__apellidos", "content_maker__instagram_handle")
+            .values("content_maker__id", "content_maker__first_name", "content_maker__last_name", "content_maker__instagram_handle")
             .annotate(projects_count=Count("project", distinct=True))
             .order_by("-projects_count")[:10]
         )
         top_cms = [
             {
                 "id": entry["content_maker__id"],
-                "nombre": f'{entry["content_maker__nombre"]} {entry["content_maker__apellidos"]}'.strip(),
+                "name": f'{entry["content_maker__first_name"]} {entry["content_maker__last_name"]}'.strip(),
                 "instagram_handle": entry["content_maker__instagram_handle"],
                 "projects_count": entry["projects_count"],
             }
@@ -1028,7 +1040,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         top_clients = [
             {
                 "id": c.id,
-                "nombre": c.nombre_cliente,
+                "name": c.name,
                 "projects_count": c.projects_count,
             }
             for c in top_clients_qs
@@ -1185,8 +1197,8 @@ class BriefingViewSet(viewsets.ModelViewSet):
                 BriefingLink.objects.create(
                     briefing=briefing,
                     url=link["url"],
-                    titulo=link.get("titulo", ""),
-                    orden=i,
+                    title=link.get("title", ""),
+                    order=i,
                 )
 
         # Create photos from uploaded files
@@ -1194,9 +1206,9 @@ class BriefingViewSet(viewsets.ModelViewSet):
         for i, photo in enumerate(photos):
             BriefingPhoto.objects.create(
                 briefing=briefing,
-                imagen=photo,
-                descripcion=request.data.get(f"photo_descripcion_{i}", ""),
-                orden=i,
+                image=photo,
+                description=request.data.get(f"photo_description_{i}", ""),
+                order=i,
             )
 
         # Use service for notifications and state transitions
@@ -1222,10 +1234,10 @@ class BriefingViewSet(viewsets.ModelViewSet):
 
         briefing = self.get_object()
 
-        # Update comentarios if provided
-        if "comentarios" in request.data:
-            briefing.comentarios = request.data["comentarios"]
-            briefing.save(update_fields=["comentarios", "updated_at"])
+        # Update comments if provided
+        if "comments" in request.data:
+            briefing.comments = request.data["comments"]
+            briefing.save(update_fields=["comments", "updated_at"])
 
         # Update links: replace all with new set
         links_raw = request.data.get("links")
@@ -1244,8 +1256,8 @@ class BriefingViewSet(viewsets.ModelViewSet):
                     BriefingLink.objects.create(
                         briefing=briefing,
                         url=link["url"],
-                        titulo=link.get("titulo", ""),
-                        orden=i,
+                        title=link.get("title", ""),
+                        order=i,
                     )
 
         # Add new photos (existing photos are kept unless explicitly removed)
@@ -1254,9 +1266,9 @@ class BriefingViewSet(viewsets.ModelViewSet):
         for i, photo in enumerate(new_photos):
             BriefingPhoto.objects.create(
                 briefing=briefing,
-                imagen=photo,
-                descripcion=request.data.get(f"photo_descripcion_{i}", ""),
-                orden=existing_count + i,
+                image=photo,
+                description=request.data.get(f"photo_description_{i}", ""),
+                order=existing_count + i,
             )
 
         # Remove specific photos by ID

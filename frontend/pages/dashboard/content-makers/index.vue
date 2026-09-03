@@ -16,9 +16,9 @@ const isClient = computed(() => auth.user?.role === 'client');
 
 const search = ref('');
 const filterStatus = ref('');
-const filterTipoBase = ref('');
-const filterTipo = ref('');
-const filterCuenta = ref('');
+const filterTypeBase = ref('');
+const filterCmType = ref('');
+const filterAccount = ref('');
 
 onMounted(() => store.fetchFilters());
 
@@ -35,9 +35,9 @@ const params = computed(() => {
   const p: Record<string, string> = {};
   if (debouncedSearch.value) p.q = debouncedSearch.value;
   if (filterStatus.value) p.status = filterStatus.value;
-  if (filterTipoBase.value) p.tipo = filterTipoBase.value;
-  if (filterTipo.value) p.tipo_cm = filterTipo.value;
-  if (filterCuenta.value) p.tiene_cuenta = filterCuenta.value;
+  if (filterTypeBase.value) p.type = filterTypeBase.value;
+  if (filterCmType.value) p.cm_type = filterCmType.value;
+  if (filterAccount.value) p.has_account = filterAccount.value;
   return p;
 });
 
@@ -108,7 +108,7 @@ function fmt(n: number | null) {
       </div>
       <NuxtLink
         v-if="isAdminOrEmployee"
-        to="/dashboard/content-makers/nuevo"
+        to="/dashboard/content-makers/new"
         class="group flex items-center gap-2 h-10 px-5 rounded-xl bg-ink text-white text-sm font-medium hover:bg-ink/80 hover:shadow-soft active:scale-[0.97] transition-all duration-200"
       >
         <svg
@@ -156,62 +156,63 @@ function fmt(n: number | null) {
         />
       </div>
 
-      <select
+      <BaseSelect
         v-if="isAdminOrEmployee"
         v-model="filterStatus"
-        class="select-field min-w-[180px] max-w-[200px]"
-      >
-        <option value="">Todos los estados</option>
-        <option v-for="s in store.filterOptions.statuses" :key="s" :value="s">
-          {{ s }}
-        </option>
-      </select>
+        class="min-w-[180px] max-w-[200px]"
+        :options="[
+          { value: '', label: 'Todos los estados' },
+          ...store.filterOptions.statuses.map((s) => ({ value: s, label: s })),
+        ]"
+      />
 
-      <select
-        v-model="filterTipoBase"
-        class="select-field min-w-[180px] max-w-[200px]"
-      >
-        <option value="">Todos (CM y Colab.)</option>
-        <option
-          v-for="t in store.filterOptions.tipo_choices"
-          :key="t.value"
-          :value="t.value"
-        >
-          {{ t.label }}
-        </option>
-      </select>
+      <BaseSelect
+        v-model="filterTypeBase"
+        class="min-w-[180px] max-w-[200px]"
+        :options="[
+          { value: '', label: 'Todos (CM y Colab.)' },
+          ...store.filterOptions.type_choices.map((t) => ({
+            value: t.value,
+            label: t.label,
+          })),
+        ]"
+      />
 
-      <select
-        v-model="filterTipo"
-        class="select-field min-w-[180px] max-w-[200px]"
-      >
-        <option value="">Todos los subtipos</option>
-        <option v-for="t in store.filterOptions.tipos" :key="t" :value="t">
-          {{ t }}
-        </option>
-      </select>
+      <BaseSelect
+        v-model="filterCmType"
+        class="min-w-[180px] max-w-[200px]"
+        :options="[
+          { value: '', label: 'Todos los subtipos' },
+          ...store.filterOptions.types.map((t) => ({ value: t, label: t })),
+        ]"
+      />
 
-      <select
+      <BaseSelect
         v-if="isAdminOrEmployee"
-        v-model="filterCuenta"
-        class="select-field min-w-[150px] max-w-[170px]"
-      >
-        <option value="">Cuenta</option>
-        <option value="true">Con cuenta</option>
-        <option value="false">Sin cuenta</option>
-      </select>
+        v-model="filterAccount"
+        class="min-w-[150px] max-w-[170px]"
+        :options="[
+          { value: '', label: 'Cuenta' },
+          { value: 'true', label: 'Con cuenta' },
+          { value: 'false', label: 'Sin cuenta' },
+        ]"
+      />
 
       <button
         v-if="
-          filterStatus || filterTipoBase || filterTipo || filterCuenta || search
+          filterStatus ||
+          filterTypeBase ||
+          filterCmType ||
+          filterAccount ||
+          search
         "
         class="h-11 px-4 rounded-xl text-sm text-muted hover:text-ink border border-border/70 hover:border-ink/20 hover:bg-panel/80 hover:shadow-sm active:scale-[0.97] transition-all duration-300"
         @click="
           search = '';
           filterStatus = '';
-          filterTipoBase = '';
-          filterTipo = '';
-          filterCuenta = '';
+          filterTypeBase = '';
+          filterCmType = '';
+          filterAccount = '';
         "
       >
         Limpiar
@@ -284,10 +285,10 @@ function fmt(n: number | null) {
                     <p
                       class="text-sm text-ink font-medium group-hover:text-gold transition-colors duration-150"
                     >
-                      {{ cm.nombre_completo }}
+                      {{ cm.full_name }}
                     </p>
                     <span
-                      v-if="cm.tipo === 'colaborador'"
+                      v-if="cm.type === 'colaborador'"
                       class="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded border text-indigo-600 bg-indigo-50 border-indigo-200"
                     >
                       Colaborador
@@ -302,7 +303,7 @@ function fmt(n: number | null) {
                 <div v-if="cm.instagram_handle">
                   <p class="text-sm text-ink/80">@{{ cm.instagram_handle }}</p>
                   <p class="text-xs text-muted">
-                    {{ fmt(cm.seguidores_instagram) }}
+                    {{ fmt(cm.instagram_followers) }}
                   </p>
                 </div>
                 <span v-else class="text-xs text-muted/60">—</span>
@@ -311,14 +312,14 @@ function fmt(n: number | null) {
                 <div v-if="cm.tiktok_handle">
                   <p class="text-sm text-ink/80">{{ cm.tiktok_handle }}</p>
                   <p class="text-xs text-muted">
-                    {{ fmt(cm.seguidores_tiktok) }}
+                    {{ fmt(cm.tiktok_followers) }}
                   </p>
                 </div>
                 <span v-else class="text-xs text-muted/60">—</span>
               </td>
               <td class="px-4 py-3.5">
                 <p class="text-sm text-muted truncate max-w-[150px]">
-                  {{ cm.categorias_contenido || '—' }}
+                  {{ cm.content_categories || '—' }}
                 </p>
               </td>
               <td class="px-4 py-3.5">
@@ -331,7 +332,7 @@ function fmt(n: number | null) {
               </td>
               <td class="px-4 py-3.5">
                 <span
-                  v-if="cm.tiene_cuenta"
+                  v-if="cm.has_account"
                   class="inline-flex items-center gap-1.5 text-xs text-emerald-600 font-medium"
                 >
                   <div class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -452,9 +453,9 @@ function fmt(n: number | null) {
             >
               <!-- Photo -->
               <img
-                v-if="cm.foto_url"
-                :src="cm.foto_url"
-                :alt="cm.nombre_completo"
+                v-if="cm.photo_url"
+                :src="cm.photo_url"
+                :alt="cm.full_name"
                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
               <div
@@ -462,7 +463,8 @@ function fmt(n: number | null) {
                 class="w-full h-full bg-gradient-to-br from-gold/10 to-gold/5 flex items-center justify-center"
               >
                 <span class="text-3xl font-bold text-gold/40"
-                  >{{ cm.nombre?.charAt(0) }}{{ cm.apellidos?.charAt(0) }}</span
+                  >{{ cm.first_name?.charAt(0)
+                  }}{{ cm.last_name?.charAt(0) }}</span
                 >
               </div>
 
@@ -488,9 +490,9 @@ function fmt(n: number | null) {
                       >@{{ cm.instagram_handle }}</span
                     >
                     <span
-                      v-if="cm.seguidores_instagram"
+                      v-if="cm.instagram_followers"
                       class="text-[10px] text-white/60"
-                      >· {{ fmt(cm.seguidores_instagram) }}</span
+                      >· {{ fmt(cm.instagram_followers) }}</span
                     >
                   </div>
                   <div
@@ -510,9 +512,9 @@ function fmt(n: number | null) {
                       cm.tiktok_handle
                     }}</span>
                     <span
-                      v-if="cm.seguidores_tiktok"
+                      v-if="cm.tiktok_followers"
                       class="text-[10px] text-white/60"
-                      >· {{ fmt(cm.seguidores_tiktok) }}</span
+                      >· {{ fmt(cm.tiktok_followers) }}</span
                     >
                   </div>
                 </div>
@@ -523,7 +525,7 @@ function fmt(n: number | null) {
             <p
               class="mt-2 text-sm font-medium text-ink text-center truncate group-hover:text-gold transition-colors duration-200"
             >
-              {{ cm.nombre_completo }}
+              {{ cm.full_name }}
             </p>
           </NuxtLink>
         </div>

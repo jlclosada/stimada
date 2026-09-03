@@ -29,9 +29,9 @@ watch(search, (val) => {
 const params = computed(() => {
   const p: Record<string, string> = {};
   if (debouncedSearch.value) p.q = debouncedSearch.value;
-  if (filterTipo.value) p.tipo = filterTipo.value;
-  if (filterContrato.value) p.contrato = filterContrato.value;
-  if (filterCuenta.value) p.cuenta = filterCuenta.value;
+  if (filterTipo.value) p.type = filterTipo.value;
+  if (filterContrato.value) p.contract = filterContrato.value;
+  if (filterCuenta.value) p.account = filterCuenta.value;
   if (sortBy.value)
     p.ordering = (sortDir.value === 'desc' ? '-' : '') + sortBy.value;
   return p;
@@ -151,7 +151,7 @@ onMounted(() => {
       <div class="flex items-center gap-2">
         <NuxtLink
           v-if="activeTab === 'clientes'"
-          to="/dashboard/clientes/nuevo"
+          to="/dashboard/clients/new"
           class="group flex items-center gap-2 h-10 px-5 rounded-xl bg-ink text-white text-sm font-medium hover:bg-ink/80 hover:shadow-soft active:scale-[0.97] transition-all duration-200"
         >
           <svg
@@ -171,7 +171,7 @@ onMounted(() => {
         </NuxtLink>
         <NuxtLink
           v-else
-          to="/dashboard/marcas/nuevo"
+          to="/dashboard/brands/new"
           class="group flex items-center gap-2 h-10 px-5 rounded-xl bg-ink text-white text-sm font-medium hover:bg-ink/80 hover:shadow-soft active:scale-[0.97] transition-all duration-200"
         >
           <svg
@@ -250,33 +250,34 @@ onMounted(() => {
           />
         </div>
 
-        <select
+        <BaseSelect
           v-model="filterTipo"
-          class="select-field min-w-[180px] max-w-[200px]"
-        >
-          <option value="">Todos los tipos</option>
-          <option v-for="t in store.types" :key="t.slug" :value="t.slug">
-            {{ t.nombre }}
-          </option>
-        </select>
+          class="min-w-[180px] max-w-[200px]"
+          :options="[
+            { value: '', label: 'Todos los tipos' },
+            ...store.types.map((t) => ({ value: t.slug, label: t.name })),
+          ]"
+        />
 
-        <select
+        <BaseSelect
           v-model="filterContrato"
-          class="select-field min-w-[160px] max-w-[180px]"
-        >
-          <option value="">Contrato (todos)</option>
-          <option value="firmado">Firmado</option>
-          <option value="pendiente">Pendiente</option>
-        </select>
+          class="min-w-[160px] max-w-[180px]"
+          :options="[
+            { value: '', label: 'Contrato (todos)' },
+            { value: 'firmado', label: 'Firmado' },
+            { value: 'pendiente', label: 'Pendiente' },
+          ]"
+        />
 
-        <select
+        <BaseSelect
           v-model="filterCuenta"
-          class="select-field min-w-[170px] max-w-[190px]"
-        >
-          <option value="">Cuenta (todas)</option>
-          <option value="activa">Con cuenta activa</option>
-          <option value="sin_cuenta">Sin cuenta</option>
-        </select>
+          class="min-w-[170px] max-w-[190px]"
+          :options="[
+            { value: '', label: 'Cuenta (todas)' },
+            { value: 'activa', label: 'Con cuenta activa' },
+            { value: 'sin_cuenta', label: 'Sin cuenta' },
+          ]"
+        />
 
         <button
           v-if="hasActiveFilters"
@@ -305,45 +306,43 @@ onMounted(() => {
               <tr class="border-b border-border/60 bg-panel/50">
                 <th
                   class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider cursor-pointer select-none hover:text-ink transition-colors"
-                  @click="toggleSort('nombre_cliente')"
+                  @click="toggleSort('name')"
                 >
                   Cliente
-                  <span class="ml-1 text-[10px]">{{
-                    sortIcon('nombre_cliente')
-                  }}</span>
+                  <span class="ml-1 text-[10px]">{{ sortIcon('name') }}</span>
                 </th>
                 <th
                   class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider cursor-pointer select-none hover:text-ink transition-colors"
-                  @click="toggleSort('cliente_id')"
+                  @click="toggleSort('client_id')"
                 >
                   ID
                   <span class="ml-1 text-[10px]">{{
-                    sortIcon('cliente_id')
+                    sortIcon('client_id')
                   }}</span>
                 </th>
                 <th
                   class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider cursor-pointer select-none hover:text-ink transition-colors"
-                  @click="toggleSort('tipo_cliente__nombre')"
+                  @click="toggleSort('client_type__name')"
                 >
                   Tipo
                   <span class="ml-1 text-[10px]">{{
-                    sortIcon('tipo_cliente__nombre')
+                    sortIcon('client_type__name')
                   }}</span>
                 </th>
                 <th
                   class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider cursor-pointer select-none hover:text-ink transition-colors"
-                  @click="toggleSort('ciudad')"
+                  @click="toggleSort('city')"
                 >
                   Ciudad
-                  <span class="ml-1 text-[10px]">{{ sortIcon('ciudad') }}</span>
+                  <span class="ml-1 text-[10px]">{{ sortIcon('city') }}</span>
                 </th>
                 <th
                   class="text-left px-5 py-3 text-xs font-medium text-muted uppercase tracking-wider cursor-pointer select-none hover:text-ink transition-colors"
-                  @click="toggleSort('contrato_firmado')"
+                  @click="toggleSort('contract_signed')"
                 >
                   Contrato
                   <span class="ml-1 text-[10px]">{{
-                    sortIcon('contrato_firmado')
+                    sortIcon('contract_signed')
                   }}</span>
                 </th>
                 <th
@@ -377,33 +376,33 @@ onMounted(() => {
                 v-for="client in store.list"
                 :key="client.id"
                 class="border-b border-border/30 table-row-hover cursor-pointer group"
-                @click="navigateTo(`/dashboard/clientes/${client.id}`)"
+                @click="navigateTo(`/dashboard/clients/${client.id}`)"
               >
                 <td class="px-5 py-3.5">
                   <p
                     class="text-sm text-ink font-medium group-hover:text-gold transition-colors duration-150"
                   >
-                    {{ client.nombre_cliente }}
+                    {{ client.name }}
                   </p>
                 </td>
                 <td class="px-5 py-3.5 text-xs text-muted">
-                  {{ formatClientId(client.cliente_id) }}
+                  {{ formatClientId(client.client_id) }}
                 </td>
                 <td class="px-5 py-3.5">
                   <span
-                    v-if="client.tipo_nombre"
+                    v-if="client.type_name"
                     class="text-xs px-2.5 py-1 rounded-lg border border-blue-200 text-blue-600 bg-blue-50 font-medium"
                   >
-                    {{ client.tipo_nombre }}
+                    {{ client.type_name }}
                   </span>
                   <span v-else class="text-xs text-muted/60">—</span>
                 </td>
                 <td class="px-5 py-3.5 text-sm text-muted">
-                  {{ client.ciudad || '—' }}
+                  {{ client.city || '—' }}
                 </td>
                 <td class="px-5 py-3.5">
                   <span
-                    v-if="client.contrato_firmado"
+                    v-if="client.contract_signed"
                     class="flex items-center gap-1.5 text-xs text-emerald-600 font-medium"
                   >
                     <div class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -619,7 +618,7 @@ onMounted(() => {
                 v-for="brand in brandsStore.list"
                 :key="brand.id"
                 class="border-b border-border/30 table-row-hover cursor-pointer group"
-                @click="navigateTo(`/dashboard/marcas/${brand.id}`)"
+                @click="navigateTo(`/dashboard/brands/${brand.id}`)"
               >
                 <td class="px-5 py-3.5">
                   <div class="flex items-center gap-3">
@@ -627,14 +626,14 @@ onMounted(() => {
                       class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center flex-shrink-0"
                     >
                       <span class="text-[11px] font-bold text-indigo-400">{{
-                        brand.nombre.charAt(0)
+                        brand.name.charAt(0)
                       }}</span>
                     </div>
                     <div>
                       <p
                         class="text-sm font-medium text-ink group-hover:text-gold transition-colors duration-150"
                       >
-                        {{ brand.nombre }}
+                        {{ brand.name }}
                       </p>
                       <p class="text-[10px] text-muted/60 font-mono">
                         {{ formatBrandId(brand.brand_id) }}
@@ -647,10 +646,10 @@ onMounted(() => {
                 </td>
                 <td class="px-5 py-3.5">
                   <span
-                    v-if="brand.tipo_marca_nombre"
+                    v-if="brand.brand_type_name"
                     class="text-xs px-2.5 py-1 rounded-lg border border-blue-200 text-blue-600 bg-blue-50 font-medium"
                   >
-                    {{ brand.tipo_marca_nombre }}
+                    {{ brand.brand_type_name }}
                   </span>
                   <span v-else class="text-xs text-muted/60">—</span>
                 </td>
@@ -658,7 +657,7 @@ onMounted(() => {
                   <span
                     class="flex items-center gap-1.5 text-xs font-medium"
                     :class="
-                      brand.estado === 'activa'
+                      brand.status === 'activa'
                         ? 'text-emerald-600'
                         : 'text-muted'
                     "
@@ -666,12 +665,12 @@ onMounted(() => {
                     <div
                       class="w-1.5 h-1.5 rounded-full"
                       :class="
-                        brand.estado === 'activa'
+                        brand.status === 'activa'
                           ? 'bg-emerald-500'
                           : 'bg-muted/40'
                       "
                     />
-                    {{ brand.estado === 'activa' ? 'Activa' : 'Inactiva' }}
+                    {{ brand.status === 'activa' ? 'Activa' : 'Inactiva' }}
                   </span>
                 </td>
               </tr>

@@ -5,40 +5,40 @@ from apps.clients.models import Brand, ClientProfile, ClientType
 
 @admin.register(ClientType)
 class ClientTypeAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "slug", "orden", "activo"]
-    list_editable = ["orden", "activo"]
-    prepopulated_fields = {"slug": ("nombre",)}
-    ordering = ["orden"]
+    list_display = ["name", "slug", "order", "is_active"]
+    list_editable = ["order", "is_active"]
+    prepopulated_fields = {"slug": ("name",)}
+    ordering = ["order"]
 
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
-    list_display = ["brand_id", "nombre", "client", "tipo_marca", "estado", "created_at"]
-    list_filter = ["estado", "tipo_marca"]
-    search_fields = ["nombre", "brand_id", "client__nombre_cliente"]
+    list_display = ["brand_id", "name", "client", "brand_type", "status", "created_at"]
+    list_filter = ["status", "brand_type"]
+    search_fields = ["name", "brand_id", "client__name"]
     readonly_fields = ["brand_id", "created_at"]
 
 
 class BrandInline(admin.TabularInline):
     model = Brand
     extra = 1
-    fields = ["brand_id", "nombre", "tipo_marca", "web_instagram", "estado"]
+    fields = ["brand_id", "name", "brand_type", "web_instagram", "status"]
     readonly_fields = ["brand_id"]
 
 
 @admin.register(ClientProfile)
 class ClientProfileAdmin(admin.ModelAdmin):
-    list_display = ["cliente_id", "nombre_cliente", "tipo_cliente", "es_agencia", "estado", "semaforo_cliente", "ciudad", "contrato_firmado", "created_at"]
-    list_filter = ["tipo_cliente", "contrato_firmado", "es_agencia", "estado", "semaforo_cliente", "pais"]
-    search_fields = ["nombre_cliente", "cliente_id", "cif", "email_facturacion", "email_contacto"]
+    list_display = ["client_id", "name", "client_type", "is_agency", "status", "traffic_light", "city", "contract_signed", "created_at"]
+    list_filter = ["client_type", "contract_signed", "is_agency", "status", "traffic_light", "country"]
+    search_fields = ["name", "client_id", "cif", "billing_email", "contact_email"]
     readonly_fields = ["created_at", "updated_at", "created_by"]
     inlines = [BrandInline]
 
     fieldsets = (
-        ("Identificación", {"fields": ("cliente_id", "nombre_cliente", "tipo_cliente", "web_instagram", "es_agencia")}),
-        ("Contacto", {"fields": ("persona_contacto", "email_contacto", "telefono")}),
-        ("Facturación", {"fields": ("nombre_facturacion", "cif", "email_facturacion", "direccion_facturacion", "codigo_postal", "ciudad", "pais")}),
-        ("Contrato", {"fields": ("contrato_firmado", "contrato")}),
-        ("Estado y evaluación", {"fields": ("estado", "semaforo_cliente", "notas_internas")}),
-        ("Metadatos", {"fields": ("created_by", "created_at", "updated_at"), "classes": ("collapse",)}),
+        ("Identification", {"fields": ("client_id", "name", "client_type", "web_instagram", "is_agency")}),
+        ("Contact", {"fields": ("contact_person", "contact_email", "phone")}),
+        ("Billing", {"fields": ("billing_name", "cif", "billing_email", "billing_address", "postal_code", "city", "country")}),
+        ("Contract", {"fields": ("contract_signed", "contract")}),
+        ("Status and evaluation", {"fields": ("status", "traffic_light", "internal_notes")}),
+        ("Metadata", {"fields": ("created_by", "created_at", "updated_at"), "classes": ("collapse",)}),
     )

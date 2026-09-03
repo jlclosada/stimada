@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import CustomUser
 from apps.accounts.permissions import IsAdminOrEmployee
-from apps.content_makers.models import ContentMakerProfile, ContentMakerStatus, ContentMakerType, DesempenoOption, TallajeCategory, TallajeOption
+from apps.content_makers.models import ContentMakerProfile, ContentMakerStatus, ContentMakerType, PerformanceOption, SizingCategory, SizingOption
 from apps.content_makers.serializers import (
     ContentMakerCreateSerializer,
     ContentMakerDetailSerializer,
@@ -35,19 +35,19 @@ def _generate_password(length: int = 14) -> str:
 
 # Fields a Content Maker can NOT edit on their own profile
 CM_NON_EDITABLE_FIELDS = [
-    "nombre", "apellidos", "stimada_id",
+    "first_name", "last_name", "stimada_id",
     "fee_instagram", "fee_tiktok",
-    "status", "tipo", "tipo_cm",
-    "categorias_contenido",
+    "status", "type", "cm_type",
+    "content_categories",
     # Valoración interna (solo admin/empleados)
-    "desempeno", "calidad_contenido", "apariencia",
+    "performance", "content_quality", "appearance",
     # Notas internas
-    "comentarios",
+    "comments",
     # DNI solo editable por admin
     "dni_cif",
     # Links y categorías de seguidores se autogeneran en el modelo
-    "link_instagram", "link_tiktok",
-    "categoria_seguidores_ig", "categoria_seguidores_tt",
+    "instagram_link", "tiktok_link",
+    "instagram_followers_category", "tiktok_followers_category",
     "user", "created_at", "updated_at",
 ]
 
@@ -105,8 +105,8 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
     def get_permissions(self):
-        # Allow clients read-only access to retrieve, list, filters, and tallaje_options
-        if self.action in ("retrieve", "list", "filters", "tallaje_options", "desempeno_options"):
+        # Allow clients read-only access to retrieve, list, filters, and sizing_options
+        if self.action in ("retrieve", "list", "filters", "sizing_options", "performance_options"):
             from rest_framework.permissions import IsAuthenticated
             return [IsAuthenticated()]
         return super().get_permissions()
@@ -128,13 +128,13 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
-    TALLAJE_FIELDS = ["talla_arriba", "talla_abajo", "talla_pie", "altura_medidas"]
-    FISCAL_FIELDS = ["dni_cif", "direccion_facturacion", "codigo_postal", "provincia", "pais", "iban"]
+    SIZING_FIELDS = ["top_size", "bottom_size", "shoe_size", "height_measurements"]
+    FISCAL_FIELDS = ["dni_cif", "billing_address", "postal_code", "province", "country", "iban"]
 
     def partial_update(self, request, *args, **kwargs):
-        # Employees cannot modify tallaje or fiscal/banking fields
+        # Employees cannot modify sizing or fiscal/banking fields
         if request.user.is_employee:
-            for field in self.TALLAJE_FIELDS + self.FISCAL_FIELDS:
+            for field in self.SIZING_FIELDS + self.FISCAL_FIELDS:
                 request.data.pop(field, None)
         return super().partial_update(request, *args, **kwargs)
 
@@ -144,20 +144,20 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
         return Response({"next_id": next_num})
 
     @action(detail=False, methods=["get"])
-    def tallaje_options(self, request):
-        categories = TallajeCategory.objects.prefetch_related("opciones").all()
+    def sizing_options(self, request):
+        categories = SizingCategory.objects.prefetch_related("options").all()
         result = {}
         for cat in categories:
-            result[cat.campo] = {
-                "label": cat.nombre,
-                "options": [opt.valor for opt in cat.opciones.all()],
+            result[cat.field] = {
+                "label": cat.name,
+                "options": [opt.value for opt in cat.options.all()],
             }
         return Response(result)
 
     @action(detail=False, methods=["get"])
-    def desempeno_options(self, request):
-        options = DesempenoOption.objects.all()
-        return Response([{"id": o.id, "nombre": o.nombre} for o in options])
+    def performance_options(self, request):
+        options = PerformanceOption.objects.all()
+        return Response([{"id": o.id, "name": o.name} for o in options])
 
     @action(detail=False, methods=["get"])
     def filters(self, request):
@@ -172,38 +172,38 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
             )
 
         return Response({
-            "statuses": list(ContentMakerStatus.objects.values_list("nombre", flat=True)),
-            "tipos": distinct_values("tipo_cm"),
-            "tipo_choices": [
+            "statuses": list(ContentMakerStatus.objects.values_list("name", flat=True)),
+            "types": distinct_values("cm_type"),
+            "type_choices": [
                 {"value": value, "label": label}
-                for value, label in ContentMakerProfile.TIPO_CHOICES
+                for value, label in ContentMakerProfile.TYPE_CHOICES
             ],
-            "sexos": distinct_values("sexo"),
-            "calidad_contenido": distinct_values("calidad_contenido", empty_value=None),
-            "apariencia": distinct_values("apariencia"),
-            "categoria_seguidores_ig": distinct_values("categoria_seguidores_ig"),
-            "categoria_seguidores_tt": distinct_values("categoria_seguidores_tt"),
+            "genders": distinct_values("gender"),
+            "content_quality": distinct_values("content_quality", empty_value=None),
+            "appearance": distinct_values("appearance"),
+            "instagram_followers_category": distinct_values("instagram_followers_category"),
+            "tiktok_followers_category": distinct_values("tiktok_followers_category"),
         })
 
     def get_queryset(self):
         qs = super().get_queryset()
         search = self.request.query_params.get("q", "").strip()
         status_filter = self.request.query_params.get("status", "").strip()
-        tipo_filter = self.request.query_params.get("tipo", "").strip()
-        tipo_cm_filter = self.request.query_params.get("tipo_cm", "").strip()
-        tiene_cuenta = self.request.query_params.get("tiene_cuenta", "").strip()
+        type_filter = self.request.query_params.get("type", "").strip()
+        cm_type_filter = self.request.query_params.get("cm_type", "").strip()
+        has_account = self.request.query_params.get("has_account", "").strip()
 
         if search:
-            qs = qs.filter(nombre__icontains=search) | qs.filter(apellidos__icontains=search) | qs.filter(email__icontains=search)
+            qs = qs.filter(first_name__icontains=search) | qs.filter(last_name__icontains=search) | qs.filter(email__icontains=search)
         if status_filter:
             qs = qs.filter(status=status_filter)
-        if tipo_filter:
-            qs = qs.filter(tipo=tipo_filter)
-        if tipo_cm_filter:
-            qs = qs.filter(tipo_cm=tipo_cm_filter)
-        if tiene_cuenta == "true":
+        if type_filter:
+            qs = qs.filter(type=type_filter)
+        if cm_type_filter:
+            qs = qs.filter(cm_type=cm_type_filter)
+        if has_account == "true":
             qs = qs.filter(user__isnull=False)
-        elif tiene_cuenta == "false":
+        elif has_account == "false":
             qs = qs.filter(user__isnull=True)
 
         return qs
@@ -236,7 +236,7 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
             email=email,
             password=password,
             role=CustomUser.CONTENT_MAKER,
-            full_name=profile.nombre_completo or profile.nombre,
+            full_name=profile.full_name or profile.first_name,
             created_by=request.user,
         )
         profile.user = user
@@ -273,7 +273,7 @@ class ContentMakerViewSet(viewsets.ModelViewSet):
         send_mail(
             subject="Bienvenida a Stimada — Tus credenciales de acceso",
             message=(
-                f"Hola {profile.nombre},\n\n"
+                f"Hola {profile.first_name},\n\n"
                 "Tu cuenta en la plataforma Stimada ha sido creada.\n\n"
                 f"Email: {profile.user.email}\n"
                 f"Contraseña: {password}\n\n"

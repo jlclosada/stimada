@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
@@ -6,129 +7,167 @@ from django.utils import timezone
 
 
 class ProjectStatus(models.Model):
-    nombre = models.CharField(max_length=50, unique=True)
-    orden = models.PositiveIntegerField(default=0)
-    activo = models.BooleanField(default=True)
+    name = models.CharField(max_length=50, unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    available_on_creation = models.BooleanField(
+        default=False,
+        verbose_name="Disponible al crear",
+        help_text="Si está activo, este estado puede seleccionarse como estado inicial al crear un proyecto.",
+    )
 
     class Meta:
         verbose_name = "Estado de proyecto"
         verbose_name_plural = "Estados de proyecto"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
 class ServiceType(models.Model):
-    nombre = models.CharField(max_length=100, unique=True)
-    orden = models.PositiveIntegerField(default=0)
-    activo = models.BooleanField(default=True)
+    name = models.CharField(max_length=100, unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    requires_profiles = models.BooleanField(
+        default=False,
+        verbose_name="Requiere red social y formato",
+        help_text="Si está activo, al seleccionar este tipo de servicio se mostrarán las secciones de Red Social y Formato.",
+    )
 
     class Meta:
         verbose_name = "Tipo de servicio"
         verbose_name_plural = "Tipos de servicio"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
-class ModalidadEconomica(models.Model):
-    nombre = models.CharField(max_length=100, unique=True)
-    orden = models.PositiveIntegerField(default=0)
-    activo = models.BooleanField(default=True)
+class SocialNetwork(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Red social"
+        verbose_name_plural = "Redes sociales"
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class Format(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Formato"
+        verbose_name_plural = "Formatos"
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class EconomicModel(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = "Modalidad económica"
         verbose_name_plural = "Modalidades económicas"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
-class LogisticaProducto(models.Model):
-    nombre = models.CharField(max_length=100, unique=True)
-    orden = models.PositiveIntegerField(default=0)
-    activo = models.BooleanField(default=True)
+class ProductLogistics(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = "Logística de producto"
         verbose_name_plural = "Opciones de logística de producto"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
-class RecogidaProducto(models.Model):
-    nombre = models.CharField(max_length=100, unique=True)
-    orden = models.PositiveIntegerField(default=0)
-    activo = models.BooleanField(default=True)
+class ProductPickup(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = "Recogida de producto"
         verbose_name_plural = "Opciones de recogida de producto"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
-class QuienGraba(models.Model):
-    nombre = models.CharField(max_length=100, unique=True)
-    orden = models.PositiveIntegerField(default=0)
-    activo = models.BooleanField(default=True)
+class WhoRecords(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = "Quién graba"
         verbose_name_plural = "Opciones de quién graba"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
-class QuienRevisa(models.Model):
-    nombre = models.CharField(max_length=100, unique=True)
-    orden = models.PositiveIntegerField(default=0)
-    activo = models.BooleanField(default=True)
+class WhoReviews(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = "Quién revisa"
         verbose_name_plural = "Opciones de quién revisa"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
-class QuienPublica(models.Model):
-    nombre = models.CharField(max_length=100, unique=True)
-    orden = models.PositiveIntegerField(default=0)
-    activo = models.BooleanField(default=True)
+class WhoPublishes(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = "Quién publica"
         verbose_name_plural = "Opciones de quién publica"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
 class WinStatus(models.Model):
-    nombre = models.CharField(max_length=50, unique=True)
-    orden = models.PositiveIntegerField(default=0)
-    activo = models.BooleanField(default=True)
+    name = models.CharField(max_length=50, unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = "Estado Win"
         verbose_name_plural = "Estados Win"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
 class Project(models.Model):
@@ -143,8 +182,8 @@ class Project(models.Model):
 
     # Identificación
     project_id = models.CharField(max_length=50, unique=True, blank=True)
-    nombre = models.CharField(max_length=300)
-    descripcion = models.TextField(blank=True, verbose_name="Brief / Descripción")
+    name = models.CharField(max_length=300)
+    description = models.TextField(blank=True, verbose_name="Brief / Descripción")
     is_draft = models.BooleanField(default=False)
 
     # Relaciones
@@ -178,55 +217,55 @@ class Project(models.Model):
     )
 
     # Modalidad operativa
-    modalidad_economica = models.ForeignKey(
-        ModalidadEconomica,
+    economic_model = models.ForeignKey(
+        EconomicModel,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="projects",
         verbose_name="Modalidad económica",
     )
-    logistica_producto = models.ForeignKey(
-        LogisticaProducto,
+    product_logistics = models.ForeignKey(
+        ProductLogistics,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="projects",
         verbose_name="Logística producto",
     )
-    recogida_producto = models.ForeignKey(
-        RecogidaProducto,
+    product_pickup = models.ForeignKey(
+        ProductPickup,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="projects",
         verbose_name="Recogida del producto",
     )
-    quien_graba = models.ForeignKey(
-        QuienGraba,
+    who_records = models.ForeignKey(
+        WhoRecords,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="projects",
         verbose_name="Quién graba",
     )
-    quien_revisa = models.ForeignKey(
-        QuienRevisa,
+    who_reviews = models.ForeignKey(
+        WhoReviews,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="projects",
         verbose_name="Quién revisa",
     )
-    quien_publica = models.ForeignKey(
-        QuienPublica,
+    who_publishes = models.ForeignKey(
+        WhoPublishes,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="projects",
         verbose_name="Quién publica",
     )
-    devolucion_producto = models.BooleanField(
+    product_return = models.BooleanField(
         default=False,
         verbose_name="Devolución de producto",
     )
@@ -240,40 +279,100 @@ class Project(models.Model):
         related_name="projects",
         verbose_name="Win?",
     )
-    semaforo_proyecto = models.PositiveSmallIntegerField(
+    traffic_light = models.PositiveSmallIntegerField(
         choices=[(1, "1"), (2, "2"), (3, "3")],
         null=True,
         blank=True,
         verbose_name="Semáforo proyecto",
     )
-    retrasado = models.BooleanField(
+    delayed = models.BooleanField(
         default=False,
         help_text="Flag paralelo: se activa si llega la fecha límite sin entregable.",
     )
-    comentarios = models.TextField(blank=True, verbose_name="Comentarios")
+    comments = models.TextField(blank=True, verbose_name="Comentarios")
+
+    # Servicio: red social y formato (aplican a servicios "en perfiles")
+    social_networks = models.ManyToManyField(
+        SocialNetwork,
+        blank=True,
+        related_name="projects",
+        verbose_name="Redes sociales",
+    )
+    formats = models.ManyToManyField(
+        Format,
+        blank=True,
+        related_name="projects",
+        verbose_name="Formatos",
+    )
+
+    # Propuesta económica
+    fee = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name="Fee (€/contenido)",
+    )
+    num_contents = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Nº de contenidos",
+    )
+    num_profiles = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Nº de perfiles",
+    )
+    gifting = models.BooleanField(
+        default=False,
+        verbose_name="Gifting",
+        help_text="Si está activo, Stimada invita al contenido y el importe final es 0 €.",
+    )
+    discount_active = models.BooleanField(
+        default=False,
+        verbose_name="Aplicar descuento",
+    )
+    discount_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name="Descuento (%)",
+    )
 
     # Precio
-    base_imponible = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    impuestos = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tax_base = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    taxes = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     @property
-    def precio_total(self):
-        return self.base_imponible + self.impuestos
+    def gross_price(self):
+        """Precio antes de gifting/descuento: fee × nº contenidos × nº perfiles."""
+        return (self.fee or Decimal("0")) * (self.num_contents or 0) * (self.num_profiles or 0)
+
+    @property
+    def final_price(self):
+        """Precio efectivo tras aplicar gifting o descuento."""
+        if self.gifting:
+            return Decimal("0")
+        bruto = self.gross_price
+        if self.discount_active and self.discount_percentage:
+            factor = Decimal("1") - (Decimal(self.discount_percentage) / Decimal("100"))
+            return (bruto * factor).quantize(Decimal("0.01"))
+        return bruto
+
+    @property
+    def total_price(self):
+        return self.tax_base + self.taxes
 
     @property
     def is_active(self):
         """Derivado del estado: False si Cerrado."""
-        if self.status and self.status.nombre.lower() == "cerrado":
+        if self.status and self.status.name.lower() == "cerrado":
             return False
         return True
 
     # Fechas
-    fecha_venta = models.DateField(null=True, blank=True)
-    fecha_servicio = models.DateField(null=True, blank=True, verbose_name="Fecha de inicio del servicio")
-    fecha_llegada_producto = models.DateField(null=True, blank=True, verbose_name="Fecha de llegada del producto")
-    fecha_limite_entrega = models.DateField(null=True, blank=True, verbose_name="Fecha límite de entrega")
-    fecha_fin = models.DateField(null=True, blank=True, verbose_name="Fecha de fin del proyecto")
-
+    sale_date = models.DateField(null=True, blank=True)
+    service_date = models.DateField(null=True, blank=True, verbose_name="Fecha de inicio del servicio")
+    product_arrival_date = models.DateField(null=True, blank=True, verbose_name="Fecha de llegada del producto")
+    delivery_deadline = models.DateField(null=True, blank=True, verbose_name="Fecha límite de entrega")
+    end_date = models.DateField(null=True, blank=True, verbose_name="Fecha de fin del proyecto")
     # Content Maker selection
     cm_selection_mode = models.CharField(
         max_length=20,
@@ -306,7 +405,7 @@ class Project(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.project_id} — {self.nombre}"
+        return f"{self.project_id} — {self.name}"
 
     @staticmethod
     def generate_next_id():
@@ -320,12 +419,15 @@ class Project(models.Model):
     def save(self, *args, **kwargs):
         if not self.project_id:
             self.project_id = self.generate_next_id()
-        # Auto-calculate fecha_limite_entrega: llegada producto + 14 days (for UGC services)
-        if not self.fecha_limite_entrega and self.fecha_llegada_producto:
-            if self.service_type and "ugc" in self.service_type.nombre.lower():
-                self.fecha_limite_entrega = self.fecha_llegada_producto + timedelta(days=14)
-        if not self.fecha_fin and self.fecha_servicio:
-            self.fecha_fin = self.fecha_servicio + timedelta(days=14)
+        # Derive tax_base from the economic proposal when available.
+        if self.fee and self.num_contents and self.num_profiles:
+            self.tax_base = self.final_price
+        # Auto-calculate delivery_deadline: llegada producto + 14 days (for UGC services)
+        if not self.delivery_deadline and self.product_arrival_date:
+            if self.service_type and "ugc" in self.service_type.name.lower():
+                self.delivery_deadline = self.product_arrival_date + timedelta(days=14)
+        if not self.end_date and self.service_date:
+            self.end_date = self.service_date + timedelta(days=14)
         # Auto-inherit client from brand
         if self.brand_id and not self.client_id:
             self.client = self.brand.client
@@ -363,7 +465,7 @@ class ProjectContentMaker(models.Model):
         default=STATUS_PENDING,
     )
     is_recommended = models.BooleanField(default=False)
-    is_suplente = models.BooleanField(
+    is_substitute = models.BooleanField(
         default=False,
         help_text="Si es suplente, recibe la solicitud automáticamente si una Principal rechaza.",
     )
@@ -449,7 +551,7 @@ class Briefing(models.Model):
         on_delete=models.CASCADE,
         related_name="briefings",
     )
-    comentarios = models.TextField(blank=True)
+    comments = models.TextField(blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -477,11 +579,11 @@ class BriefingLink(models.Model):
         related_name="links",
     )
     url = models.URLField(max_length=500)
-    titulo = models.CharField(max_length=200, blank=True)
-    orden = models.PositiveIntegerField(default=0)
+    title = models.CharField(max_length=200, blank=True)
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ["orden", "id"]
+        ordering = ["order", "id"]
 
     def __str__(self):
         return self.url
@@ -494,18 +596,18 @@ class BriefingPhoto(models.Model):
         on_delete=models.CASCADE,
         related_name="photos",
     )
-    imagen = models.ImageField(upload_to="briefings/photos/%Y/%m/")
-    descripcion = models.CharField(max_length=300, blank=True)
-    orden = models.PositiveIntegerField(default=0)
+    image = models.ImageField(upload_to="briefings/photos/%Y/%m/")
+    description = models.CharField(max_length=300, blank=True)
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ["orden", "id"]
+        ordering = ["order", "id"]
 
     def __str__(self):
-        return self.descripcion or f"Foto {self.id}"
+        return self.description or f"Foto {self.id}"
 
 
-class Entregable(models.Model):
+class Deliverable(models.Model):
     """Entregable subido por una Content Maker para un proyecto."""
     STATUS_PENDING = "pending"
     STATUS_APPROVED = "approved"
@@ -523,15 +625,15 @@ class Entregable(models.Model):
     project = models.ForeignKey(
         Project,
         on_delete=models.CASCADE,
-        related_name="entregables",
+        related_name="deliverables",
     )
     content_maker = models.ForeignKey(
         "content_makers.ContentMakerProfile",
         on_delete=models.CASCADE,
-        related_name="entregables",
+        related_name="deliverables",
     )
-    archivo = models.FileField(upload_to="entregables/")
-    descripcion = models.TextField(blank=True)
+    file = models.FileField(upload_to="entregables/")
+    description = models.TextField(blank=True)
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -618,7 +720,7 @@ class StatusChangeLog(models.Model):
         ordering = ["-timestamp"]
 
     def __str__(self):
-        from_name = self.from_status.nombre if self.from_status else "—"
-        to_name = self.to_status.nombre if self.to_status else "—"
+        from_name = self.from_status.name if self.from_status else "—"
+        to_name = self.to_status.name if self.to_status else "—"
         return f"{self.project.project_id}: {from_name} → {to_name}"
 

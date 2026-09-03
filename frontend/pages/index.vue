@@ -7,7 +7,7 @@ const auth = useAuthStore();
 
 // If already authenticated, redirect to inicio
 if (auth.isAuthenticated) {
-  await navigateTo("/inicio", { replace: true });
+  await navigateTo("/home", { replace: true });
 }
 </script>
 

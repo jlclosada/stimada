@@ -1,33 +1,33 @@
 from rest_framework import serializers
 
-from apps.content_makers.models import ContentMakerProfile, DesempenoOption
+from apps.content_makers.models import ContentMakerProfile, PerformanceOption
 
 
 class ContentMakerProjectSerializer(serializers.Serializer):
     """Lightweight project info for the CM detail view."""
     id = serializers.IntegerField()
     project_id = serializers.CharField()
-    nombre = serializers.CharField()
+    name = serializers.CharField()
     brand_name = serializers.CharField(allow_null=True)
     status_name = serializers.CharField(allow_null=True)
-    fecha_servicio = serializers.DateField(allow_null=True)
+    service_date = serializers.DateField(allow_null=True)
 
 
 class ContentMakerListSerializer(serializers.ModelSerializer):
-    nombre_completo = serializers.CharField(read_only=True)
-    tiene_cuenta = serializers.BooleanField(read_only=True)
+    full_name = serializers.CharField(read_only=True)
+    has_account = serializers.BooleanField(read_only=True)
     user_email = serializers.SerializerMethodField()
-    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
+    type_display = serializers.CharField(source="get_type_display", read_only=True)
 
     class Meta:
         model = ContentMakerProfile
         fields = [
-            "id", "stimada_id", "nombre_completo", "nombre", "apellidos",
-            "tipo", "tipo_display",
-            "tipo_cm", "status", "categorias_contenido",
-            "instagram_handle", "seguidores_instagram",
-            "tiktok_handle", "seguidores_tiktok",
-            "tiene_cuenta", "user_email", "email",
+            "id", "stimada_id", "full_name", "first_name", "last_name",
+            "type", "type_display",
+            "cm_type", "status", "content_categories",
+            "instagram_handle", "instagram_followers",
+            "tiktok_handle", "tiktok_followers",
+            "has_account", "user_email", "email",
         ]
 
     def get_user_email(self, obj):
@@ -35,17 +35,17 @@ class ContentMakerListSerializer(serializers.ModelSerializer):
 
 
 class ContentMakerDetailSerializer(serializers.ModelSerializer):
-    nombre_completo = serializers.CharField(read_only=True)
-    tiene_cuenta = serializers.BooleanField(read_only=True)
+    full_name = serializers.CharField(read_only=True)
+    has_account = serializers.BooleanField(read_only=True)
     user_id = serializers.IntegerField(source="user.id", read_only=True, allow_null=True)
     user_email = serializers.SerializerMethodField()
-    foto_url = serializers.SerializerMethodField()
-    proyectos_asociados = serializers.SerializerMethodField()
-    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
-    desempeno_opciones = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=DesempenoOption.objects.all(), required=False,
+    photo_url = serializers.SerializerMethodField()
+    associated_projects = serializers.SerializerMethodField()
+    type_display = serializers.CharField(source="get_type_display", read_only=True)
+    performance_options = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=PerformanceOption.objects.all(), required=False,
     )
-    desempeno_opciones_display = serializers.SerializerMethodField()
+    performance_options_display = serializers.SerializerMethodField()
 
     class Meta:
         model = ContentMakerProfile
@@ -55,25 +55,25 @@ class ContentMakerDetailSerializer(serializers.ModelSerializer):
     def get_user_email(self, obj):
         return obj.user.email if obj.user_id else None
 
-    def get_foto_url(self, obj):
-        if obj.foto:
+    def get_photo_url(self, obj):
+        if obj.photo:
             request = self.context.get("request")
             if request:
-                return request.build_absolute_uri(obj.foto.url)
-            return obj.foto.url
+                return request.build_absolute_uri(obj.photo.url)
+            return obj.photo.url
         return None
 
-    def get_desempeno_opciones_display(self, obj):
-        return [{"id": o.id, "nombre": o.nombre} for o in obj.desempeno_opciones.all()]
+    def get_performance_options_display(self, obj):
+        return [{"id": o.id, "name": o.name} for o in obj.performance_options.all()]
 
     def update(self, instance, validated_data):
-        desempeno_opciones = validated_data.pop("desempeno_opciones", None)
+        performance_options = validated_data.pop("performance_options", None)
         instance = super().update(instance, validated_data)
-        if desempeno_opciones is not None:
-            instance.desempeno_opciones.set(desempeno_opciones)
+        if performance_options is not None:
+            instance.performance_options.set(performance_options)
         return instance
 
-    def get_proyectos_asociados(self, obj):
+    def get_associated_projects(self, obj):
         from apps.projects.models import Project, ProjectContentMaker
 
         # Projects where CM accepted/selected via ProjectContentMaker
@@ -94,10 +94,10 @@ class ContentMakerDetailSerializer(serializers.ModelSerializer):
             {
                 "id": p.id,
                 "project_id": p.project_id,
-                "nombre": p.nombre,
-                "brand_name": p.brand.nombre if p.brand else None,
-                "status_name": p.status.nombre if p.status else None,
-                "fecha_servicio": p.fecha_servicio,
+                "name": p.name,
+                "brand_name": p.brand.name if p.brand else None,
+                "status_name": p.status.name if p.status else None,
+                "service_date": p.service_date,
             }
             for p in projects
         ], many=True).data
@@ -109,37 +109,37 @@ class CreateAccountSerializer(serializers.Serializer):
 
 class ContentMakerPublicSerializer(serializers.ModelSerializer):
     """Limited view for clients — hides sensitive/internal data like fees, billing, status."""
-    nombre_completo = serializers.CharField(read_only=True)
-    foto_url = serializers.SerializerMethodField()
-    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
+    full_name = serializers.CharField(read_only=True)
+    photo_url = serializers.SerializerMethodField()
+    type_display = serializers.CharField(source="get_type_display", read_only=True)
 
     class Meta:
         model = ContentMakerProfile
         fields = [
-            "id", "stimada_id", "nombre", "apellidos", "nombre_completo",
-            "tipo", "tipo_display",
-            "tipo_cm", "sexo", "categorias_contenido",
-            "es_mama",
-            "instagram_handle", "link_instagram",
-            "seguidores_instagram", "categoria_seguidores_ig",
-            "tiktok_handle", "link_tiktok",
-            "seguidores_tiktok", "categoria_seguidores_tt",
-            "talla_arriba", "talla_abajo", "talla_pie", "altura_medidas",
-            "foto_url",
+            "id", "stimada_id", "first_name", "last_name", "full_name",
+            "type", "type_display",
+            "cm_type", "gender", "content_categories",
+            "is_mother",
+            "instagram_handle", "instagram_link",
+            "instagram_followers", "instagram_followers_category",
+            "tiktok_handle", "tiktok_link",
+            "tiktok_followers", "tiktok_followers_category",
+            "top_size", "bottom_size", "shoe_size", "height_measurements",
+            "photo_url",
         ]
 
-    def get_foto_url(self, obj):
-        if obj.foto:
+    def get_photo_url(self, obj):
+        if obj.photo:
             request = self.context.get("request")
             if request:
-                return request.build_absolute_uri(obj.foto.url)
-            return obj.foto.url
+                return request.build_absolute_uri(obj.photo.url)
+            return obj.photo.url
         return None
 
 
 class ContentMakerCreateSerializer(serializers.ModelSerializer):
-    desempeno_opciones = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=DesempenoOption.objects.all(), required=False,
+    performance_options = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=PerformanceOption.objects.all(), required=False,
     )
 
     class Meta:
@@ -148,26 +148,26 @@ class ContentMakerCreateSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             "stimada_id": {"required": False, "allow_blank": True},
             "dni_cif": {"required": True, "allow_blank": False},
-            "direccion_facturacion": {"required": True, "allow_blank": False},
-            "codigo_postal": {"required": True, "allow_blank": False},
-            "provincia": {"required": True, "allow_blank": False},
-            "pais": {"required": True, "allow_blank": False},
+            "billing_address": {"required": True, "allow_blank": False},
+            "postal_code": {"required": True, "allow_blank": False},
+            "province": {"required": True, "allow_blank": False},
+            "country": {"required": True, "allow_blank": False},
             "iban": {"required": True, "allow_blank": False},
         }
 
     def create(self, validated_data):
-        desempeno_opciones = validated_data.pop("desempeno_opciones", [])
+        performance_options = validated_data.pop("performance_options", [])
         instance = super().create(validated_data)
-        if desempeno_opciones:
-            instance.desempeno_opciones.set(desempeno_opciones)
+        if performance_options:
+            instance.performance_options.set(performance_options)
         return instance
 
-    def validate_link_instagram(self, value):
+    def validate_instagram_link(self, value):
         if value and not value.startswith("http"):
             value = f"https://{value}"
         return value
 
-    def validate_link_tiktok(self, value):
+    def validate_tiktok_link(self, value):
         if value and not value.startswith("http"):
             value = f"https://{value}"
         return value

@@ -101,7 +101,7 @@ async function handleClick(notif: NotificationItem) {
     if (item) item.read = true;
   }
   if (notif.project) {
-    router.push(`/proyectos/${notif.project}`);
+    router.push(`/projects/${notif.project}`);
   }
 }
 
@@ -181,22 +181,22 @@ onMounted(fetchNotifications);
       </div>
 
       <!-- Type filter -->
-      <select
+      <BaseSelect
         v-model="selectedType"
-        class="h-9 px-3 rounded-xl border border-border/60 bg-white text-xs text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40 transition-all"
+        size="sm"
+        class="min-w-[150px] max-w-[200px]"
+        :options="typeOptions.map((opt) => ({ value: opt.value, label: opt.label }))"
         @change="onFilterChange"
-      >
-        <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
+      />
 
       <!-- Read filter -->
-      <select
+      <BaseSelect
         v-model="selectedRead"
-        class="h-9 px-3 rounded-xl border border-border/60 bg-white text-xs text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40 transition-all"
+        size="sm"
+        class="min-w-[150px] max-w-[200px]"
+        :options="readOptions.map((opt) => ({ value: opt.value, label: opt.label }))"
         @change="onFilterChange"
-      >
-        <option v-for="opt in readOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
+      />
     </div>
 
     <!-- Loading -->

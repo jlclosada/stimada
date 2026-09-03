@@ -32,32 +32,32 @@ function selectClient(client: any) {
   clientSearch.value = '';
   clientResults.value = [];
   // Auto-inherit fields if client is not an agency
-  if (!client.es_agencia) {
-    form.nombre = client.nombre_cliente;
-    form.tipo_marca = client.tipo_cliente;
+  if (!client.is_agency) {
+    form.name = client.name;
+    form.brand_type = client.client_type;
     form.web_instagram = client.web_instagram || '';
   }
 }
 
 function clearClient() {
   selectedClient.value = null;
-  form.nombre = '';
-  form.tipo_marca = null;
+  form.name = '';
+  form.brand_type = null;
   form.web_instagram = '';
-  form.persona_contacto = '';
-  form.email_contacto = '';
-  form.telefono = '';
+  form.contact_person = '';
+  form.contact_email = '';
+  form.phone = '';
 }
 
 // Form
 const form = reactive({
-  nombre: '',
-  tipo_marca: null as number | null,
+  name: '',
+  brand_type: null as number | null,
   web_instagram: '',
-  persona_contacto: '',
-  email_contacto: '',
-  telefono: '',
-  notas: '',
+  contact_person: '',
+  contact_email: '',
+  phone: '',
+  notes: '',
 });
 
 const isLoading = ref(false);
@@ -71,17 +71,17 @@ function validateForm(): Record<string, string> {
   if (!selectedClient.value) {
     e.client = 'Debes seleccionar un cliente.';
   }
-  if (!form.nombre.trim()) {
-    e.nombre = 'El nombre de la marca es obligatorio.';
+  if (!form.name.trim()) {
+    e.name = 'El nombre de la marca es obligatorio.';
   }
-  if (!form.tipo_marca) {
-    e.tipo_marca = 'Selecciona un tipo de marca.';
+  if (!form.brand_type) {
+    e.brand_type = 'Selecciona un tipo de marca.';
   }
   if (form.web_instagram && !URL_RE.test(form.web_instagram.trim())) {
     e.web_instagram = 'La URL debe empezar por http:// o https://';
   }
-  if (form.email_contacto && !EMAIL_RE.test(form.email_contacto.trim())) {
-    e.email_contacto = 'Introduce un email válido (ej: nombre@dominio.com).';
+  if (form.contact_email && !EMAIL_RE.test(form.contact_email.trim())) {
+    e.contact_email = 'Introduce un email válido (ej: nombre@dominio.com).';
   }
   return e;
 }
@@ -98,15 +98,15 @@ async function handleSubmit() {
   try {
     await brandsStore.create({
       client: selectedClient.value.id,
-      nombre: form.nombre,
-      tipo_marca: form.tipo_marca || null,
+      name: form.name,
+      brand_type: form.brand_type || null,
       web_instagram: form.web_instagram,
-      persona_contacto: form.persona_contacto,
-      email_contacto: form.email_contacto,
-      telefono: form.telefono,
-      notas: form.notas,
+      contact_person: form.contact_person,
+      contact_email: form.contact_email,
+      phone: form.phone,
+      notes: form.notes,
     });
-    router.push('/dashboard/marcas');
+    router.push('/dashboard/brands');
   } catch (err: unknown) {
     const e = err as { data?: Record<string, string[] | string> };
     if (e?.data) {
@@ -117,9 +117,9 @@ async function handleSubmit() {
           field === 'non_field_errors' &&
           /conjunto único|unique set|deben formar un conjunto/i.test(msg)
         ) {
-          msg = `Ya existe una marca llamada "${form.nombre}" para este cliente. Elige otro nombre o edita la marca existente.`;
-          // También marcamos el campo "nombre" para destacarlo inline.
-          errors.value.nombre = msg;
+          msg = `Ya existe una marca llamada "${form.name}" para este cliente. Elige otro nombre o edita la marca existente.`;
+          // También marcamos el campo "name" para destacarlo inline.
+          errors.value.name = msg;
         }
         errors.value[field] = msg;
       });
@@ -137,7 +137,7 @@ async function handleSubmit() {
     <!-- Header -->
     <div class="flex items-center gap-3 mb-7">
       <NuxtLink
-        to="/dashboard/marcas"
+        to="/dashboard/brands"
         class="flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors"
       >
         <svg
@@ -222,17 +222,17 @@ async function handleSubmit() {
               class="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-400/20 flex items-center justify-center"
             >
               <span class="text-sm font-bold text-blue-400">{{
-                selectedClient.nombre_cliente.charAt(0)
+                selectedClient.name.charAt(0)
               }}</span>
             </div>
             <div>
               <p class="text-sm font-medium text-ink">
-                {{ selectedClient.nombre_cliente }}
+                {{ selectedClient.name }}
               </p>
               <p class="text-[10px] text-muted/70">
-                {{ selectedClient.es_agencia ? 'Agencia' : 'Marca directa' }}
-                <span v-if="selectedClient.tipo_nombre">
-                  · {{ selectedClient.tipo_nombre }}</span
+                {{ selectedClient.is_agency ? 'Agencia' : 'Marca directa' }}
+                <span v-if="selectedClient.type_name">
+                  · {{ selectedClient.type_name }}</span
                 >
               </p>
             </div>
@@ -266,9 +266,9 @@ async function handleSubmit() {
               class="w-full text-left px-4 py-2.5 text-sm hover:bg-panel/60 transition-colors border-b border-border/20 last:border-0"
               @click="selectClient(c)"
             >
-              <span class="font-medium text-ink">{{ c.nombre_cliente }}</span>
+              <span class="font-medium text-ink">{{ c.name }}</span>
               <span class="text-muted ml-2 text-xs">{{
-                c.es_agencia ? '(Agencia)' : '(Marca directa)'
+                c.is_agency ? '(Agencia)' : '(Marca directa)'
               }}</span>
             </button>
           </div>
@@ -279,7 +279,7 @@ async function handleSubmit() {
 
         <!-- Inheritance notice -->
         <div
-          v-if="selectedClient && !selectedClient.es_agencia"
+          v-if="selectedClient && !selectedClient.is_agency"
           class="rounded-lg bg-blue-50 border border-blue-200/50 px-4 py-2.5"
         >
           <p class="text-xs text-blue-600">
@@ -330,28 +330,33 @@ async function handleSubmit() {
               >Nombre de la marca *</label
             >
             <input
-              v-model="form.nombre"
+              v-model="form.name"
               type="text"
               required
               class="input-field"
               placeholder="Nombre comercial"
             />
-            <p v-if="errors.nombre" class="text-xs text-red-400 mt-1">
-              {{ errors.nombre }}
+            <p v-if="errors.name" class="text-xs text-red-400 mt-1">
+              {{ errors.name }}
             </p>
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5"
               >Tipo de marca *</label
             >
-            <select v-model="form.tipo_marca" class="select-field">
-              <option :value="null">Seleccionar tipo…</option>
-              <option v-for="t in clientsStore.types" :key="t.id" :value="t.id">
-                {{ t.nombre }}
-              </option>
-            </select>
-            <p v-if="errors.tipo_marca" class="text-xs text-red-400 mt-1">
-              {{ errors.tipo_marca }}
+            <BaseSelect
+              v-model="form.brand_type"
+              placeholder="Seleccionar tipo…"
+              :options="[
+                { value: null, label: 'Seleccionar tipo…' },
+                ...clientsStore.types.map((t) => ({
+                  value: t.id,
+                  label: t.name,
+                })),
+              ]"
+            />
+            <p v-if="errors.brand_type" class="text-xs text-red-400 mt-1">
+              {{ errors.brand_type }}
             </p>
           </div>
           <div>
@@ -373,7 +378,7 @@ async function handleSubmit() {
               >Notas</label
             >
             <textarea
-              v-model="form.notas"
+              v-model="form.notes"
               rows="3"
               class="input-field resize-none"
               placeholder="Notas internas sobre la marca…"
@@ -421,7 +426,7 @@ async function handleSubmit() {
               >Persona de contacto</label
             >
             <input
-              v-model="form.persona_contacto"
+              v-model="form.contact_person"
               type="text"
               class="input-field"
               placeholder="Nombre del contacto de la marca"
@@ -432,13 +437,13 @@ async function handleSubmit() {
               >Email de contacto</label
             >
             <input
-              v-model="form.email_contacto"
+              v-model="form.contact_email"
               type="text"
               class="input-field"
               placeholder="email@marca.com"
             />
-            <p v-if="errors.email_contacto" class="text-xs text-red-400 mt-1">
-              {{ errors.email_contacto }}
+            <p v-if="errors.contact_email" class="text-xs text-red-400 mt-1">
+              {{ errors.contact_email }}
             </p>
           </div>
           <div>
@@ -446,7 +451,7 @@ async function handleSubmit() {
               >Teléfono</label
             >
             <input
-              v-model="form.telefono"
+              v-model="form.phone"
               type="tel"
               class="input-field"
               placeholder="+34 …"

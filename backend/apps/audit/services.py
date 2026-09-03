@@ -11,18 +11,18 @@ from apps.audit.models import AuditLog
 AUDITED_FIELDS = {
     "content_maker": [
         "fee_instagram", "fee_tiktok", "iban", "dni_cif",
-        "direccion", "estado", "status", "tipo_cm", "contrato_firmado",
+        "billing_address", "status", "cm_type", "contract_signed",
     ],
     "client": [
-        "cif", "direccion_facturacion", "email_facturacion",
-        "contrato_firmado", "contrato", "estado", "semaforo_cliente",
+        "cif", "billing_address", "billing_email",
+        "contract_signed", "contract", "status", "traffic_light",
     ],
     "brand": [
-        "estado", "client",
+        "status", "client",
     ],
     "project": [
-        "base_imponible", "impuestos", "status", "content_maker",
-        "win_status", "fecha_fin",
+        "tax_base", "taxes", "status", "content_maker",
+        "win_status", "end_date",
     ],
     "user": [
         "is_active", "role",

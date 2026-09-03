@@ -32,10 +32,10 @@ const showDeleteConfirm = ref(false);
 
 // Edit mode - CM selection
 const editSelectedCMs = ref<
-  { id: number; nombre: string; instagram_handle: string }[]
+  { id: number; name: string; instagram_handle: string }[]
 >([]);
 const editRecommendedCMs = ref<
-  { id: number; nombre: string; instagram_handle: string }[]
+  { id: number; name: string; instagram_handle: string }[]
 >([]);
 const editCMSearch = ref('');
 const editCMResults = ref<any[]>([]);
@@ -72,7 +72,7 @@ function addEditDefinedCM(cm: any) {
   if (!editSelectedCMs.value.find((r) => r.id === cm.id)) {
     editSelectedCMs.value.push({
       id: cm.id,
-      nombre: `${cm.nombre} ${cm.apellidos}`.trim(),
+      name: `${cm.first_name} ${cm.last_name}`.trim(),
       instagram_handle: cm.instagram_handle || '',
     });
   }
@@ -88,7 +88,7 @@ function addEditRecommendedCM(cm: any) {
   if (!editRecommendedCMs.value.find((r) => r.id === cm.id)) {
     editRecommendedCMs.value.push({
       id: cm.id,
-      nombre: `${cm.nombre} ${cm.apellidos}`.trim(),
+      name: `${cm.first_name} ${cm.last_name}`.trim(),
       instagram_handle: cm.instagram_handle || '',
     });
   }
@@ -123,13 +123,17 @@ function cancelConfirmAction() {
 
 function startEdit() {
   editForm.value = {
-    nombre: project.value.nombre,
-    descripcion: project.value.descripcion || '',
-    base_imponible: project.value.base_imponible,
-    impuestos: project.value.impuestos,
-    fecha_venta: project.value.fecha_venta || '',
-    fecha_servicio: project.value.fecha_servicio || '',
-    fecha_fin: project.value.fecha_fin || '',
+    name: project.value.name,
+    description: project.value.description || '',
+    fee: project.value.fee ?? '',
+    num_contents: project.value.num_contents ?? '',
+    num_profiles: project.value.num_profiles ?? '',
+    gifting: !!project.value.gifting,
+    discount_active: !!project.value.discount_active,
+    discount_percentage: project.value.discount_percentage ?? '',
+    sale_date: project.value.sale_date || '',
+    service_date: project.value.service_date || '',
+    end_date: project.value.end_date || '',
     status: project.value.status,
     service_type: project.value.service_type,
     cm_selection_mode: project.value.cm_selection_mode || 'client_chooses',
@@ -141,7 +145,7 @@ function startEdit() {
     for (const cm of project.value.content_makers) {
       const entry = {
         id: cm.content_maker_id,
-        nombre: cm.nombre,
+        name: cm.name,
         instagram_handle: cm.instagram_handle || '',
       };
       if (cm.is_recommended || cm.status === 'recommended') {
@@ -162,13 +166,19 @@ async function saveEdit() {
   saving.value = true;
   try {
     const body: Record<string, unknown> = {
-      nombre: editForm.value.nombre,
-      descripcion: editForm.value.descripcion,
-      base_imponible: editForm.value.base_imponible,
-      impuestos: editForm.value.impuestos,
-      fecha_venta: editForm.value.fecha_venta || null,
-      fecha_servicio: editForm.value.fecha_servicio || null,
-      fecha_fin: editForm.value.fecha_fin || null,
+      name: editForm.value.name,
+      description: editForm.value.description,
+      fee: editForm.value.fee || '0',
+      num_contents: parseInt(editForm.value.num_contents) || 0,
+      num_profiles: parseInt(editForm.value.num_profiles) || 0,
+      gifting: editForm.value.gifting,
+      discount_active: editForm.value.discount_active,
+      discount_percentage: editForm.value.discount_active
+        ? editForm.value.discount_percentage || '0'
+        : '0',
+      sale_date: editForm.value.sale_date || null,
+      service_date: editForm.value.service_date || null,
+      end_date: editForm.value.end_date || null,
       status: editForm.value.status || null,
       service_type: editForm.value.service_type || null,
       cm_selection_mode: editForm.value.cm_selection_mode,
@@ -222,7 +232,7 @@ async function deleteProject() {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${auth.accessToken}` },
     });
-    router.push('/proyectos');
+    router.push('/projects');
   } catch {
     // silent
   } finally {
@@ -454,25 +464,22 @@ function getBriefing(cmId: number) {
 
 // Briefing form per CM
 const briefingForms = ref<
-  Record<
-    number,
-    { links: { url: string; titulo: string }[]; comentarios: string }
-  >
+  Record<number, { links: { url: string; title: string }[]; comments: string }>
 >({});
 const briefingSaving = ref<Record<number, boolean>>({});
 
 function initBriefingForm(cmId: number) {
   if (!briefingForms.value[cmId]) {
     briefingForms.value[cmId] = {
-      links: [{ url: '', titulo: '' }],
-      comentarios: '',
+      links: [{ url: '', title: '' }],
+      comments: '',
     };
   }
 }
 
 function addLink(cmId: number) {
   initBriefingForm(cmId);
-  briefingForms.value[cmId].links.push({ url: '', titulo: '' });
+  briefingForms.value[cmId].links.push({ url: '', title: '' });
 }
 
 function removeLink(cmId: number, index: number) {
@@ -494,7 +501,7 @@ async function submitBriefing(cmId: number) {
       body: {
         project: project.value.id,
         content_maker: cmId,
-        comentarios: form?.comentarios || '',
+        comments: form?.comments || '',
         links: validLinks,
       },
     });
@@ -509,13 +516,13 @@ async function submitBriefing(cmId: number) {
 // Briefing edit mode (admin/employee only)
 const editingBriefingCmId = ref<number | null>(null);
 const editBriefingForm = ref<{
-  links: { url: string; titulo: string }[];
-  comentarios: string;
-  existingPhotos: { id: number; imagen_url: string; descripcion: string }[];
+  links: { url: string; title: string }[];
+  comments: string;
+  existingPhotos: { id: number; image_url: string; description: string }[];
   removePhotoIds: number[];
 }>({
   links: [],
-  comentarios: '',
+  comments: '',
   existingPhotos: [],
   removePhotoIds: [],
 });
@@ -525,14 +532,14 @@ function startEditBriefing(cmId: number) {
   if (!briefing) return;
   editBriefingForm.value = {
     links: briefing.links?.length
-      ? briefing.links.map((l: any) => ({ url: l.url, titulo: l.titulo || '' }))
-      : [{ url: '', titulo: '' }],
-    comentarios: briefing.comentarios || '',
+      ? briefing.links.map((l: any) => ({ url: l.url, title: l.title || '' }))
+      : [{ url: '', title: '' }],
+    comments: briefing.comments || '',
     existingPhotos:
       briefing.photos?.map((p: any) => ({
         id: p.id,
-        imagen_url: p.imagen_url,
-        descripcion: p.descripcion,
+        image_url: p.image_url,
+        description: p.description,
       })) || [],
     removePhotoIds: [],
   };
@@ -544,7 +551,7 @@ function cancelEditBriefing() {
 }
 
 function addEditBriefingLink() {
-  editBriefingForm.value.links.push({ url: '', titulo: '' });
+  editBriefingForm.value.links.push({ url: '', title: '' });
 }
 
 function removeEditBriefingLink(index: number) {
@@ -566,7 +573,7 @@ async function saveEditBriefing(cmId: number) {
     const validLinks = form.links.filter((l) => l.url.trim());
 
     const body: Record<string, any> = {
-      comentarios: form.comentarios,
+      comments: form.comments,
       links: validLinks,
     };
     if (form.removePhotoIds.length) {
@@ -593,17 +600,17 @@ async function saveEditBriefing(cmId: number) {
 // ─── Pipeline Progress ─────────────────────────────────────────────────────────
 const pipelineSteps = computed(() => {
   if (!project.value) return [];
-  const logistica = (project.value.logistica_producto_name || '').toLowerCase();
+  const logistics = (project.value.product_logistics_name || '').toLowerCase();
   const hasShipping =
-    logistica.includes('envío') || logistica.includes('envio');
-  const hasDevolucion = project.value.devolucion_producto;
+    logistics.includes('envío') || logistics.includes('envio');
+  const hasReturn = project.value.product_return;
 
   const steps: string[] = ['Perfiles Propuestos', 'Perfiles Aprobados'];
   if (hasShipping) steps.push('Producto Enviado');
   steps.push('Briefing');
   if (hasShipping) steps.push('Producto Recibido');
   steps.push('En producción', 'Revisión', 'Publicado');
-  if (hasDevolucion) steps.push('Producto a Recoger');
+  if (hasReturn) steps.push('Producto a Recoger');
   steps.push('Proyecto Finalizado');
   return steps;
 });
@@ -613,17 +620,17 @@ const currentStepIndex = computed(() => {
   return pipelineSteps.value.indexOf(project.value.status_name);
 });
 
-// ─── Entregables (Deliverables) ────────────────────────────────────────────────
-const entregables = ref<any[]>([]);
-const entregablesLoading = ref(false);
+// ─── Deliverables ────────────────────────────────────────────────
+const deliverables = ref<any[]>([]);
+const deliverablesLoading = ref(false);
 const uploadFile = ref<File | null>(null);
-const uploadDescripcion = ref('');
+const uploadDescription = ref('');
 const uploading = ref(false);
 const reviewNotes = ref('');
 const reviewingId = ref<number | null>(null);
 const reviewAction = ref<'approve' | 'reject' | null>(null);
 
-const showEntregables = computed(() => {
+const showDeliverables = computed(() => {
   if (!project.value) return false;
   const statusOrder = [
     'En producción',
@@ -635,11 +642,11 @@ const showEntregables = computed(() => {
   ];
   return (
     statusOrder.includes(project.value.status_name) ||
-    entregables.value.length > 0
+    deliverables.value.length > 0
   );
 });
 
-const canUploadEntregable = computed(() => {
+const canUploadDeliverable = computed(() => {
   if (!isContentMaker.value || !project.value) return false;
   // CM must be accepted on this project
   const participation = project.value.content_makers?.find(
@@ -648,18 +655,18 @@ const canUploadEntregable = computed(() => {
   return !!participation;
 });
 
-async function loadEntregables() {
+async function loadDeliverables() {
   if (!project.value) return;
-  entregablesLoading.value = true;
+  deliverablesLoading.value = true;
   try {
-    entregables.value = await $fetch<any[]>(
-      `${config.public.apiBase}/projects/${route.params.id}/entregables/`,
+    deliverables.value = await $fetch<any[]>(
+      `${config.public.apiBase}/projects/${route.params.id}/deliverables/`,
       { headers: { Authorization: `Bearer ${auth.accessToken}` } },
     );
   } catch {
-    entregables.value = [];
+    deliverables.value = [];
   } finally {
-    entregablesLoading.value = false;
+    deliverablesLoading.value = false;
   }
 }
 
@@ -668,15 +675,15 @@ function onFileChange(e: Event) {
   uploadFile.value = target.files?.[0] || null;
 }
 
-async function uploadEntregable() {
+async function uploadDeliverable() {
   if (!uploadFile.value) return;
   uploading.value = true;
   try {
     const formData = new FormData();
-    formData.append('archivo', uploadFile.value);
-    formData.append('descripcion', uploadDescripcion.value);
+    formData.append('file', uploadFile.value);
+    formData.append('description', uploadDescription.value);
     await $fetch(
-      `${config.public.apiBase}/projects/${route.params.id}/upload_entregable/`,
+      `${config.public.apiBase}/projects/${route.params.id}/upload_deliverable/`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${auth.accessToken}` },
@@ -684,8 +691,8 @@ async function uploadEntregable() {
       },
     );
     uploadFile.value = null;
-    uploadDescripcion.value = '';
-    await loadEntregables();
+    uploadDescription.value = '';
+    await loadDeliverables();
     await loadProject();
   } catch {
     // silent
@@ -694,8 +701,8 @@ async function uploadEntregable() {
   }
 }
 
-function startReview(entregableId: number, action: 'approve' | 'reject') {
-  reviewingId.value = entregableId;
+function startReview(deliverableId: number, action: 'approve' | 'reject') {
+  reviewingId.value = deliverableId;
   reviewAction.value = action;
   reviewNotes.value = '';
 }
@@ -711,19 +718,19 @@ async function submitReview() {
   actionLoading.value = true;
   try {
     await $fetch(
-      `${config.public.apiBase}/projects/${route.params.id}/review_entregable/`,
+      `${config.public.apiBase}/projects/${route.params.id}/review_deliverable/`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${auth.accessToken}` },
         body: {
-          entregable_id: reviewingId.value,
+          deliverable_id: reviewingId.value,
           approved: reviewAction.value === 'approve',
           notes: reviewNotes.value,
         },
       },
     );
     cancelReview();
-    await loadEntregables();
+    await loadDeliverables();
     await loadProject();
   } catch {
     // silent
@@ -732,15 +739,15 @@ async function submitReview() {
   }
 }
 
-// ─── Entregable helpers ────────────────────────────────────────────────────────
+// ─── Deliverable helpers ────────────────────────────────────────────────────────
 
-function getFileType(archivo: string): 'video' | 'foto' | 'documento' {
-  if (!archivo) return 'documento';
-  const ext = archivo.split('.').pop()?.toLowerCase() || '';
+function getFileType(file: string): 'video' | 'photo' | 'document' {
+  if (!file) return 'document';
+  const ext = file.split('.').pop()?.toLowerCase() || '';
   if (['mp4', 'mov', 'avi', 'webm', 'mkv', 'm4v'].includes(ext)) return 'video';
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'heic'].includes(ext))
-    return 'foto';
-  return 'documento';
+    return 'photo';
+  return 'document';
 }
 
 const FILE_TYPE_CONFIG = {
@@ -749,12 +756,12 @@ const FILE_TYPE_CONFIG = {
     icon: 'M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z',
     color: 'text-blue-600 bg-blue-50',
   },
-  foto: {
+  photo: {
     label: 'Foto',
     icon: 'M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z',
     color: 'text-emerald-600 bg-emerald-50',
   },
-  documento: {
+  document: {
     label: 'Documento',
     icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
     color: 'text-amber-600 bg-amber-50',
@@ -771,15 +778,15 @@ function onReuploadFileChange(e: Event) {
   reuploadFile.value = target.files?.[0] || null;
 }
 
-async function reuploadEntregable(entregableId: number) {
+async function reuploadDeliverable(deliverableId: number) {
   if (!reuploadFile.value) return;
   actionLoading.value = true;
   try {
     const formData = new FormData();
-    formData.append('archivo', reuploadFile.value);
-    formData.append('entregable_id', String(entregableId));
+    formData.append('file', reuploadFile.value);
+    formData.append('deliverable_id', String(deliverableId));
     await $fetch(
-      `${config.public.apiBase}/projects/${route.params.id}/reupload_entregable/`,
+      `${config.public.apiBase}/projects/${route.params.id}/reupload_deliverable/`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${auth.accessToken}` },
@@ -788,7 +795,7 @@ async function reuploadEntregable(entregableId: number) {
     );
     reuploadingId.value = null;
     reuploadFile.value = null;
-    await loadEntregables();
+    await loadDeliverables();
     await loadProject();
   } catch {
     // silent
@@ -797,18 +804,18 @@ async function reuploadEntregable(entregableId: number) {
   }
 }
 
-async function deleteEntregable(entregableId: number) {
-  deletingId.value = entregableId;
+async function deleteDeliverable(deliverableId: number) {
+  deletingId.value = deliverableId;
   try {
     await $fetch(
-      `${config.public.apiBase}/projects/${route.params.id}/delete_entregable/`,
+      `${config.public.apiBase}/projects/${route.params.id}/delete_deliverable/`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${auth.accessToken}` },
-        body: { entregable_id: entregableId },
+        body: { deliverable_id: deliverableId },
       },
     );
-    await loadEntregables();
+    await loadDeliverables();
     await loadProject();
   } catch {
     // silent
@@ -817,18 +824,21 @@ async function deleteEntregable(entregableId: number) {
   }
 }
 
-async function changeEntregableStatus(entregableId: number, newStatus: string) {
+async function changeDeliverableStatus(
+  deliverableId: number,
+  newStatus: string,
+) {
   actionLoading.value = true;
   try {
     await $fetch(
-      `${config.public.apiBase}/projects/${route.params.id}/change_entregable_status/`,
+      `${config.public.apiBase}/projects/${route.params.id}/change_deliverable_status/`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${auth.accessToken}` },
-        body: { entregable_id: entregableId, status: newStatus },
+        body: { deliverable_id: deliverableId, status: newStatus },
       },
     );
-    await loadEntregables();
+    await loadDeliverables();
     await loadProject();
   } catch {
     // silent
@@ -838,33 +848,33 @@ async function changeEntregableStatus(entregableId: number, newStatus: string) {
 }
 
 // ─── Product Tracking ──────────────────────────────────────────────────────────
-const fechaLlegadaInput = ref('');
-const savingFechaLlegada = ref(false);
+const productArrivalInput = ref('');
+const savingProductArrival = ref(false);
 
 const showProductTracking = computed(() => {
   if (!isAdminOrEmployee.value || !project.value) return false;
   // Show when logistics implies shipping and arrival not yet registered
-  const logistica = project.value.logistica_producto_name?.toLowerCase() || '';
+  const logistics = project.value.product_logistics_name?.toLowerCase() || '';
   return (
-    (logistica.includes('envío') || logistica.includes('envio')) &&
-    !project.value.fecha_llegada_producto
+    (logistics.includes('envío') || logistics.includes('envio')) &&
+    !project.value.product_arrival_date
   );
 });
 
-async function saveFechaLlegada() {
-  if (!fechaLlegadaInput.value) return;
-  savingFechaLlegada.value = true;
+async function saveProductArrival() {
+  if (!productArrivalInput.value) return;
+  savingProductArrival.value = true;
   try {
     await $fetch(`${config.public.apiBase}/projects/${route.params.id}/`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${auth.accessToken}` },
-      body: { fecha_llegada_producto: fechaLlegadaInput.value },
+      body: { product_arrival_date: productArrivalInput.value },
     });
     await loadProject();
   } catch {
     // silent
   } finally {
-    savingFechaLlegada.value = false;
+    savingProductArrival.value = false;
   }
 }
 
@@ -903,18 +913,18 @@ async function submitOverride() {
 // ─── Mark as Published ─────────────────────────────────────────────────────────
 const publishingId = ref<number | null>(null);
 
-async function markAsPublished(entregableId: number) {
-  publishingId.value = entregableId;
+async function markAsPublished(deliverableId: number) {
+  publishingId.value = deliverableId;
   try {
     await $fetch(
       `${config.public.apiBase}/projects/${route.params.id}/mark_published/`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${auth.accessToken}` },
-        body: { entregable_id: entregableId },
+        body: { deliverable_id: deliverableId },
       },
     );
-    await loadEntregables();
+    await loadDeliverables();
     await loadProject();
   } catch {
     // silent
@@ -930,7 +940,7 @@ const showPickupConfirmation = computed(() => {
   if (!isAdminOrEmployee.value || !project.value) return false;
   return (
     project.value.status_name === 'Producto a Recoger' &&
-    project.value.devolucion_producto
+    project.value.product_return
   );
 });
 
@@ -959,11 +969,11 @@ onMounted(() => {
   }
 });
 
-// Load entregables when project loads
+// Load deliverables when project loads
 watch(
   () => project.value?.id,
   (id) => {
-    if (id) loadEntregables();
+    if (id) loadDeliverables();
   },
 );
 </script>
@@ -980,7 +990,7 @@ watch(
     <!-- Not found -->
     <div v-else-if="!project" class="text-center py-20">
       <p class="text-muted">Proyecto no encontrado</p>
-      <NuxtLink to="/proyectos" class="text-sm text-gold mt-4 inline-block"
+      <NuxtLink to="/projects" class="text-sm text-gold mt-4 inline-block"
         >← Volver a proyectos</NuxtLink
       >
     </div>
@@ -991,7 +1001,7 @@ watch(
       <div class="flex items-start justify-between mb-8">
         <div>
           <NuxtLink
-            to="/proyectos"
+            to="/projects"
             class="text-xs text-muted hover:text-gold transition-colors mb-2 inline-flex items-center gap-1"
           >
             <svg
@@ -1010,7 +1020,7 @@ watch(
             Proyectos
           </NuxtLink>
           <h1 class="text-2xl font-semibold text-ink mt-1">
-            {{ project.nombre }}
+            {{ project.name }}
           </h1>
           <div class="flex items-center gap-2 mt-1">
             <p class="text-sm text-muted">
@@ -1020,7 +1030,7 @@ watch(
             </p>
             <NuxtLink
               v-if="isAdminOrEmployee && project.client"
-              :to="`/dashboard/clientes/${project.client}`"
+              :to="`/dashboard/clients/${project.client}`"
               class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium text-gold border border-gold/30 hover:bg-gold/10 transition-all"
             >
               <svg
@@ -1119,7 +1129,7 @@ watch(
               >Nombre</label
             >
             <input
-              v-model="editForm.nombre"
+              v-model="editForm.name"
               type="text"
               class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
             />
@@ -1129,39 +1139,93 @@ watch(
               >Descripción</label
             >
             <textarea
-              v-model="editForm.descripcion"
+              v-model="editForm.description"
               rows="3"
               class="w-full px-3 py-2 rounded-lg border border-border/60 bg-white text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40 resize-none"
             />
           </div>
           <div>
             <label class="text-[11px] text-muted font-medium mb-1 block"
-              >Base imponible (€)</label
+              >Fee (€/contenido)</label
             >
             <input
-              v-model="editForm.base_imponible"
+              v-model="editForm.fee"
               type="number"
+              min="0"
               step="0.01"
               class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
             />
           </div>
           <div>
             <label class="text-[11px] text-muted font-medium mb-1 block"
-              >Impuestos (€)</label
+              >Nº de contenidos</label
             >
             <input
-              v-model="editForm.impuestos"
+              v-model="editForm.num_contents"
               type="number"
-              step="0.01"
+              min="0"
+              step="1"
               class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
             />
+          </div>
+          <div>
+            <label class="text-[11px] text-muted font-medium mb-1 block"
+              >Nº de perfiles</label
+            >
+            <input
+              v-model="editForm.num_profiles"
+              type="number"
+              min="0"
+              step="1"
+              class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
+            />
+          </div>
+          <div
+            class="md:col-span-2 flex flex-wrap items-center gap-4 rounded-lg border border-border/50 bg-white/60 px-3 py-2.5"
+          >
+            <label
+              class="flex items-center gap-2 text-xs text-ink cursor-pointer"
+            >
+              <input
+                v-model="editForm.gifting"
+                type="checkbox"
+                class="accent-[#c9a84c]"
+              />
+              Gifting
+            </label>
+            <label
+              class="flex items-center gap-2 text-xs cursor-pointer"
+              :class="editForm.gifting ? 'opacity-50' : 'text-ink'"
+            >
+              <input
+                v-model="editForm.discount_active"
+                type="checkbox"
+                :disabled="editForm.gifting"
+                class="accent-[#c9a84c]"
+              />
+              Descuento
+            </label>
+            <div
+              v-if="editForm.discount_active && !editForm.gifting"
+              class="flex items-center gap-2"
+            >
+              <input
+                v-model="editForm.discount_percentage"
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                class="w-20 h-8 px-2 rounded-lg border border-border/60 bg-white text-xs text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
+              />
+              <span class="text-xs text-muted">%</span>
+            </div>
           </div>
           <div>
             <label class="text-[11px] text-muted font-medium mb-1 block"
               >Fecha de venta</label
             >
             <input
-              v-model="editForm.fecha_venta"
+              v-model="editForm.sale_date"
               type="date"
               class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
             />
@@ -1171,7 +1235,7 @@ watch(
               >Fecha de servicio</label
             >
             <input
-              v-model="editForm.fecha_servicio"
+              v-model="editForm.service_date"
               type="date"
               class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
             />
@@ -1181,7 +1245,7 @@ watch(
               >Fecha fin</label
             >
             <input
-              v-model="editForm.fecha_fin"
+              v-model="editForm.end_date"
               type="date"
               class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
             />
@@ -1190,19 +1254,17 @@ watch(
             <label class="text-[11px] text-muted font-medium mb-1 block"
               >Estado</label
             >
-            <select
+            <BaseSelect
               v-model="editForm.status"
-              class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
-            >
-              <option :value="null">Sin estado</option>
-              <option
-                v-for="s in projectsStore.filters.statuses"
-                :key="s.id"
-                :value="s.id"
-              >
-                {{ s.nombre }}
-              </option>
-            </select>
+              size="sm"
+              :options="[
+                { value: null, label: 'Sin estado' },
+                ...projectsStore.filters.statuses.map((s) => ({
+                  value: s.id,
+                  label: s.name,
+                })),
+              ]"
+            />
           </div>
         </div>
 
@@ -1277,7 +1339,7 @@ watch(
                 @click="addEditDefinedCM(cm)"
               >
                 <span class="font-medium text-ink"
-                  >{{ cm.nombre }} {{ cm.apellidos }}</span
+                  >{{ cm.first_name }} {{ cm.last_name }}</span
                 >
                 <span v-if="cm.instagram_handle" class="text-muted ml-2 text-xs"
                   >@{{ cm.instagram_handle }}</span
@@ -1294,7 +1356,7 @@ watch(
                 class="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-border/40"
               >
                 <span class="text-xs text-ink font-medium"
-                  >{{ cm.nombre }}
+                  >{{ cm.name }}
                   <span v-if="cm.instagram_handle" class="text-muted"
                     >@{{ cm.instagram_handle }}</span
                   ></span
@@ -1335,7 +1397,7 @@ watch(
                 @click="addEditRecommendedCM(cm)"
               >
                 <span class="font-medium text-ink"
-                  >{{ cm.nombre }} {{ cm.apellidos }}</span
+                  >{{ cm.first_name }} {{ cm.last_name }}</span
                 >
                 <span v-if="cm.instagram_handle" class="text-muted ml-2 text-xs"
                   >@{{ cm.instagram_handle }}</span
@@ -1352,7 +1414,7 @@ watch(
                 class="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-border/40"
               >
                 <span class="text-xs text-ink font-medium"
-                  >{{ cm.nombre }}
+                  >{{ cm.name }}
                   <span v-if="cm.instagram_handle" class="text-muted"
                     >@{{ cm.instagram_handle }}</span
                   ></span
@@ -1402,91 +1464,181 @@ watch(
         </div>
       </div>
 
+      <!-- Top Info Cards -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Details Card -->
+        <div class="rounded-2xl border border-border/60 bg-white p-6 space-y-4">
+          <h2 class="text-sm font-semibold text-ink">Detalles del proyecto</h2>
+          <div class="space-y-3 text-xs">
+            <div class="flex justify-between">
+              <span class="text-muted">Tipo de servicio</span
+              ><span class="text-ink font-medium">{{
+                project.service_type_name || '—'
+              }}</span>
+            </div>
+            <div
+              v-if="project.social_networks && project.social_networks.length"
+              class="flex items-start justify-between gap-4"
+            >
+              <span class="text-muted pt-1">Red social</span>
+              <div class="flex flex-wrap justify-end gap-1.5">
+                <span
+                  v-for="red in project.social_networks"
+                  :key="red.id"
+                  class="inline-flex items-center rounded-full border border-border/60 bg-panel/50 px-2.5 py-1 text-[11px] font-medium text-ink"
+                  >{{ red.name }}</span
+                >
+              </div>
+            </div>
+            <div
+              v-if="project.formats && project.formats.length"
+              class="flex items-start justify-between gap-4"
+            >
+              <span class="text-muted pt-1">Formato</span>
+              <div class="flex flex-wrap justify-end gap-1.5">
+                <span
+                  v-for="fmt in project.formats"
+                  :key="fmt.id"
+                  class="inline-flex items-center rounded-full border border-gold/30 bg-gold/10 px-2.5 py-1 text-[11px] font-medium text-gold"
+                  >{{ fmt.name }}</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Propuesta económica Card -->
+        <div
+          v-if="!isContentMaker"
+          class="rounded-2xl border border-border/60 bg-white p-6 space-y-4"
+        >
+          <h2 class="text-sm font-semibold text-ink">Propuesta económica</h2>
+          <div class="space-y-3 text-xs">
+            <div class="flex justify-between">
+              <span class="text-muted">Fee</span
+              ><span class="text-ink font-medium"
+                >{{ Number(project.fee || 0).toFixed(2) }} €/contenido</span
+              >
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Nº de contenidos</span
+              ><span class="text-ink font-medium">{{
+                project.num_contents || 0
+              }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Nº de perfiles</span
+              ><span class="text-ink font-medium">{{
+                project.num_profiles || 0
+              }}</span>
+            </div>
+            <div v-if="project.gifting" class="flex justify-between">
+              <span class="text-muted">Modalidad</span>
+              <span
+                class="inline-flex items-center gap-1.5 text-gold font-medium"
+              >
+                <svg
+                  class="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
+                  />
+                </svg>
+                Gifting
+              </span>
+            </div>
+            <div
+              v-else-if="
+                project.discount_active &&
+                Number(project.discount_percentage) > 0
+              "
+              class="flex justify-between"
+            >
+              <span class="text-muted">Descuento</span
+              ><span class="text-gold font-medium"
+                >−{{ Number(project.discount_percentage) }}%</span
+              >
+            </div>
+            <div
+              class="flex justify-between items-center border-t border-border/40 pt-3"
+            >
+              <span class="text-muted font-medium">Total</span>
+              <span class="flex items-center gap-2">
+                <span
+                  v-if="
+                    project.gifting ||
+                    (project.discount_active &&
+                      Number(project.discount_percentage) > 0)
+                  "
+                  class="text-muted line-through decoration-red-400/70"
+                  >{{ Number(project.gross_price || 0).toFixed(2) }} €</span
+                >
+                <span
+                  class="font-bold"
+                  :class="
+                    project.gifting ||
+                    (project.discount_active &&
+                      Number(project.discount_percentage) > 0)
+                      ? 'text-gold'
+                      : 'text-ink'
+                  "
+                  >{{ Number(project.total_price || 0).toFixed(2) }} €</span
+                >
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dates Card -->
+        <div class="rounded-2xl border border-border/60 bg-white p-6 space-y-4">
+          <h2 class="text-sm font-semibold text-ink">Fechas</h2>
+          <div class="space-y-3 text-xs">
+            <div class="flex justify-between">
+              <span class="text-muted">Fecha de venta</span
+              ><span class="text-ink font-medium">{{
+                formatDate(project.sale_date)
+              }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Fecha de servicio</span
+              ><span class="text-ink font-medium">{{
+                formatDate(project.service_date)
+              }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Fecha fin</span
+              ><span class="text-ink font-medium">{{
+                formatDate(project.end_date)
+              }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Creado</span
+              ><span class="text-ink font-medium">{{
+                formatDate(project.created_at)
+              }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Info Grid -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         <!-- Main Content (left 2/3) -->
         <div class="lg:col-span-2 space-y-8">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Details Card -->
-            <div
-              class="rounded-2xl border border-border/60 bg-white p-6 space-y-4"
-            >
-              <h2 class="text-sm font-semibold text-ink">
-                Detalles del proyecto
-              </h2>
-              <div class="space-y-3 text-xs">
-                <div class="flex justify-between">
-                  <span class="text-muted">Tipo de servicio</span
-                  ><span class="text-ink font-medium">{{
-                    project.service_type_name || '—'
-                  }}</span>
-                </div>
-                <div v-if="!isContentMaker" class="flex justify-between">
-                  <span class="text-muted">Base imponible</span
-                  ><span class="text-ink font-medium"
-                    >{{ project.base_imponible }} €</span
-                  >
-                </div>
-                <div v-if="!isContentMaker" class="flex justify-between">
-                  <span class="text-muted">Impuestos</span
-                  ><span class="text-ink font-medium"
-                    >{{ project.impuestos }} €</span
-                  >
-                </div>
-                <div
-                  v-if="!isContentMaker"
-                  class="flex justify-between border-t border-border/40 pt-3"
-                >
-                  <span class="text-muted font-medium">Total</span
-                  ><span class="text-ink font-bold"
-                    >{{ project.precio_total }} €</span
-                  >
-                </div>
-              </div>
-            </div>
-
-            <!-- Dates Card -->
-            <div
-              class="rounded-2xl border border-border/60 bg-white p-6 space-y-4"
-            >
-              <h2 class="text-sm font-semibold text-ink">Fechas</h2>
-              <div class="space-y-3 text-xs">
-                <div class="flex justify-between">
-                  <span class="text-muted">Fecha de venta</span
-                  ><span class="text-ink font-medium">{{
-                    formatDate(project.fecha_venta)
-                  }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-muted">Fecha de servicio</span
-                  ><span class="text-ink font-medium">{{
-                    formatDate(project.fecha_servicio)
-                  }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-muted">Fecha fin</span
-                  ><span class="text-ink font-medium">{{
-                    formatDate(project.fecha_fin)
-                  }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-muted">Creado</span
-                  ><span class="text-ink font-medium">{{
-                    formatDate(project.created_at)
-                  }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <!-- Description -->
           <div
-            v-if="project.descripcion"
+            v-if="project.description"
             class="rounded-2xl border border-border/60 bg-white p-6"
           >
             <h2 class="text-sm font-semibold text-ink mb-3">Descripción</h2>
             <p class="text-sm text-muted leading-relaxed">
-              {{ project.descripcion }}
+              {{ project.description }}
             </p>
           </div>
 
@@ -1507,9 +1659,9 @@ watch(
                 >
                   <div class="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0">
                     <img
-                      v-if="cm.foto_url"
-                      :src="cm.foto_url"
-                      :alt="cm.nombre"
+                      v-if="cm.photo_url"
+                      :src="cm.photo_url"
+                      :alt="cm.name"
                       class="w-full h-full object-cover"
                     />
                     <div
@@ -1517,7 +1669,7 @@ watch(
                       class="w-full h-full bg-emerald-100 flex items-center justify-center text-[10px] font-bold text-emerald-600"
                     >
                       {{
-                        cm.nombre
+                        cm.name
                           ?.split(' ')
                           .map((n: string) => n[0])
                           .join('')
@@ -1529,7 +1681,7 @@ watch(
                     <p
                       class="text-sm font-medium text-ink hover:text-gold transition-colors"
                     >
-                      {{ cm.nombre }}
+                      {{ cm.name }}
                     </p>
                     <p class="text-[11px] text-emerald-600">
                       Asignada al proyecto
@@ -1565,9 +1717,9 @@ watch(
                 >
                   <div class="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0">
                     <img
-                      v-if="cm.foto_url"
-                      :src="cm.foto_url"
-                      :alt="cm.nombre"
+                      v-if="cm.photo_url"
+                      :src="cm.photo_url"
+                      :alt="cm.name"
                       class="w-full h-full object-cover"
                     />
                     <div
@@ -1575,7 +1727,7 @@ watch(
                       class="w-full h-full bg-amber-100 flex items-center justify-center text-[10px] font-bold text-amber-600"
                     >
                       {{
-                        cm.nombre
+                        cm.name
                           ?.split(' ')
                           .map((n: string) => n[0])
                           .join('')
@@ -1587,7 +1739,7 @@ watch(
                     <p
                       class="text-sm font-medium text-ink hover:text-gold transition-colors"
                     >
-                      {{ cm.nombre }}
+                      {{ cm.name }}
                     </p>
                     <p class="text-[11px] text-amber-600">
                       Pendiente de confirmación
@@ -1640,9 +1792,9 @@ watch(
                       class="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0"
                     >
                       <img
-                        v-if="cm.foto_url"
-                        :src="cm.foto_url"
-                        :alt="cm.nombre"
+                        v-if="cm.photo_url"
+                        :src="cm.photo_url"
+                        :alt="cm.name"
                         class="w-full h-full object-cover"
                       />
                       <div
@@ -1650,7 +1802,7 @@ watch(
                         class="w-full h-full bg-gold/10 flex items-center justify-center text-[10px] font-bold text-gold"
                       >
                         {{
-                          cm.nombre
+                          cm.name
                             ?.split(' ')
                             .map((n: string) => n[0])
                             .join('')
@@ -1662,14 +1814,14 @@ watch(
                       <p
                         class="text-xs font-medium text-ink hover:text-gold transition-colors"
                       >
-                        {{ cm.nombre }}
+                        {{ cm.name }}
                       </p>
                       <p
                         v-if="cm.instagram_handle"
                         class="text-[10px] text-muted"
                       >
                         @{{ cm.instagram_handle }} ·
-                        {{ cm.seguidores_instagram?.toLocaleString() }} seg.
+                        {{ cm.instagram_followers?.toLocaleString() }} seg.
                       </p>
                     </div>
                   </NuxtLink>
@@ -1737,9 +1889,9 @@ watch(
                 >
                   <div class="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
                     <img
-                      v-if="cm.foto_url"
-                      :src="cm.foto_url"
-                      :alt="cm.nombre"
+                      v-if="cm.photo_url"
+                      :src="cm.photo_url"
+                      :alt="cm.name"
                       class="w-full h-full object-cover"
                     />
                     <div
@@ -1747,7 +1899,7 @@ watch(
                       class="w-full h-full bg-panel flex items-center justify-center text-[10px] font-bold text-muted"
                     >
                       {{
-                        cm.nombre
+                        cm.name
                           ?.split(' ')
                           .map((n: string) => n[0])
                           .join('')
@@ -1759,7 +1911,7 @@ watch(
                     <p
                       class="text-xs font-medium text-ink hover:text-gold transition-colors"
                     >
-                      {{ cm.nombre }}
+                      {{ cm.name }}
                     </p>
                     <p
                       v-if="cm.instagram_handle"
@@ -1830,7 +1982,7 @@ watch(
                         </svg>
                       </div>
                       <p class="text-xs font-medium text-ink">
-                        Briefing para {{ cm.nombre }}
+                        Briefing para {{ cm.name }}
                       </p>
                     </div>
                     <button
@@ -1877,7 +2029,7 @@ watch(
                             class="flex-1 h-8 px-3 rounded-lg border border-border/60 bg-white text-xs text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
                           />
                           <input
-                            v-model="link.titulo"
+                            v-model="link.title"
                             type="text"
                             placeholder="Título (opcional)"
                             class="w-32 h-8 px-3 rounded-lg border border-border/60 bg-white text-xs text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
@@ -1919,8 +2071,8 @@ watch(
                           class="relative w-16 h-16 rounded-lg overflow-hidden border border-border/40 group"
                         >
                           <img
-                            :src="photo.imagen_url"
-                            :alt="photo.descripcion"
+                            :src="photo.image_url"
+                            :alt="photo.description"
                             class="w-full h-full object-cover"
                           />
                           <button
@@ -1953,7 +2105,7 @@ watch(
                         >Comentarios</label
                       >
                       <textarea
-                        v-model="editBriefingForm.comentarios"
+                        v-model="editBriefingForm.comments"
                         rows="3"
                         placeholder="Instrucciones, referencias, tono, estilo, etc."
                         class="w-full px-3 py-2 rounded-lg border border-border/60 bg-white text-sm text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40 resize-none"
@@ -2012,7 +2164,7 @@ watch(
                             :href="link.url"
                             target="_blank"
                             class="text-gold hover:underline truncate"
-                            >{{ link.titulo || link.url }}</a
+                            >{{ link.title || link.url }}</a
                           >
                         </div>
                       </div>
@@ -2027,23 +2179,23 @@ watch(
                           v-for="photo in getBriefing(cm.content_maker_id)
                             .photos"
                           :key="photo.id"
-                          :href="photo.imagen_url"
+                          :href="photo.image_url"
                           target="_blank"
                           class="aspect-square rounded-lg overflow-hidden border border-border/40 hover:border-gold/40 transition-all"
                         >
                           <img
-                            :src="photo.imagen_url"
-                            :alt="photo.descripcion"
+                            :src="photo.image_url"
+                            :alt="photo.description"
                             class="w-full h-full object-cover"
                           />
                         </a>
                       </div>
                     </div>
                     <!-- Comments -->
-                    <div v-if="getBriefing(cm.content_maker_id)?.comentarios">
+                    <div v-if="getBriefing(cm.content_maker_id)?.comments">
                       <span class="text-muted font-medium">Comentarios:</span>
                       <p class="text-ink mt-0.5 whitespace-pre-line">
-                        {{ getBriefing(cm.content_maker_id).comentarios }}
+                        {{ getBriefing(cm.content_maker_id).comments }}
                       </p>
                     </div>
                   </div>
@@ -2055,7 +2207,7 @@ watch(
                   class="rounded-xl border border-blue-200/50 bg-blue-50/30 p-4"
                 >
                   <p class="text-xs font-medium text-ink mb-3">
-                    Briefing para {{ cm.nombre }}
+                    Briefing para {{ cm.name }}
                   </p>
                   <div class="space-y-4">
                     <!-- Links -->
@@ -2088,7 +2240,7 @@ watch(
                             @focus="initBriefingForm(cm.content_maker_id)"
                           />
                           <input
-                            v-model="link.titulo"
+                            v-model="link.title"
                             type="text"
                             placeholder="Título (opcional)"
                             class="w-32 h-8 px-3 rounded-lg border border-border/60 bg-white text-xs text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
@@ -2128,7 +2280,7 @@ watch(
                       >
                       <textarea
                         :value="
-                          briefingForms[cm.content_maker_id]?.comentarios || ''
+                          briefingForms[cm.content_maker_id]?.comments || ''
                         "
                         rows="3"
                         placeholder="Instrucciones, referencias, tono, estilo, etc."
@@ -2136,7 +2288,7 @@ watch(
                         @focus="initBriefingForm(cm.content_maker_id)"
                         @input="
                           initBriefingForm(cm.content_maker_id);
-                          briefingForms[cm.content_maker_id].comentarios = (
+                          briefingForms[cm.content_maker_id].comments = (
                             $event.target as HTMLTextAreaElement
                           ).value;
                         "
@@ -2163,7 +2315,7 @@ watch(
                   class="rounded-xl border border-amber-200/50 bg-amber-50/30 p-4"
                 >
                   <p class="text-xs text-amber-700">
-                    Pendiente: briefing para {{ cm.nombre }} (el cliente debe
+                    Pendiente: briefing para {{ cm.name }} (el cliente debe
                     completarlo)
                   </p>
                 </div>
@@ -2199,15 +2351,15 @@ watch(
                   >Fecha de llegada</label
                 >
                 <input
-                  v-model="fechaLlegadaInput"
+                  v-model="productArrivalInput"
                   type="date"
                   class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
                 />
               </div>
               <button
-                :disabled="!fechaLlegadaInput || savingFechaLlegada"
+                :disabled="!productArrivalInput || savingProductArrival"
                 class="px-4 py-2 rounded-xl text-xs font-medium bg-gold text-white hover:bg-gold/90 shadow-gold-sm transition-all disabled:opacity-50"
-                @click="saveFechaLlegada"
+                @click="saveProductArrival"
               >
                 Registrar
               </button>
@@ -2265,65 +2417,6 @@ watch(
         <!-- Right Sidebar: Status & Roadmap -->
         <div class="lg:col-span-1">
           <div class="sticky top-8 space-y-5">
-            <!-- Status Card -->
-            <div class="rounded-2xl border border-border/60 bg-white p-5">
-              <!-- Current Status -->
-              <div class="flex items-center justify-between mb-4">
-                <h3
-                  class="text-xs font-semibold text-muted uppercase tracking-wide"
-                >
-                  Estado actual
-                </h3>
-                <div
-                  v-if="project.retrasado"
-                  class="flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 border border-red-200"
-                >
-                  <div
-                    class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"
-                  />
-                  <span class="text-[10px] font-medium text-red-700"
-                    >Retrasado</span
-                  >
-                </div>
-              </div>
-              <div class="flex items-center gap-3 mb-4">
-                <div
-                  class="w-10 h-10 rounded-xl flex items-center justify-center bg-gold/10"
-                >
-                  <svg
-                    class="w-5 h-5 text-gold"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-base font-semibold text-ink">
-                    {{ project.status_name || 'Sin estado' }}
-                  </p>
-                  <p v-if="project.is_draft" class="text-[11px] text-muted">
-                    Borrador
-                  </p>
-                </div>
-              </div>
-
-              <!-- Override button (admin only) -->
-              <button
-                v-if="isAdminOrEmployee && !isEditing"
-                class="w-full px-3 py-2 rounded-xl text-xs font-medium border border-border/60 text-muted hover:text-ink hover:border-ink/20 transition-all text-center"
-                @click="showOverrideModal = true"
-              >
-                Cambiar estado manualmente
-              </button>
-            </div>
-
             <!-- Roadmap Card -->
             <div
               v-if="pipelineSteps.length && !project.is_draft"
@@ -2434,7 +2527,7 @@ watch(
               </div>
               <NuxtLink
                 v-if="project.client"
-                :to="`/dashboard/clientes/${project.client}`"
+                :to="`/dashboard/clients/${project.client}`"
                 class="mt-3 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-medium border border-border/60 text-muted hover:text-ink hover:border-ink/20 transition-all"
               >
                 <svg
@@ -2459,23 +2552,23 @@ watch(
       </div>
       <!-- end grid -->
 
-      <!-- Entregables Section (full width) -->
+      <!-- Deliverables Section (full width) -->
       <div
-        v-if="showEntregables || canUploadEntregable"
+        v-if="showDeliverables || canUploadDeliverable"
         class="rounded-2xl border border-border/60 bg-white p-6 mt-8"
       >
         <div class="flex items-center justify-between mb-5">
           <h2 class="text-sm font-semibold text-ink">Entregables</h2>
-          <span v-if="entregables.length" class="text-[11px] text-muted"
-            >{{ entregables.length }} archivo{{
-              entregables.length !== 1 ? 's' : ''
+          <span v-if="deliverables.length" class="text-[11px] text-muted"
+            >{{ deliverables.length }} archivo{{
+              deliverables.length !== 1 ? 's' : ''
             }}</span
           >
         </div>
 
         <!-- Upload form (CM only) -->
         <div
-          v-if="canUploadEntregable"
+          v-if="canUploadDeliverable"
           class="rounded-xl border border-blue-200/50 bg-blue-50/30 p-4 mb-5"
         >
           <p class="text-xs font-medium text-ink mb-3">Subir entregable</p>
@@ -2495,7 +2588,7 @@ watch(
                 >Descripción (opcional)</label
               >
               <input
-                v-model="uploadDescripcion"
+                v-model="uploadDescription"
                 type="text"
                 placeholder="Describe brevemente el contenido..."
                 class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
@@ -2504,7 +2597,7 @@ watch(
             <button
               :disabled="!uploadFile || uploading"
               class="px-4 py-2 rounded-xl text-xs font-medium bg-gold text-white hover:bg-gold/90 shadow-gold-sm transition-all disabled:opacity-50 whitespace-nowrap"
-              @click="uploadEntregable"
+              @click="uploadDeliverable"
             >
               {{ uploading ? 'Subiendo...' : 'Subir' }}
             </button>
@@ -2512,7 +2605,7 @@ watch(
         </div>
 
         <!-- Entregables Table -->
-        <div v-if="entregables.length" class="overflow-x-auto">
+        <div v-if="deliverables.length" class="overflow-x-auto">
           <table class="w-full text-xs">
             <thead>
               <tr class="border-b border-border/60">
@@ -2537,16 +2630,14 @@ watch(
               </tr>
             </thead>
             <tbody class="divide-y divide-border/40">
-              <template v-for="ent in entregables" :key="ent.id">
+              <template v-for="ent in deliverables" :key="ent.id">
                 <tr class="hover:bg-panel/30 transition-colors">
                   <!-- Type -->
                   <td class="py-3 px-3">
                     <div class="flex items-center gap-2">
                       <div
                         class="w-7 h-7 rounded-lg flex items-center justify-center"
-                        :class="
-                          FILE_TYPE_CONFIG[getFileType(ent.archivo)].color
-                        "
+                        :class="FILE_TYPE_CONFIG[getFileType(ent.file)].color"
                       >
                         <svg
                           class="w-3.5 h-3.5"
@@ -2558,12 +2649,12 @@ watch(
                           <path
                             stroke-linecap="round"
                             stroke-linejoin="round"
-                            :d="FILE_TYPE_CONFIG[getFileType(ent.archivo)].icon"
+                            :d="FILE_TYPE_CONFIG[getFileType(ent.file)].icon"
                           />
                         </svg>
                       </div>
                       <span class="text-[11px] font-medium text-ink">{{
-                        FILE_TYPE_CONFIG[getFileType(ent.archivo)].label
+                        FILE_TYPE_CONFIG[getFileType(ent.file)].label
                       }}</span>
                     </div>
                   </td>
@@ -2573,8 +2664,8 @@ watch(
                       class="text-xs text-ink font-medium truncate max-w-[200px]"
                     >
                       {{
-                        ent.descripcion ||
-                        ent.archivo?.split('/').pop() ||
+                        ent.description ||
+                        ent.file?.split('/').pop() ||
                         'Sin título'
                       }}
                     </p>
@@ -2633,32 +2724,29 @@ watch(
                   <td class="py-3 px-3">
                     <div class="flex items-center gap-1.5">
                       <!-- Admin/Employee: dropdown to change status -->
-                      <select
+                      <BaseSelect
                         v-if="isAdminOrEmployee"
-                        :value="ent.status"
-                        class="text-[10px] px-2 py-0.5 rounded-md font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-gold/20"
-                        :class="{
-                          'bg-emerald-100 text-emerald-700 border-emerald-200':
-                            ent.status === 'approved',
-                          'bg-amber-100 text-amber-700 border-amber-200':
-                            ent.status === 'pending',
-                          'bg-orange-100 text-orange-700 border-orange-200':
-                            ent.status === 'revision',
-                          'bg-red-100 text-red-700 border-red-200':
-                            ent.status === 'rejected',
-                        }"
-                        @change="
-                          changeEntregableStatus(
-                            ent.id,
-                            ($event.target as HTMLSelectElement).value,
-                          )
+                        variant="pill"
+                        :model-value="ent.status"
+                        :trigger-class="
+                          ent.status === 'approved'
+                            ? '!bg-emerald-100 !text-emerald-700 !border-emerald-200'
+                            : ent.status === 'pending'
+                              ? '!bg-amber-100 !text-amber-700 !border-amber-200'
+                              : ent.status === 'revision'
+                                ? '!bg-orange-100 !text-orange-700 !border-orange-200'
+                                : '!bg-red-100 !text-red-700 !border-red-200'
                         "
-                      >
-                        <option value="pending">Pendiente</option>
-                        <option value="approved">Aprobado</option>
-                        <option value="revision">Revisión</option>
-                        <option value="rejected">Rechazado</option>
-                      </select>
+                        :options="[
+                          { value: 'pending', label: 'Pendiente' },
+                          { value: 'approved', label: 'Aprobado' },
+                          { value: 'revision', label: 'Revisión' },
+                          { value: 'rejected', label: 'Rechazado' },
+                        ]"
+                        @change="
+                          changeDeliverableStatus(ent.id, $event as string)
+                        "
+                      />
                       <!-- Others: static badge -->
                       <span
                         v-else
@@ -2695,7 +2783,7 @@ watch(
                     <div class="flex items-center justify-end gap-1">
                       <!-- View -->
                       <a
-                        :href="ent.archivo"
+                        :href="ent.file"
                         target="_blank"
                         class="p-1.5 rounded-lg hover:bg-panel transition-colors"
                         title="Ver"
@@ -2721,7 +2809,7 @@ watch(
                       </a>
                       <!-- Download -->
                       <a
-                        :href="ent.archivo"
+                        :href="ent.file"
                         download
                         class="p-1.5 rounded-lg hover:bg-panel transition-colors"
                         title="Descargar"
@@ -2794,7 +2882,7 @@ watch(
                         :disabled="deletingId === ent.id"
                         class="p-1.5 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
                         title="Eliminar"
-                        @click="deleteEntregable(ent.id)"
+                        @click="deleteDeliverable(ent.id)"
                       >
                         <svg
                           class="w-4 h-4 text-red-400 hover:text-red-600"
@@ -2973,7 +3061,7 @@ watch(
             <!-- Show the revision notes for context -->
             <div
               v-if="
-                entregables.find((e) => e.id === reuploadingId)?.revision_notes
+                deliverables.find((e) => e.id === reuploadingId)?.revision_notes
               "
               class="mb-3 rounded-lg border border-orange-200/60 bg-white p-3"
             >
@@ -2982,7 +3070,7 @@ watch(
               </p>
               <p class="text-xs text-ink whitespace-pre-line">
                 {{
-                  entregables.find((e) => e.id === reuploadingId)
+                  deliverables.find((e) => e.id === reuploadingId)
                     ?.revision_notes
                 }}
               </p>
@@ -2998,7 +3086,7 @@ watch(
               <button
                 :disabled="!reuploadFile || actionLoading"
                 class="px-4 py-2 rounded-xl text-xs font-medium bg-gold text-white hover:bg-gold/90 shadow-gold-sm transition-all disabled:opacity-50"
-                @click="reuploadEntregable(reuploadingId)"
+                @click="reuploadDeliverable(reuploadingId)"
               >
                 Subir
               </button>
@@ -3064,8 +3152,8 @@ watch(
           </div>
         </div>
 
-        <!-- No entregables yet -->
-        <div v-else-if="!canUploadEntregable" class="text-center py-8">
+        <!-- No deliverables yet -->
+        <div v-else-if="!canUploadDeliverable" class="text-center py-8">
           <svg
             class="w-10 h-10 mx-auto text-muted/30 mb-3"
             fill="none"
@@ -3182,7 +3270,7 @@ watch(
                 </svg>
               </button>
               <h3 class="text-sm font-semibold text-ink">
-                {{ selectedCMProfile.nombre }}
+                {{ selectedCMProfile.name }}
               </h3>
             </div>
             <button
@@ -3260,9 +3348,9 @@ watch(
                   class="aspect-square rounded-xl overflow-hidden border border-border/40 group-hover:border-gold/60 group-hover:shadow-md transition-all"
                 >
                   <img
-                    v-if="cm.foto_url"
-                    :src="cm.foto_url"
-                    :alt="cm.nombre"
+                    v-if="cm.photo_url"
+                    :src="cm.photo_url"
+                    :alt="cm.name"
                     class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   <div
@@ -3270,7 +3358,7 @@ watch(
                     class="w-full h-full bg-gradient-to-br from-gold/10 to-gold/5 flex items-center justify-center"
                   >
                     <span class="text-lg font-bold text-gold/60">{{
-                      cm.nombre
+                      cm.name
                         ?.split(' ')
                         .map((n: string) => n[0])
                         .join('')
@@ -3281,7 +3369,7 @@ watch(
                 <p
                   class="mt-1.5 text-[11px] font-medium text-ink text-center truncate group-hover:text-gold transition-colors"
                 >
-                  {{ cm.nombre }}
+                  {{ cm.name }}
                 </p>
               </div>
             </div>
@@ -3300,9 +3388,9 @@ watch(
                 class="w-32 h-32 rounded-2xl overflow-hidden border-2 border-gold/20 shadow-lg"
               >
                 <img
-                  v-if="selectedCMProfile.foto_url"
-                  :src="selectedCMProfile.foto_url"
-                  :alt="selectedCMProfile.nombre"
+                  v-if="selectedCMProfile.photo_url"
+                  :src="selectedCMProfile.photo_url"
+                  :alt="selectedCMProfile.name"
                   class="w-full h-full object-cover"
                 />
                 <div
@@ -3310,7 +3398,7 @@ watch(
                   class="w-full h-full bg-gradient-to-br from-gold/10 to-gold/5 flex items-center justify-center"
                 >
                   <span class="text-3xl font-bold text-gold/60">{{
-                    selectedCMProfile.nombre
+                    selectedCMProfile.name
                       ?.split(' ')
                       .map((n: string) => n[0])
                       .join('')
@@ -3322,7 +3410,7 @@ watch(
               <!-- Name -->
               <div>
                 <h4 class="text-lg font-semibold text-ink">
-                  {{ selectedCMProfile.nombre }}
+                  {{ selectedCMProfile.name }}
                 </h4>
                 <p
                   v-if="selectedCMProfile.instagram_handle"
@@ -3334,7 +3422,7 @@ watch(
 
               <!-- Stats -->
               <div
-                v-if="selectedCMProfile.seguidores_instagram"
+                v-if="selectedCMProfile.instagram_followers"
                 class="flex items-center gap-1 text-sm text-muted"
               >
                 <svg
@@ -3352,7 +3440,7 @@ watch(
                 </svg>
                 <span
                   >{{
-                    selectedCMProfile.seguidores_instagram?.toLocaleString()
+                    selectedCMProfile.instagram_followers?.toLocaleString()
                   }}
                   seguidores</span
                 >
@@ -3412,19 +3500,18 @@ watch(
               <label class="text-[11px] text-muted font-medium mb-1 block"
                 >Nuevo estado</label
               >
-              <select
+              <BaseSelect
                 v-model="overrideStatus"
-                class="w-full h-9 px-3 rounded-lg border border-border/60 bg-white text-sm text-ink focus:outline-none focus:ring-2 focus:ring-gold/20 focus:border-gold/40"
-              >
-                <option value="">Selecciona un estado</option>
-                <option
-                  v-for="s in projectsStore.filters.statuses"
-                  :key="s.id"
-                  :value="s.nombre"
-                >
-                  {{ s.nombre }}
-                </option>
-              </select>
+                size="sm"
+                placeholder="Selecciona un estado"
+                :options="[
+                  { value: '', label: 'Selecciona un estado' },
+                  ...projectsStore.filters.statuses.map((s) => ({
+                    value: s.name,
+                    label: s.name,
+                  })),
+                ]"
+              />
             </div>
             <div>
               <label class="text-[11px] text-muted font-medium mb-1 block"

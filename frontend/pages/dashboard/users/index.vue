@@ -132,16 +132,24 @@ onMounted(() => fetchUsers());
 
     <!-- Filters -->
     <div class="flex flex-wrap items-center gap-3 animate-fade-up delay-100">
-      <select v-model="filterRole" class="select-field min-w-[180px] max-w-[200px]">
-        <option value="">Todos los roles</option>
-        <option v-for="r in visibleRoles" :key="r" :value="r">{{ ROLE_LABELS[r] }}</option>
-      </select>
+      <BaseSelect
+        v-model="filterRole"
+        class="min-w-[180px] max-w-[200px]"
+        :options="[
+          { value: '', label: 'Todos los roles' },
+          ...visibleRoles.map((r) => ({ value: r, label: ROLE_LABELS[r] })),
+        ]"
+      />
 
-      <select v-model="filterStatus" class="select-field min-w-[180px] max-w-[200px]">
-        <option value="">Todos los estados</option>
-        <option value="active">Activos</option>
-        <option value="inactive">Inactivos</option>
-      </select>
+      <BaseSelect
+        v-model="filterStatus"
+        class="min-w-[180px] max-w-[200px]"
+        :options="[
+          { value: '', label: 'Todos los estados' },
+          { value: 'active', label: 'Activos' },
+          { value: 'inactive', label: 'Inactivos' },
+        ]"
+      />
 
       <button
         v-if="filterRole || filterStatus"

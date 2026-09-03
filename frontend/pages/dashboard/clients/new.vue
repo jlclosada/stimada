@@ -9,21 +9,21 @@ const router = useRouter();
 onMounted(() => store.fetchTypes());
 
 const form = reactive({
-  nombre_cliente: '',
-  tipo_cliente: '' as string | number,
+  name: '',
+  client_type: '' as string | number,
   web_instagram: '',
-  persona_contacto: '',
-  email_contacto: '',
-  telefono: '',
-  es_agencia: false,
-  nombre_facturacion: '',
+  contact_person: '',
+  contact_email: '',
+  phone: '',
+  is_agency: false,
+  billing_name: '',
   cif: '',
-  email_facturacion: '',
-  direccion_facturacion: '',
-  codigo_postal: '',
-  ciudad: '',
-  pais: 'España',
-  contrato_firmado: false,
+  billing_email: '',
+  billing_address: '',
+  postal_code: '',
+  city: '',
+  country: 'España',
+  contract_signed: false,
 });
 
 const contratoFile = ref<File | null>(null);
@@ -36,8 +36,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SECTION_VALIDATORS: Record<string, () => Record<string, string>> = {
   identificacion: () => {
     const e: Record<string, string> = {};
-    if (!form.nombre_cliente.trim())
-      e.nombre_cliente = 'El nombre comercial es obligatorio.';
+    if (!form.name.trim()) e.name = 'El nombre comercial es obligatorio.';
     if (
       form.web_instagram &&
       !/^https?:\/\/.+/i.test(form.web_instagram.trim())
@@ -48,31 +47,30 @@ const SECTION_VALIDATORS: Record<string, () => Record<string, string>> = {
   },
   contacto: () => {
     const e: Record<string, string> = {};
-    if (!form.persona_contacto.trim())
-      e.persona_contacto = 'La persona de contacto es obligatoria.';
-    if (!form.email_contacto.trim()) {
-      e.email_contacto = 'El email de contacto es obligatorio.';
-    } else if (!EMAIL_RE.test(form.email_contacto.trim())) {
-      e.email_contacto = 'Introduce un email válido (ej: nombre@dominio.com).';
+    if (!form.contact_person.trim())
+      e.contact_person = 'La persona de contacto es obligatoria.';
+    if (!form.contact_email.trim()) {
+      e.contact_email = 'El email de contacto es obligatorio.';
+    } else if (!EMAIL_RE.test(form.contact_email.trim())) {
+      e.contact_email = 'Introduce un email válido (ej: nombre@dominio.com).';
     }
     return e;
   },
   facturacion: () => {
     const e: Record<string, string> = {};
-    if (!form.nombre_facturacion.trim())
-      e.nombre_facturacion = 'El nombre de facturación es obligatorio.';
+    if (!form.billing_name.trim())
+      e.billing_name = 'El nombre de facturación es obligatorio.';
     if (!form.cif.trim()) e.cif = 'El CIF es obligatorio.';
-    if (!form.email_facturacion.trim()) {
-      e.email_facturacion = 'El email de facturación es obligatorio.';
-    } else if (!EMAIL_RE.test(form.email_facturacion.trim())) {
-      e.email_facturacion =
-        'Introduce un email válido (ej: facturas@dominio.com).';
+    if (!form.billing_email.trim()) {
+      e.billing_email = 'El email de facturación es obligatorio.';
+    } else if (!EMAIL_RE.test(form.billing_email.trim())) {
+      e.billing_email = 'Introduce un email válido (ej: facturas@dominio.com).';
     }
-    if (!form.direccion_facturacion.trim())
-      e.direccion_facturacion = 'La dirección es obligatoria.';
-    if (!form.codigo_postal.trim())
-      e.codigo_postal = 'El código postal es obligatorio.';
-    if (!form.ciudad.trim()) e.ciudad = 'La ciudad es obligatoria.';
+    if (!form.billing_address.trim())
+      e.billing_address = 'La dirección es obligatoria.';
+    if (!form.postal_code.trim())
+      e.postal_code = 'El código postal es obligatorio.';
+    if (!form.city.trim()) e.city = 'La ciudad es obligatoria.';
     return e;
   },
   marcas: () => ({}),
@@ -141,10 +139,10 @@ async function handleSubmit() {
         fd.append(k, String(v));
       }
     });
-    if (contratoFile.value) fd.append('contrato', contratoFile.value);
+    if (contratoFile.value) fd.append('contract', contratoFile.value);
 
     await store.create(fd);
-    await router.push('/dashboard/clientes');
+    await router.push('/dashboard/clients');
   } catch (err: unknown) {
     const e = err as { data?: Record<string, string[]> };
     if (e?.data) {
@@ -153,19 +151,19 @@ async function handleSubmit() {
       });
       // Jump to the first section that contains a field with an error.
       const sectionByField: Record<string, string> = {
-        nombre_cliente: 'identificacion',
-        tipo_cliente: 'identificacion',
+        name: 'identificacion',
+        client_type: 'identificacion',
         web_instagram: 'identificacion',
-        persona_contacto: 'contacto',
-        email_contacto: 'contacto',
-        telefono: 'contacto',
-        nombre_facturacion: 'facturacion',
+        contact_person: 'contacto',
+        contact_email: 'contacto',
+        phone: 'contacto',
+        billing_name: 'facturacion',
         cif: 'facturacion',
-        email_facturacion: 'facturacion',
-        direccion_facturacion: 'facturacion',
-        codigo_postal: 'facturacion',
-        ciudad: 'facturacion',
-        pais: 'facturacion',
+        billing_email: 'facturacion',
+        billing_address: 'facturacion',
+        postal_code: 'facturacion',
+        city: 'facturacion',
+        country: 'facturacion',
       };
       const firstField = Object.keys(e.data)[0];
       if (firstField && sectionByField[firstField]) {
@@ -191,16 +189,16 @@ const activeSection = ref('identificacion');
 
 // Fields that belong to each section (used to filter the error banner).
 const SECTION_FIELDS: Record<string, string[]> = {
-  identificacion: ['nombre_cliente', 'tipo_cliente', 'web_instagram'],
-  contacto: ['persona_contacto', 'email_contacto', 'telefono'],
+  identificacion: ['name', 'client_type', 'web_instagram'],
+  contacto: ['contact_person', 'contact_email', 'phone'],
   facturacion: [
-    'nombre_facturacion',
+    'billing_name',
     'cif',
-    'email_facturacion',
-    'direccion_facturacion',
-    'codigo_postal',
-    'ciudad',
-    'pais',
+    'billing_email',
+    'billing_address',
+    'postal_code',
+    'city',
+    'country',
   ],
   marcas: [],
   contrato: [],
@@ -220,7 +218,7 @@ const currentSectionErrors = computed(() => {
     <!-- Header -->
     <div class="flex items-center gap-3 mb-7">
       <NuxtLink
-        to="/dashboard/clientes"
+        to="/dashboard/clients"
         class="flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors"
       >
         <svg
@@ -296,28 +294,30 @@ const currentSectionErrors = computed(() => {
               >Nombre comercial del cliente *</label
             >
             <input
-              v-model="form.nombre_cliente"
+              v-model="form.name"
               type="text"
               required
               class="input-field"
               placeholder="Ej: Brand Company S.L."
             />
-            <p v-if="errors.nombre_cliente" class="text-xs text-red-400 mt-1">
-              {{ errors.nombre_cliente }}
+            <p v-if="errors.name" class="text-xs text-red-400 mt-1">
+              {{ errors.name }}
             </p>
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5"
               >Tipo de cliente</label
             >
-            <select v-model="form.tipo_cliente" class="select-field">
-              <option value="">Seleccionar tipo…</option>
-              <option v-for="t in store.types" :key="t.id" :value="t.id">
-                {{ t.nombre }}
-              </option>
-            </select>
-            <p v-if="errors.tipo_cliente" class="text-xs text-red-400 mt-1">
-              {{ errors.tipo_cliente }}
+            <BaseSelect
+              v-model="form.client_type"
+              placeholder="Seleccionar tipo…"
+              :options="[
+                { value: '', label: 'Seleccionar tipo…' },
+                ...store.types.map((t) => ({ value: t.id, label: t.name })),
+              ]"
+            />
+            <p v-if="errors.client_type" class="text-xs text-red-400 mt-1">
+              {{ errors.client_type }}
             </p>
           </div>
           <div>
@@ -339,14 +339,14 @@ const currentSectionErrors = computed(() => {
               <div
                 class="w-5 h-5 rounded-md border flex-shrink-0 flex items-center justify-center transition-colors"
                 :class="
-                  form.es_agencia
+                  form.is_agency
                     ? 'bg-gold border-gold'
                     : 'border-border group-hover:border-subtle'
                 "
-                @click="form.es_agencia = !form.es_agencia"
+                @click="form.is_agency = !form.is_agency"
               >
                 <svg
-                  v-if="form.es_agencia"
+                  v-if="form.is_agency"
                   class="w-3 h-3 text-ink"
                   fill="none"
                   stroke="currentColor"
@@ -396,13 +396,13 @@ const currentSectionErrors = computed(() => {
               >Persona de contacto *</label
             >
             <input
-              v-model="form.persona_contacto"
+              v-model="form.contact_person"
               type="text"
               class="input-field"
               placeholder="Nombre y apellidos"
             />
-            <p v-if="errors.persona_contacto" class="text-xs text-red-400 mt-1">
-              {{ errors.persona_contacto }}
+            <p v-if="errors.contact_person" class="text-xs text-red-400 mt-1">
+              {{ errors.contact_person }}
             </p>
           </div>
           <div>
@@ -410,13 +410,13 @@ const currentSectionErrors = computed(() => {
               >Email de contacto *</label
             >
             <input
-              v-model="form.email_contacto"
+              v-model="form.contact_email"
               type="text"
               class="input-field"
               placeholder="contacto@empresa.com"
             />
-            <p v-if="errors.email_contacto" class="text-xs text-red-400 mt-1">
-              {{ errors.email_contacto }}
+            <p v-if="errors.contact_email" class="text-xs text-red-400 mt-1">
+              {{ errors.contact_email }}
             </p>
           </div>
           <div>
@@ -424,7 +424,7 @@ const currentSectionErrors = computed(() => {
               >Teléfono</label
             >
             <input
-              v-model="form.telefono"
+              v-model="form.phone"
               type="text"
               class="input-field"
               placeholder="+34 600 000 000"
@@ -460,17 +460,14 @@ const currentSectionErrors = computed(() => {
               >Nombre de facturación *</label
             >
             <input
-              v-model="form.nombre_facturacion"
+              v-model="form.billing_name"
               type="text"
               required
               class="input-field"
               placeholder="Razón social"
             />
-            <p
-              v-if="errors.nombre_facturacion"
-              class="text-xs text-red-400 mt-1"
-            >
-              {{ errors.nombre_facturacion }}
+            <p v-if="errors.billing_name" class="text-xs text-red-400 mt-1">
+              {{ errors.billing_name }}
             </p>
           </div>
           <div>
@@ -493,17 +490,14 @@ const currentSectionErrors = computed(() => {
               >Email de facturación *</label
             >
             <input
-              v-model="form.email_facturacion"
+              v-model="form.billing_email"
               type="text"
               required
               class="input-field"
               placeholder="facturas@empresa.com"
             />
-            <p
-              v-if="errors.email_facturacion"
-              class="text-xs text-red-400 mt-1"
-            >
-              {{ errors.email_facturacion }}
+            <p v-if="errors.billing_email" class="text-xs text-red-400 mt-1">
+              {{ errors.billing_email }}
             </p>
           </div>
           <div class="col-span-2">
@@ -511,17 +505,14 @@ const currentSectionErrors = computed(() => {
               >Dirección de facturación *</label
             >
             <input
-              v-model="form.direccion_facturacion"
+              v-model="form.billing_address"
               type="text"
               required
               class="input-field"
               placeholder="Calle, número, piso…"
             />
-            <p
-              v-if="errors.direccion_facturacion"
-              class="text-xs text-red-400 mt-1"
-            >
-              {{ errors.direccion_facturacion }}
+            <p v-if="errors.billing_address" class="text-xs text-red-400 mt-1">
+              {{ errors.billing_address }}
             </p>
           </div>
           <div>
@@ -529,14 +520,14 @@ const currentSectionErrors = computed(() => {
               >Código postal *</label
             >
             <input
-              v-model="form.codigo_postal"
+              v-model="form.postal_code"
               type="text"
               required
               class="input-field"
               placeholder="28001"
             />
-            <p v-if="errors.codigo_postal" class="text-xs text-red-400 mt-1">
-              {{ errors.codigo_postal }}
+            <p v-if="errors.postal_code" class="text-xs text-red-400 mt-1">
+              {{ errors.postal_code }}
             </p>
           </div>
           <div>
@@ -544,21 +535,21 @@ const currentSectionErrors = computed(() => {
               >Ciudad *</label
             >
             <input
-              v-model="form.ciudad"
+              v-model="form.city"
               type="text"
               required
               class="input-field"
               placeholder="Madrid"
             />
-            <p v-if="errors.ciudad" class="text-xs text-red-400 mt-1">
-              {{ errors.ciudad }}
+            <p v-if="errors.city" class="text-xs text-red-400 mt-1">
+              {{ errors.city }}
             </p>
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5"
               >País</label
             >
-            <input v-model="form.pais" type="text" class="input-field" />
+            <input v-model="form.country" type="text" class="input-field" />
           </div>
         </div>
         <div class="flex justify-between pt-2">
@@ -615,7 +606,7 @@ const currentSectionErrors = computed(() => {
             de Marcas.
           </p>
           <NuxtLink
-            to="/dashboard/marcas"
+            to="/dashboard/brands"
             class="inline-flex items-center gap-1.5 text-xs text-gold hover:text-gold/80 transition-colors mt-2"
           >
             Ir a Marcas
@@ -662,14 +653,14 @@ const currentSectionErrors = computed(() => {
           <div
             class="w-5 h-5 rounded-md border flex-shrink-0 flex items-center justify-center transition-colors"
             :class="
-              form.contrato_firmado
+              form.contract_signed
                 ? 'bg-gold border-gold'
                 : 'border-border group-hover:border-subtle'
             "
-            @click="form.contrato_firmado = !form.contrato_firmado"
+            @click="form.contract_signed = !form.contract_signed"
           >
             <svg
-              v-if="form.contrato_firmado"
+              v-if="form.contract_signed"
               class="w-3 h-3 text-ink"
               fill="none"
               stroke="currentColor"

@@ -3,22 +3,22 @@ import { useAuthStore } from '~/stores/auth';
 
 export interface ClientType {
   id: number;
-  nombre: string;
+  name: string;
   slug: string;
 }
 
 export interface ClientProfile {
   id: number;
-  cliente_id: string;
-  nombre_cliente: string;
-  tipo_nombre: string | null;
+  client_id: string;
+  name: string;
+  type_name: string | null;
   cif: string;
-  ciudad: string;
-  pais: string;
-  contrato_firmado: boolean;
-  es_agencia: boolean;
-  estado: string;
-  semaforo_cliente: number | null;
+  city: string;
+  country: string;
+  contract_signed: boolean;
+  is_agency: boolean;
+  status: string;
+  traffic_light: number | null;
   has_account: boolean;
   created_by_name: string | null;
   created_at: string;
@@ -27,28 +27,28 @@ export interface ClientProfile {
 export interface ClientBrand {
   id: number;
   brand_id: string;
-  nombre: string;
-  tipo_marca_nombre: string | null;
+  name: string;
+  brand_type_name: string | null;
   web_instagram: string;
-  estado: string;
+  status: string;
 }
 
 export interface ClientProfileDetail extends ClientProfile {
-  tipo_cliente: number | null;
+  client_type: number | null;
   web_instagram: string;
-  persona_contacto: string;
-  email_contacto: string;
-  telefono: string;
-  nombre_facturacion: string;
-  email_facturacion: string;
-  direccion_facturacion: string;
-  codigo_postal: string;
-  contrato_url: string | null;
-  notas_internas: string;
+  contact_person: string;
+  contact_email: string;
+  phone: string;
+  billing_name: string;
+  billing_email: string;
+  billing_address: string;
+  postal_code: string;
+  contract_url: string | null;
+  internal_notes: string;
   user_email: string | null;
   user_name: string | null;
   has_account: boolean;
-  marcas: ClientBrand[];
+  brands: ClientBrand[];
 }
 
 export const useClientsStore = defineStore('clients', {
@@ -165,8 +165,8 @@ export const useClientsStore = defineStore('clients', {
 
     async createBrand(data: {
       client: number;
-      nombre: string;
-      tipo_marca?: number | null;
+      name: string;
+      brand_type?: number | null;
       web_instagram?: string;
     }): Promise<ClientBrand> {
       const auth = useAuthStore();

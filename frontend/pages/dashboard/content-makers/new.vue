@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAuthStore } from '~/stores/auth';
-import type { DesempenoOption } from '~/stores/contentMakers';
+import type { PerformanceOption } from '~/stores/contentMakers';
 import { useContentMakersStore } from '~/stores/contentMakers';
 
 definePageMeta({ middleware: ['auth', 'role'] });
@@ -13,13 +13,13 @@ const router = useRouter();
 // --- Next ID ---
 const nextId = ref('');
 
-// Tallaje options from backend
-const tallajeOptions = ref<
-  Record<string, { label: string; options: string[] }>
->({});
+// Sizing options from backend
+const sizingOptions = ref<Record<string, { label: string; options: string[] }>>(
+  {},
+);
 
-// Desempeño options from backend
-const desempenoOptions = ref<DesempenoOption[]>([]);
+// Performance options from backend
+const performanceOptions = ref<PerformanceOption[]>([]);
 
 onMounted(async () => {
   store.fetchFilters();
@@ -32,16 +32,16 @@ onMounted(async () => {
     form.stimada_id = data.next_id;
   } catch {}
   try {
-    tallajeOptions.value = await $fetch(
-      `${config.public.apiBase}/content-makers/tallaje_options/`,
+    sizingOptions.value = await $fetch(
+      `${config.public.apiBase}/content-makers/sizing_options/`,
       {
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       },
     );
   } catch {}
   try {
-    desempenoOptions.value = await $fetch(
-      `${config.public.apiBase}/content-makers/desempeno_options/`,
+    performanceOptions.value = await $fetch(
+      `${config.public.apiBase}/content-makers/performance_options/`,
       {
         headers: { Authorization: `Bearer ${auth.accessToken}` },
       },
@@ -51,11 +51,11 @@ onMounted(async () => {
 
 // --- Steps ---
 const STEPS = [
-  { id: 'basico', label: 'Datos básicos' },
-  { id: 'redes', label: 'Redes sociales' },
-  { id: 'valoracion', label: 'Valoración' },
-  { id: 'tallaje', label: 'Tallaje' },
-  { id: 'contacto', label: 'Contacto y facturación' },
+  { id: 'basic', label: 'Datos básicos' },
+  { id: 'social', label: 'Redes sociales' },
+  { id: 'rating', label: 'Valoración' },
+  { id: 'sizing', label: 'Tallaje' },
+  { id: 'contact', label: 'Contacto y facturación' },
 ];
 const currentStep = ref(0);
 function prev() {
@@ -68,46 +68,46 @@ function next() {
 // --- Form data ---
 const form = reactive({
   stimada_id: '',
-  nombre: '',
-  apellidos: '',
-  tipo: 'content_maker',
-  tipo_cm: '',
-  sexo: '',
+  first_name: '',
+  last_name: '',
+  type: 'content_maker',
+  cm_type: '',
+  gender: '',
   status: '',
   email: '',
   // Redes
   instagram_handle: '',
-  link_instagram: '',
-  seguidores_instagram: '' as string | number,
-  categoria_seguidores_ig: '',
+  instagram_link: '',
+  instagram_followers: '' as string | number,
+  instagram_followers_category: '',
   fee_instagram: '' as string | number,
   tiktok_handle: '',
-  link_tiktok: '',
-  seguidores_tiktok: '' as string | number,
-  categoria_seguidores_tt: '',
+  tiktok_link: '',
+  tiktok_followers: '' as string | number,
+  tiktok_followers_category: '',
   fee_tiktok: '' as string | number,
   // Valoración
-  calidad_contenido: null as number | null,
-  desempeno_opciones: [] as number[],
-  apariencia: '',
-  desempeno: '',
-  es_mama: false,
-  categorias_contenido: '',
-  sigue_stimada: false,
-  stimada_en_bio: false,
-  contrato_firmado: false,
-  comentarios: '',
+  content_quality: null as number | null,
+  performance_options: [] as number[],
+  appearance: '',
+  performance: '',
+  is_mother: false,
+  content_categories: '',
+  follows_stimada: false,
+  stimada_in_bio: false,
+  contract_signed: false,
+  comments: '',
   // Tallaje
-  talla_arriba: '',
-  talla_abajo: '',
-  talla_pie: '',
-  altura_medidas: '',
+  top_size: '',
+  bottom_size: '',
+  shoe_size: '',
+  height_measurements: '',
   // Contacto
-  telefono: '',
-  direccion_facturacion: '',
-  codigo_postal: '',
-  provincia: '',
-  pais: 'España',
+  phone: '',
+  billing_address: '',
+  postal_code: '',
+  province: '',
+  country: 'España',
   dni_cif: '',
   iban: '',
 });
@@ -124,11 +124,11 @@ function boolField(key: keyof typeof form) {
   };
 }
 
-function toggleDesempeno(id: number) {
-  if (form.desempeno_opciones.includes(id)) {
-    form.desempeno_opciones = form.desempeno_opciones.filter((x) => x !== id);
+function togglePerformance(id: number) {
+  if (form.performance_options.includes(id)) {
+    form.performance_options = form.performance_options.filter((x) => x !== id);
   } else {
-    form.desempeno_opciones = [...form.desempeno_opciones, id];
+    form.performance_options = [...form.performance_options, id];
   }
 }
 
@@ -157,34 +157,34 @@ async function handleSubmit() {
       // Jump to the step that has the first error
       const errorFields = Object.keys(errors.value);
       const stepFields: Record<string, string[]> = {
-        basico: [
+        basic: [
           'stimada_id',
-          'nombre',
-          'apellidos',
-          'tipo',
-          'tipo_cm',
-          'sexo',
+          'first_name',
+          'last_name',
+          'type',
+          'cm_type',
+          'gender',
           'status',
           'email',
         ],
-        redes: [
+        social: [
           'instagram_handle',
-          'link_instagram',
-          'seguidores_instagram',
+          'instagram_link',
+          'instagram_followers',
           'fee_instagram',
           'tiktok_handle',
-          'link_tiktok',
-          'seguidores_tiktok',
+          'tiktok_link',
+          'tiktok_followers',
           'fee_tiktok',
         ],
-        valoracion: ['calidad_contenido', 'desempeno_opciones', 'comentarios'],
-        tallaje: ['talla_arriba', 'talla_abajo', 'talla_pie', 'altura_medidas'],
-        contacto: [
-          'telefono',
-          'direccion_facturacion',
-          'codigo_postal',
-          'provincia',
-          'pais',
+        rating: ['content_quality', 'performance_options', 'comments'],
+        sizing: ['top_size', 'bottom_size', 'shoe_size', 'height_measurements'],
+        contact: [
+          'phone',
+          'billing_address',
+          'postal_code',
+          'province',
+          'country',
           'dni_cif',
           'iban',
         ],
@@ -325,15 +325,15 @@ function fieldError(field: string) {
             <label class="block text-xs font-medium text-muted mb-1.5"
               >Tipo *</label
             >
-            <select v-model="form.tipo" required class="select-field">
-              <option
-                v-for="t in store.filterOptions.tipo_choices"
-                :key="t.value"
-                :value="t.value"
-              >
-                {{ t.label }}
-              </option>
-            </select>
+            <BaseSelect
+              v-model="form.type"
+              :options="
+                store.filterOptions.type_choices.map((t) => ({
+                  value: t.value,
+                  label: t.label,
+                }))
+              "
+            />
             <p class="text-xs text-muted/60 mt-1">
               Content Maker o Colaborador
             </p>
@@ -342,30 +342,30 @@ function fieldError(field: string) {
             <label class="block text-xs font-medium text-muted mb-1.5"
               >Subtipo / Tipo de CM *</label
             >
-            <select v-model="form.tipo_cm" required class="select-field">
-              <option value="" disabled>Selecciona tipo</option>
-              <option
-                v-for="t in store.filterOptions.tipos"
-                :key="t"
-                :value="t"
-              >
-                {{ t }}
-              </option>
-            </select>
+            <BaseSelect
+              v-model="form.cm_type"
+              placeholder="Selecciona tipo"
+              :options="
+                store.filterOptions.types.map((t) => ({ value: t, label: t }))
+              "
+            />
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5"
               >Nombre *</label
             >
             <input
-              v-model="form.nombre"
+              v-model="form.first_name"
               type="text"
               required
               class="input-field"
               placeholder="Nombre"
             />
-            <p v-if="fieldError('nombre')" class="text-xs text-red-400 mt-1">
-              {{ fieldError('nombre') }}
+            <p
+              v-if="fieldError('first_name')"
+              class="text-xs text-red-400 mt-1"
+            >
+              {{ fieldError('first_name') }}
             </p>
           </div>
           <div>
@@ -373,7 +373,7 @@ function fieldError(field: string) {
               >Apellidos</label
             >
             <input
-              v-model="form.apellidos"
+              v-model="form.last_name"
               type="text"
               class="input-field"
               placeholder="Apellidos"
@@ -383,31 +383,31 @@ function fieldError(field: string) {
             <label class="block text-xs font-medium text-muted mb-1.5"
               >Sexo</label
             >
-            <select v-model="form.sexo" class="select-field">
-              <option value="">Sin especificar</option>
-              <option
-                v-for="s in store.filterOptions.sexos"
-                :key="s"
-                :value="s"
-              >
-                {{ s }}
-              </option>
-            </select>
+            <BaseSelect
+              v-model="form.gender"
+              :options="[
+                { value: '', label: 'Sin especificar' },
+                ...store.filterOptions.genders.map((s) => ({
+                  value: s,
+                  label: s,
+                })),
+              ]"
+            />
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5"
               >Status</label
             >
-            <select v-model="form.status" class="select-field">
-              <option value="" disabled>Selecciona estado</option>
-              <option
-                v-for="s in store.filterOptions.statuses"
-                :key="s"
-                :value="s"
-              >
-                {{ s }}
-              </option>
-            </select>
+            <BaseSelect
+              v-model="form.status"
+              placeholder="Selecciona estado"
+              :options="
+                store.filterOptions.statuses.map((s) => ({
+                  value: s,
+                  label: s,
+                }))
+              "
+            />
           </div>
           <div class="col-span-2">
             <label class="block text-xs font-medium text-muted mb-1.5"
@@ -463,7 +463,7 @@ function fieldError(field: string) {
             <div>
               <label class="block text-xs text-muted mb-1">Seguidores</label>
               <input
-                v-model="form.seguidores_instagram"
+                v-model="form.instagram_followers"
                 type="number"
                 class="input-field"
                 placeholder="0"
@@ -473,19 +473,18 @@ function fieldError(field: string) {
               <label class="block text-xs text-muted mb-1"
                 >Categoría seguidores</label
               >
-              <select
-                v-model="form.categoria_seguidores_ig"
-                class="select-field"
-              >
-                <option value="">—</option>
-                <option
-                  v-for="c in store.filterOptions.categoria_seguidores_ig"
-                  :key="c"
-                  :value="c"
-                >
-                  {{ c }}
-                </option>
-              </select>
+              <BaseSelect
+                v-model="form.instagram_followers_category"
+                :options="[
+                  { value: '', label: '—' },
+                  ...store.filterOptions.instagram_followers_category.map(
+                    (c) => ({
+                      value: c,
+                      label: c,
+                    }),
+                  ),
+                ]"
+              />
             </div>
             <div>
               <label class="block text-xs text-muted mb-1">Fee (€)</label>
@@ -499,7 +498,7 @@ function fieldError(field: string) {
             <div class="col-span-2">
               <label class="block text-xs text-muted mb-1">Link perfil</label>
               <input
-                v-model="form.link_instagram"
+                v-model="form.instagram_link"
                 type="url"
                 class="input-field"
                 placeholder="https://instagram.com/…"
@@ -541,7 +540,7 @@ function fieldError(field: string) {
             <div>
               <label class="block text-xs text-muted mb-1">Seguidores</label>
               <input
-                v-model="form.seguidores_tiktok"
+                v-model="form.tiktok_followers"
                 type="number"
                 class="input-field"
                 placeholder="0"
@@ -551,19 +550,16 @@ function fieldError(field: string) {
               <label class="block text-xs text-muted mb-1"
                 >Categoría seguidores</label
               >
-              <select
-                v-model="form.categoria_seguidores_tt"
-                class="select-field"
-              >
-                <option value="">—</option>
-                <option
-                  v-for="c in store.filterOptions.categoria_seguidores_tt"
-                  :key="c"
-                  :value="c"
-                >
-                  {{ c }}
-                </option>
-              </select>
+              <BaseSelect
+                v-model="form.tiktok_followers_category"
+                :options="[
+                  { value: '', label: '—' },
+                  ...store.filterOptions.tiktok_followers_category.map((c) => ({
+                    value: c,
+                    label: c,
+                  })),
+                ]"
+              />
             </div>
             <div>
               <label class="block text-xs text-muted mb-1">Fee (€)</label>
@@ -577,7 +573,7 @@ function fieldError(field: string) {
             <div class="col-span-2">
               <label class="block text-xs text-muted mb-1">Link perfil</label>
               <input
-                v-model="form.link_tiktok"
+                v-model="form.tiktok_link"
                 type="url"
                 class="input-field"
                 placeholder="https://tiktok.com/@…"
@@ -597,12 +593,16 @@ function fieldError(field: string) {
             <label class="block text-xs font-medium text-muted mb-1.5"
               >Calidad del contenido (0–5)</label
             >
-            <select v-model="form.calidad_contenido" class="select-field">
-              <option :value="null">—</option>
-              <option v-for="n in [0, 1, 2, 3, 4, 5]" :key="n" :value="n">
-                {{ n }}
-              </option>
-            </select>
+            <BaseSelect
+              v-model="form.content_quality"
+              :options="[
+                { value: null, label: '—' },
+                ...[0, 1, 2, 3, 4, 5].map((n) => ({
+                  value: n,
+                  label: String(n),
+                })),
+              ]"
+            />
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5"
@@ -612,18 +612,18 @@ function fieldError(field: string) {
               class="flex flex-wrap gap-2 p-2 rounded-xl border border-border bg-raised min-h-[38px]"
             >
               <button
-                v-for="opt in desempenoOptions"
+                v-for="opt in performanceOptions"
                 :key="opt.id"
                 type="button"
                 class="text-xs px-2.5 py-1 rounded-full border transition-colors"
                 :class="
-                  form.desempeno_opciones.includes(opt.id)
+                  form.performance_options.includes(opt.id)
                     ? 'border-gold bg-gold/15 text-gold font-medium'
                     : 'border-border text-muted hover:border-gold/40 hover:text-ink'
                 "
-                @click="toggleDesempeno(opt.id)"
+                @click="togglePerformance(opt.id)"
               >
-                {{ opt.nombre }}
+                {{ opt.name }}
               </button>
             </div>
           </div>
@@ -632,7 +632,7 @@ function fieldError(field: string) {
               >Comentarios internos</label
             >
             <textarea
-              v-model="form.comentarios"
+              v-model="form.comments"
               rows="3"
               class="input-field resize-none"
               placeholder="Observaciones internas sobre la content maker…"
@@ -644,10 +644,10 @@ function fieldError(field: string) {
         <div class="grid grid-cols-2 gap-3 pt-1">
           <label
             v-for="item in [
-              { key: 'es_mama', label: 'Es mamá' },
-              { key: 'sigue_stimada', label: 'Sigue @stimada' },
-              { key: 'stimada_en_bio', label: 'Stimada en bio' },
-              { key: 'contrato_firmado', label: 'Contrato firmado' },
+              { key: 'is_mother', label: 'Es mamá' },
+              { key: 'follows_stimada', label: 'Sigue @stimada' },
+              { key: 'stimada_in_bio', label: 'Stimada en bio' },
+              { key: 'contract_signed', label: 'Contrato firmado' },
             ]"
             :key="item.key"
             class="flex items-center gap-2.5 cursor-pointer group"
@@ -691,26 +691,24 @@ function fieldError(field: string) {
         class="rounded-2xl border border-border/60 bg-white shadow-card p-6 space-y-4"
       >
         <div class="grid grid-cols-3 gap-4">
-          <div v-for="(cat, campo) in tallajeOptions" :key="campo">
+          <div v-for="(cat, field) in sizingOptions" :key="field">
             <label class="block text-xs font-medium text-muted mb-1.5">{{
               cat.label
             }}</label>
-            <select
-              v-model="(form as Record<string, unknown>)[campo]"
-              class="input-field"
-            >
-              <option value="">—</option>
-              <option v-for="opt in cat.options" :key="opt" :value="opt">
-                {{ opt }}
-              </option>
-            </select>
+            <BaseSelect
+              v-model="(form as Record<string, unknown>)[field]"
+              :options="[
+                { value: '', label: '—' },
+                ...cat.options.map((opt) => ({ value: opt, label: opt })),
+              ]"
+            />
           </div>
           <div class="col-span-3">
             <label class="block text-xs font-medium text-muted mb-1.5"
               >Altura (cm)</label
             >
             <input
-              v-model="form.altura_medidas"
+              v-model="form.height_measurements"
               type="number"
               min="0"
               step="1"
@@ -732,7 +730,7 @@ function fieldError(field: string) {
               >Teléfono</label
             >
             <input
-              v-model="form.telefono"
+              v-model="form.phone"
               type="tel"
               class="input-field"
               placeholder="6XXXXXXXX"
@@ -755,7 +753,7 @@ function fieldError(field: string) {
               <span class="text-red-400">*</span></label
             >
             <input
-              v-model="form.direccion_facturacion"
+              v-model="form.billing_address"
               type="text"
               class="input-field"
               placeholder="Calle, número…"
@@ -765,18 +763,14 @@ function fieldError(field: string) {
             <label class="block text-xs font-medium text-muted mb-1.5"
               >Código postal <span class="text-red-400">*</span></label
             >
-            <input
-              v-model="form.codigo_postal"
-              type="text"
-              class="input-field"
-            />
+            <input v-model="form.postal_code" type="text" class="input-field" />
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5"
               >Provincia <span class="text-red-400">*</span></label
             >
             <input
-              v-model="form.provincia"
+              v-model="form.province"
               type="text"
               class="input-field"
               placeholder="Madrid"
@@ -786,7 +780,7 @@ function fieldError(field: string) {
             <label class="block text-xs font-medium text-muted mb-1.5"
               >País <span class="text-red-400">*</span></label
             >
-            <input v-model="form.pais" type="text" class="input-field" />
+            <input v-model="form.country" type="text" class="input-field" />
           </div>
           <div>
             <label class="block text-xs font-medium text-muted mb-1.5"

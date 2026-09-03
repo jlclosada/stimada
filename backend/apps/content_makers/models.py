@@ -4,156 +4,156 @@ from django.db import models
 
 
 class ContentMakerStatus(models.Model):
-    nombre = models.CharField(max_length=50, unique=True)
-    orden = models.PositiveIntegerField(default=0)
+    name = models.CharField(max_length=50, unique=True)
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
         verbose_name = "Estado de Content Maker"
         verbose_name_plural = "Estados de Content Maker"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
 class ContentMakerType(models.Model):
-    nombre = models.CharField(max_length=50, unique=True)
-    orden = models.PositiveIntegerField(default=0)
+    name = models.CharField(max_length=50, unique=True)
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
         verbose_name = "Tipo de Content Maker"
         verbose_name_plural = "Tipos de Content Maker"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
-class DesempenoOption(models.Model):
-    nombre = models.CharField(max_length=100, unique=True)
-    orden = models.PositiveIntegerField(default=0)
+class PerformanceOption(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
         verbose_name = "Opción de desempeño"
         verbose_name_plural = "Opciones de desempeño"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
-class TallajeCategory(models.Model):
-    nombre = models.CharField(max_length=50, unique=True)
-    campo = models.CharField(
+class SizingCategory(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    field = models.CharField(
         max_length=30, unique=True,
-        help_text="Nombre del campo en el perfil (ej: talla_arriba, talla_abajo, talla_pie)",
+        help_text="Nombre del campo en el perfil (ej: top_size, bottom_size, shoe_size)",
     )
-    orden = models.PositiveIntegerField(default=0)
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
         verbose_name = "Categoría de tallaje"
         verbose_name_plural = "Categorías de tallaje"
-        ordering = ["orden", "nombre"]
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
-class TallajeOption(models.Model):
-    categoria = models.ForeignKey(
-        TallajeCategory, on_delete=models.CASCADE, related_name="opciones",
+class SizingOption(models.Model):
+    category = models.ForeignKey(
+        SizingCategory, on_delete=models.CASCADE, related_name="options",
     )
-    valor = models.CharField(max_length=20)
-    orden = models.PositiveIntegerField(default=0)
+    value = models.CharField(max_length=20)
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
         verbose_name = "Opción de tallaje"
         verbose_name_plural = "Opciones de tallaje"
-        ordering = ["categoria", "orden"]
-        unique_together = ["categoria", "valor"]
+        ordering = ["category", "order"]
+        unique_together = ["category", "value"]
 
     def __str__(self):
-        return f"{self.categoria.nombre} — {self.valor}"
+        return f"{self.category.name} — {self.value}"
 
 
 class ContentMakerProfile(models.Model):
     # Tipo de perfil (Content Maker vs Colaborador)
-    TIPO_CONTENT_MAKER = "content_maker"
-    TIPO_COLABORADOR = "colaborador"
-    TIPO_CHOICES = [
-        (TIPO_CONTENT_MAKER, "Content Maker"),
-        (TIPO_COLABORADOR, "Colaborador"),
+    TYPE_CONTENT_MAKER = "content_maker"
+    TYPE_COLLABORATOR = "colaborador"
+    TYPE_CHOICES = [
+        (TYPE_CONTENT_MAKER, "Content Maker"),
+        (TYPE_COLLABORATOR, "Colaborador"),
     ]
 
     # Identificador Stimada
     stimada_id = models.CharField(max_length=30, unique=True, blank=True)
 
     # Datos personales
-    nombre = models.CharField(max_length=100)
-    apellidos = models.CharField(max_length=150, blank=True)
-    tipo = models.CharField(
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=150, blank=True)
+    type = models.CharField(
         max_length=20,
-        choices=TIPO_CHOICES,
-        default=TIPO_CONTENT_MAKER,
+        choices=TYPE_CHOICES,
+        default=TYPE_CONTENT_MAKER,
         db_index=True,
     )
-    tipo_cm = models.CharField(max_length=50, blank=True)
-    sexo = models.CharField(max_length=20, blank=True)
+    cm_type = models.CharField(max_length=50, blank=True)
+    gender = models.CharField(max_length=20, blank=True)
     status = models.CharField(max_length=50, blank=True)
 
     # Valoración interna
-    desempeno = models.CharField(max_length=200, blank=True)
-    calidad_contenido = models.IntegerField(
+    performance = models.CharField(max_length=200, blank=True)
+    content_quality = models.IntegerField(
         null=True, blank=True,
         validators=[MinValueValidator(0), MaxValueValidator(5)],
     )
-    desempeno_opciones = models.ManyToManyField(
-        "DesempenoOption", blank=True, related_name="content_makers",
+    performance_options = models.ManyToManyField(
+        "PerformanceOption", blank=True, related_name="content_makers",
     )
-    apariencia = models.CharField(max_length=50, blank=True)
-    es_mama = models.BooleanField(default=False)
-    categorias_contenido = models.CharField(max_length=200, blank=True)
+    appearance = models.CharField(max_length=50, blank=True)
+    is_mother = models.BooleanField(default=False)
+    content_categories = models.CharField(max_length=200, blank=True)
 
     # Relación con Stimada
-    sigue_stimada = models.BooleanField(default=False)
-    stimada_en_bio = models.BooleanField(default=False)
-    contrato_firmado = models.BooleanField(default=False)
+    follows_stimada = models.BooleanField(default=False)
+    stimada_in_bio = models.BooleanField(default=False)
+    contract_signed = models.BooleanField(default=False)
 
     # Instagram
     fee_instagram = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
-    categoria_seguidores_ig = models.CharField(max_length=50, blank=True)
-    seguidores_instagram = models.IntegerField(null=True, blank=True)
+    instagram_followers_category = models.CharField(max_length=50, blank=True)
+    instagram_followers = models.IntegerField(null=True, blank=True)
     instagram_handle = models.CharField(max_length=100, blank=True)
-    link_instagram = models.URLField(max_length=300, blank=True)
+    instagram_link = models.URLField(max_length=300, blank=True)
 
     # TikTok
     fee_tiktok = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
-    categoria_seguidores_tt = models.CharField(max_length=50, blank=True)
-    seguidores_tiktok = models.IntegerField(null=True, blank=True)
+    tiktok_followers_category = models.CharField(max_length=50, blank=True)
+    tiktok_followers = models.IntegerField(null=True, blank=True)
     tiktok_handle = models.CharField(max_length=100, blank=True)
-    link_tiktok = models.URLField(max_length=300, blank=True)
+    tiktok_link = models.URLField(max_length=300, blank=True)
 
     # Tallaje
-    talla_arriba = models.CharField(max_length=50, blank=True)
-    talla_abajo = models.CharField(max_length=50, blank=True)
-    talla_pie = models.CharField(max_length=50, blank=True)
-    altura_medidas = models.TextField(blank=True)
+    top_size = models.CharField(max_length=50, blank=True)
+    bottom_size = models.CharField(max_length=50, blank=True)
+    shoe_size = models.CharField(max_length=50, blank=True)
+    height_measurements = models.TextField(blank=True)
 
     # Contacto y facturación
     email = models.EmailField(blank=True)
-    telefono = models.CharField(max_length=30, blank=True)
-    direccion_facturacion = models.TextField(blank=True)
-    codigo_postal = models.CharField(max_length=10, blank=True)
-    provincia = models.CharField(max_length=100, blank=True)
-    pais = models.CharField(max_length=100, blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    billing_address = models.TextField(blank=True)
+    postal_code = models.CharField(max_length=10, blank=True)
+    province = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, blank=True)
     dni_cif = models.CharField(max_length=20, blank=True)
     iban = models.CharField(max_length=40, blank=True)
 
     # Foto de perfil
-    foto = models.ImageField(upload_to="content_makers/fotos/", null=True, blank=True)
+    photo = models.ImageField(upload_to="content_makers/fotos/", null=True, blank=True)
 
     # Notas
-    comentarios = models.TextField(blank=True)
+    comments = models.TextField(blank=True)
 
     # Vinculación con cuenta de usuario (null hasta que se crea la cuenta)
     user = models.OneToOneField(
@@ -188,14 +188,14 @@ class ContentMakerProfile(models.Model):
         self.instagram_handle = self._normalize_handle(self.instagram_handle)
         self.tiktok_handle = self._normalize_handle(self.tiktok_handle)
         # Auto-generate links from handles.
-        self.link_instagram = self._build_instagram_url(self.instagram_handle)
-        self.link_tiktok = self._build_tiktok_url(self.tiktok_handle)
+        self.instagram_link = self._build_instagram_url(self.instagram_handle)
+        self.tiktok_link = self._build_tiktok_url(self.tiktok_handle)
         # Auto-compute follower category from follower count.
-        self.categoria_seguidores_ig = self._compute_followers_category(
-            self.seguidores_instagram
+        self.instagram_followers_category = self._compute_followers_category(
+            self.instagram_followers
         )
-        self.categoria_seguidores_tt = self._compute_followers_category(
-            self.seguidores_tiktok
+        self.tiktok_followers_category = self._compute_followers_category(
+            self.tiktok_followers
         )
         super().save(*args, **kwargs)
 
@@ -250,12 +250,12 @@ class ContentMakerProfile(models.Model):
         return cls.FOLLOWER_RANGE_TOP
 
     def __str__(self):
-        return f"{self.stimada_id} — {self.nombre} {self.apellidos}"
+        return f"{self.stimada_id} — {self.first_name} {self.last_name}"
 
     @property
-    def nombre_completo(self):
-        return f"{self.nombre} {self.apellidos}".strip()
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}".strip()
 
     @property
-    def tiene_cuenta(self):
+    def has_account(self):
         return self.user_id is not None

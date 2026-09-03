@@ -3,19 +3,19 @@ import { useAuthStore } from "~/stores/auth";
 const ROUTE_ROLES: Record<string, string[]> = {
   // Most specific routes first (startsWith matching)
   "/dashboard/admin": ["admin"],
-  "/dashboard/usuarios": ["admin", "stimada_employee"],
-  "/dashboard/clientes": ["admin", "stimada_employee"],
+  "/dashboard/users": ["admin", "stimada_employee"],
+  "/dashboard/clients": ["admin", "stimada_employee"],
   "/dashboard/content-makers/me": ["content_maker"],
   "/dashboard/content-makers": ["admin", "stimada_employee", "client"],
-  "/dashboard/mis-proyectos": ["client"],
-  "/dashboard/mis-contenidos": ["content_maker"],
-  "/dashboard/perfil": ["admin", "stimada_employee", "client", "content_maker"],
+  "/dashboard/my-projects": ["client"],
+  "/dashboard/my-contents": ["content_maker"],
+  "/dashboard/profile": ["admin", "stimada_employee", "client", "content_maker"],
   // General dashboard (KPIs) — only admin/employee
   "/dashboard": ["admin", "stimada_employee"],
   // Projects (all roles, backend filters by queryset)
-  "/proyectos": ["admin", "stimada_employee", "client", "content_maker"],
+  "/projects": ["admin", "stimada_employee", "client", "content_maker"],
   // Notifications (all roles)
-  "/notificaciones": ["admin", "stimada_employee", "client", "content_maker"],
+  "/notifications": ["admin", "stimada_employee", "client", "content_maker"],
 };
 
 export default defineNuxtRouteMiddleware((to) => {

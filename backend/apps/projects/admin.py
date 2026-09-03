@@ -4,75 +4,89 @@ from apps.projects.models import (
     Briefing,
     BriefingLink,
     BriefingPhoto,
-    Entregable,
-    LogisticaProducto,
-    ModalidadEconomica,
+    Deliverable,
+    EconomicModel,
+    Format,
     Notification,
     Project,
     ProjectContentMaker,
     ProjectStatus,
-    QuienGraba,
-    QuienPublica,
-    QuienRevisa,
-    RecogidaProducto,
+    ProductLogistics,
+    ProductPickup,
     ServiceType,
+    SocialNetwork,
     StatusChangeLog,
+    WhoPublishes,
+    WhoRecords,
+    WhoReviews,
     WinStatus,
 )
 
 
 @admin.register(ProjectStatus)
 class ProjectStatusAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden", "activo"]
-    list_editable = ["orden", "activo"]
+    list_display = ["name", "order", "is_active", "available_on_creation"]
+    list_editable = ["order", "is_active", "available_on_creation"]
 
 
 @admin.register(ServiceType)
 class ServiceTypeAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden", "activo"]
-    list_editable = ["orden", "activo"]
+    list_display = ["name", "order", "is_active", "requires_profiles"]
+    list_editable = ["order", "is_active", "requires_profiles"]
 
 
-@admin.register(ModalidadEconomica)
-class ModalidadEconomicaAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden", "activo"]
-    list_editable = ["orden", "activo"]
+@admin.register(SocialNetwork)
+class SocialNetworkAdmin(admin.ModelAdmin):
+    list_display = ["name", "order", "is_active"]
+    list_editable = ["order", "is_active"]
 
 
-@admin.register(LogisticaProducto)
-class LogisticaProductoAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden", "activo"]
-    list_editable = ["orden", "activo"]
+@admin.register(Format)
+class FormatAdmin(admin.ModelAdmin):
+    list_display = ["name", "order", "is_active"]
+    list_editable = ["order", "is_active"]
 
 
-@admin.register(RecogidaProducto)
-class RecogidaProductoAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden", "activo"]
-    list_editable = ["orden", "activo"]
+@admin.register(EconomicModel)
+class EconomicModelAdmin(admin.ModelAdmin):
+    list_display = ["name", "order", "is_active"]
+    list_editable = ["order", "is_active"]
 
 
-@admin.register(QuienGraba)
-class QuienGrabaAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden", "activo"]
-    list_editable = ["orden", "activo"]
+@admin.register(ProductLogistics)
+class ProductLogisticsAdmin(admin.ModelAdmin):
+    list_display = ["name", "order", "is_active"]
+    list_editable = ["order", "is_active"]
 
 
-@admin.register(QuienRevisa)
-class QuienRevisaAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden", "activo"]
-    list_editable = ["orden", "activo"]
+@admin.register(ProductPickup)
+class ProductPickupAdmin(admin.ModelAdmin):
+    list_display = ["name", "order", "is_active"]
+    list_editable = ["order", "is_active"]
 
 
-@admin.register(QuienPublica)
-class QuienPublicaAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden", "activo"]
-    list_editable = ["orden", "activo"]
+@admin.register(WhoRecords)
+class WhoRecordsAdmin(admin.ModelAdmin):
+    list_display = ["name", "order", "is_active"]
+    list_editable = ["order", "is_active"]
+
+
+@admin.register(WhoReviews)
+class WhoReviewsAdmin(admin.ModelAdmin):
+    list_display = ["name", "order", "is_active"]
+    list_editable = ["order", "is_active"]
+
+
+@admin.register(WhoPublishes)
+class WhoPublishesAdmin(admin.ModelAdmin):
+    list_display = ["name", "order", "is_active"]
+    list_editable = ["order", "is_active"]
 
 
 @admin.register(WinStatus)
 class WinStatusAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden", "activo"]
-    list_editable = ["orden", "activo"]
+    list_display = ["name", "order", "is_active"]
+    list_editable = ["order", "is_active"]
 
 
 class ProjectContentMakerInline(admin.TabularInline):
@@ -83,10 +97,11 @@ class ProjectContentMakerInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ["project_id", "nombre", "client", "status", "service_type", "win_status", "semaforo_proyecto", "fecha_venta", "created_at"]
-    list_filter = ["status", "service_type", "modalidad_economica", "win_status", "cm_selection_mode"]
-    search_fields = ["project_id", "nombre", "client__nombre_cliente"]
+    list_display = ["project_id", "name", "client", "status", "service_type", "win_status", "traffic_light", "sale_date", "created_at"]
+    list_filter = ["status", "service_type", "economic_model", "win_status", "cm_selection_mode"]
+    search_fields = ["project_id", "name", "client__name"]
     raw_id_fields = ["client", "brand", "content_maker", "created_by"]
+    filter_horizontal = ["social_networks", "formats"]
     inlines = [ProjectContentMakerInline]
 
 
@@ -111,16 +126,16 @@ class BriefingPhotoInline(admin.TabularInline):
 class BriefingAdmin(admin.ModelAdmin):
     list_display = ["project", "content_maker", "created_by", "created_at"]
     list_filter = ["project__status"]
-    search_fields = ["project__project_id", "project__nombre"]
+    search_fields = ["project__project_id", "project__name"]
     raw_id_fields = ["project", "content_maker", "created_by"]
     inlines = [BriefingLinkInline, BriefingPhotoInline]
 
 
-@admin.register(Entregable)
-class EntregableAdmin(admin.ModelAdmin):
+@admin.register(Deliverable)
+class DeliverableAdmin(admin.ModelAdmin):
     list_display = ["project", "content_maker", "status", "revision_round", "uploaded_at", "reviewed_at"]
     list_filter = ["status", "revision_round"]
-    search_fields = ["project__project_id", "project__nombre"]
+    search_fields = ["project__project_id", "project__name"]
     raw_id_fields = ["project", "content_maker", "reviewed_by"]
 
 
@@ -128,7 +143,7 @@ class EntregableAdmin(admin.ModelAdmin):
 class StatusChangeLogAdmin(admin.ModelAdmin):
     list_display = ["project", "from_status", "to_status", "is_manual", "changed_by", "timestamp"]
     list_filter = ["is_manual", "to_status"]
-    search_fields = ["project__project_id", "project__nombre", "reason"]
+    search_fields = ["project__project_id", "project__name", "reason"]
     raw_id_fields = ["project", "changed_by"]
     readonly_fields = ["project", "from_status", "to_status", "is_manual", "reason", "changed_by", "timestamp"]
 

@@ -1,6 +1,6 @@
 """
 Management command to run daily scheduled checks:
-- Deadline reminders (3 days before fecha_limite_entrega)
+- Deadline reminders (3 days before delivery_deadline)
 - Overdue delivery detection
 
 Schedule via cron: python manage.py check_deadlines (daily)

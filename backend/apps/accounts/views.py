@@ -298,7 +298,7 @@ class GiveAccessCMView(APIView):
 class GiveAccessClientView(APIView):
     """
     Admin/Employee creates a user account for a Client.
-    Requires: contrato_firmado = True and contrato file uploaded.
+    Requires: contract_signed = True and contract file uploaded.
     """
     permission_classes = [IsAdminOrEmployee]
 

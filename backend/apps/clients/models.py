@@ -3,22 +3,22 @@ from django.db import models
 
 
 class ClientType(models.Model):
-    nombre = models.CharField(max_length=100)
+    name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)
-    activo = models.BooleanField(default=True)
-    orden = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        verbose_name = "Tipo de cliente"
-        verbose_name_plural = "Tipos de cliente"
-        ordering = ["orden", "nombre"]
+        verbose_name = "Client type"
+        verbose_name_plural = "Client types"
+        ordering = ["order", "name"]
 
     def __str__(self):
-        return self.nombre
+        return self.name
 
 
 class ClientProfile(models.Model):
-    # Cuenta de usuario
+    # User account
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -27,108 +27,108 @@ class ClientProfile(models.Model):
         related_name="client_profile",
     )
 
-    # Identificación
-    nombre_cliente = models.CharField(max_length=200, verbose_name="Nombre comercial")
-    cliente_id = models.CharField(max_length=50, unique=True, blank=True)
-    tipo_cliente = models.ForeignKey(
+    # Identification
+    name = models.CharField(max_length=200, verbose_name="Commercial name")
+    client_id = models.CharField(max_length=50, unique=True, blank=True)
+    client_type = models.ForeignKey(
         ClientType,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name="clientes",
+        related_name="clients",
     )
     web_instagram = models.URLField(max_length=300, blank=True, verbose_name="Web / Instagram")
 
-    # Contacto
-    persona_contacto = models.CharField(max_length=200, blank=True, verbose_name="Persona de contacto")
-    email_contacto = models.EmailField(blank=True, verbose_name="Email de contacto")
-    telefono = models.CharField(max_length=30, blank=True)
+    # Contact
+    contact_person = models.CharField(max_length=200, blank=True, verbose_name="Contact person")
+    contact_email = models.EmailField(blank=True, verbose_name="Contact email")
+    phone = models.CharField(max_length=30, blank=True)
 
-    # Facturación
-    nombre_facturacion = models.CharField(max_length=200, verbose_name="Razón social")
+    # Billing
+    billing_name = models.CharField(max_length=200, verbose_name="Legal name")
     cif = models.CharField(max_length=20)
-    email_facturacion = models.EmailField()
-    direccion_facturacion = models.TextField()
-    codigo_postal = models.CharField(max_length=10)
-    ciudad = models.CharField(max_length=100)
-    pais = models.CharField(max_length=100, default="España")
+    billing_email = models.EmailField()
+    billing_address = models.TextField()
+    postal_code = models.CharField(max_length=10)
+    city = models.CharField(max_length=100)
+    country = models.CharField(max_length=100, default="España")
 
-    # Contrato
-    contrato_firmado = models.BooleanField(default=False)
-    contrato = models.FileField(upload_to="contratos/clientes/", null=True, blank=True)
+    # Contract
+    contract_signed = models.BooleanField(default=False)
+    contract = models.FileField(upload_to="contratos/clientes/", null=True, blank=True)
 
-    # Estado y evaluación
-    ESTADO_ACTIVO = "activo"
-    ESTADO_INACTIVO = "inactivo"
-    ESTADO_CHOICES = [
-        (ESTADO_ACTIVO, "Activo"),
-        (ESTADO_INACTIVO, "Inactivo"),
+    # Status and evaluation
+    STATUS_ACTIVE = "activo"
+    STATUS_INACTIVE = "inactivo"
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Activo"),
+        (STATUS_INACTIVE, "Inactivo"),
     ]
-    SEMAFORO_CHOICES = [(1, "1"), (2, "2"), (3, "3")]
+    TRAFFIC_LIGHT_CHOICES = [(1, "1"), (2, "2"), (3, "3")]
 
-    estado = models.CharField(
-        max_length=10, choices=ESTADO_CHOICES, default=ESTADO_ACTIVO
+    status = models.CharField(
+        max_length=10, choices=STATUS_CHOICES, default=STATUS_ACTIVE
     )
-    semaforo_cliente = models.PositiveSmallIntegerField(
-        choices=SEMAFORO_CHOICES, null=True, blank=True,
-        verbose_name="Semáforo cliente",
+    traffic_light = models.PositiveSmallIntegerField(
+        choices=TRAFFIC_LIGHT_CHOICES, null=True, blank=True,
+        verbose_name="Client traffic light",
     )
-    notas_internas = models.TextField(blank=True, verbose_name="Notas internas")
+    internal_notes = models.TextField(blank=True, verbose_name="Internal notes")
 
-    # Agencia / Marca
-    es_agencia = models.BooleanField(
+    # Agency / Brand
+    is_agency = models.BooleanField(
         default=False,
-        help_text="Si es agencia, puede tener múltiples marcas asociadas.",
+        help_text="If it is an agency, it can have multiple associated brands.",
     )
 
-    # Content Makers favoritas
+    # Favorite content makers
     favorite_cms = models.ManyToManyField(
         "content_makers.ContentMakerProfile",
         blank=True,
         related_name="favorited_by_clients",
     )
 
-    # Metadatos
+    # Metadata
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name="clientes_creados",
+        related_name="created_clients",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "Cliente"
-        verbose_name_plural = "Clientes"
-        ordering = ["nombre_cliente"]
+        verbose_name = "Client"
+        verbose_name_plural = "Clients"
+        ordering = ["name"]
 
     @staticmethod
     def generate_next_id():
         """Generate the next sequential numeric client ID (zero-padded to 5 digits)."""
         import re
-        ids = ClientProfile.objects.values_list("cliente_id", flat=True)
+        ids = ClientProfile.objects.values_list("client_id", flat=True)
         nums = [int(m.group()) for cid in ids if (m := re.search(r"\d+", cid))]
         next_num = (max(nums) if nums else 0) + 1
         return f"{next_num:05d}"
 
     def save(self, *args, **kwargs):
-        if not self.cliente_id:
-            self.cliente_id = self.generate_next_id()
+        if not self.client_id:
+            self.client_id = self.generate_next_id()
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.cliente_id} — {self.nombre_cliente}"
+        return f"{self.client_id} — {self.name}"
 
 
 class Brand(models.Model):
-    """Marca asociada a un cliente (agencia). Si el cliente es marca propia, se crea una marca con su mismo nombre."""
-    ESTADO_ACTIVA = "activa"
-    ESTADO_INACTIVA = "inactiva"
-    ESTADO_CHOICES = [
-        (ESTADO_ACTIVA, "Activa"),
-        (ESTADO_INACTIVA, "Inactiva"),
+    """Brand associated with a client (agency). If the client is an own brand, a brand with the same name is created."""
+    STATUS_ACTIVE = "activa"
+    STATUS_INACTIVE = "inactiva"
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Activa"),
+        (STATUS_INACTIVE, "Inactiva"),
     ]
 
     brand_id = models.CharField(max_length=50, unique=True, blank=True)
@@ -137,33 +137,33 @@ class Brand(models.Model):
         on_delete=models.CASCADE,
         related_name="brands",
     )
-    nombre = models.CharField(max_length=200, verbose_name="Nombre de la Marca")
-    tipo_marca = models.ForeignKey(
+    name = models.CharField(max_length=200, verbose_name="Brand name")
+    brand_type = models.ForeignKey(
         ClientType,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name="marcas",
-        verbose_name="Tipo de marca",
+        related_name="brands",
+        verbose_name="Brand type",
     )
     web_instagram = models.URLField(max_length=300, blank=True, verbose_name="Web / Instagram")
-    notas = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
 
-    # Contacto propio de la marca (si vacío, hereda del cliente)
-    persona_contacto = models.CharField(max_length=200, blank=True, verbose_name="Persona de contacto")
-    email_contacto = models.EmailField(blank=True, verbose_name="Email de contacto")
-    telefono = models.CharField(max_length=30, blank=True, verbose_name="Teléfono")
+    # Brand's own contact (if empty, inherits from client)
+    contact_person = models.CharField(max_length=200, blank=True, verbose_name="Contact person")
+    contact_email = models.EmailField(blank=True, verbose_name="Contact email")
+    phone = models.CharField(max_length=30, blank=True, verbose_name="Phone")
 
-    estado = models.CharField(
-        max_length=10, choices=ESTADO_CHOICES, default=ESTADO_ACTIVA
+    status = models.CharField(
+        max_length=10, choices=STATUS_CHOICES, default=STATUS_ACTIVE
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = "Marca"
-        verbose_name_plural = "Marcas"
-        ordering = ["nombre"]
-        unique_together = ["client", "nombre"]
+        verbose_name = "Brand"
+        verbose_name_plural = "Brands"
+        ordering = ["name"]
+        unique_together = ["client", "name"]
 
     @staticmethod
     def generate_next_id():
@@ -180,4 +180,4 @@ class Brand(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.nombre} ({self.client.nombre_cliente})"
+        return f"{self.name} ({self.client.name})"

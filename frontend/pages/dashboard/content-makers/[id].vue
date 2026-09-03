@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAuthStore } from "~/stores/auth";
-import type { ContentMakerDetail } from "~/stores/contentMakers";
+import type { ContentMakerDetail, PerformanceOption } from "~/stores/contentMakers";
 import { useContentMakersStore } from "~/stores/contentMakers";
 import { formatContentMakerId } from "~/utils/formatId";
 
@@ -62,10 +62,10 @@ function computeFollowersCategory(count: number | null | undefined): string {
 }
 
 const previewInstagramCategory = computed(() =>
-  computeFollowersCategory(editData.value.seguidores_instagram as number | null | undefined)
+  computeFollowersCategory(editData.value.instagram_followers as number | null | undefined)
 );
 const previewTiktokCategory = computed(() =>
-  computeFollowersCategory(editData.value.seguidores_tiktok as number | null | undefined)
+  computeFollowersCategory(editData.value.tiktok_followers as number | null | undefined)
 );
 const previewInstagramUrl = computed(() =>
   buildInstagramUrl(String(editData.value.instagram_handle ?? ""))
@@ -92,7 +92,7 @@ const canEdit = computed(() => {
   return auth.user?.role === "admin" || auth.user?.role === "stimada_employee";
 });
 
-const canEditTallaje = computed(() => auth.user?.role === "admin");
+const canEditSizing = computed(() => auth.user?.role === "admin");
 
 const canEditFiscal = computed(() => auth.user?.role === "admin");
 
@@ -100,15 +100,15 @@ const canEditDni = computed(() => auth.user?.role === "admin");
 
 const isClient = computed(() => auth.user?.role === "client");
 
-// Tallaje options from backend
-const tallajeOptions = ref<Record<string, { label: string; options: string[] }>>({});
+// Sizing options from backend
+const sizingOptions = ref<Record<string, { label: string; options: string[] }>>({});
 
-// Desempeño options from backend
-const desempenoOptions = ref<DesempenoOption[]>([]);
+// Performance options from backend
+const performanceOptions = ref<PerformanceOption[]>([]);
 
-async function loadTallajeOptions() {
+async function loadSizingOptions() {
   try {
-    tallajeOptions.value = await $fetch(`${config.public.apiBase}/content-makers/tallaje_options/`, {
+    sizingOptions.value = await $fetch(`${config.public.apiBase}/content-makers/sizing_options/`, {
       headers: { Authorization: `Bearer ${auth.accessToken}` },
     });
   } catch {
@@ -116,9 +116,9 @@ async function loadTallajeOptions() {
   }
 }
 
-async function loadDesempenoOptions() {
+async function loadPerformanceOptions() {
   try {
-    desempenoOptions.value = await $fetch(`${config.public.apiBase}/content-makers/desempeno_options/`, {
+    performanceOptions.value = await $fetch(`${config.public.apiBase}/content-makers/performance_options/`, {
       headers: { Authorization: `Bearer ${auth.accessToken}` },
     });
   } catch {
@@ -196,7 +196,7 @@ async function load() {
     cm.value = await store.fetchDetail(route.params.id as string);
     createEmail.value = cm.value?.email ?? "";
     checkFavorite();
-    loadTallajeOptions();
+    loadSizingOptions();
   } catch {
     error.value = "No se pudo cargar el perfil.";
   } finally {
@@ -209,8 +209,8 @@ function startEditing() {
   editData.value = { ...cm.value };
   isEditing.value = true;
   saveError.value = "";
-  loadTallajeOptions();
-  loadDesempenoOptions();
+  loadSizingOptions();
+  loadPerformanceOptions();
   store.fetchFilters();
 }
 
@@ -220,12 +220,12 @@ function cancelEditing() {
   saveError.value = "";
 }
 
-function toggleDesempeno(id: number) {
-  const current = editData.value.desempeno_opciones as number[] || [];
+function togglePerformance(id: number) {
+  const current = editData.value.performance_options as number[] || [];
   if (current.includes(id)) {
-    editData.value.desempeno_opciones = current.filter((x: number) => x !== id);
+    editData.value.performance_options = current.filter((x: number) => x !== id);
   } else {
-    editData.value.desempeno_opciones = [...current, id];
+    editData.value.performance_options = [...current, id];
   }
 }
 
@@ -238,7 +238,7 @@ async function saveChanges() {
     const payload: Record<string, unknown> = {};
     const keys = Object.keys(editData.value) as (keyof ContentMakerDetail)[];
     for (const key of keys) {
-      if (["id", "nombre_completo", "tiene_cuenta", "user_id", "user_email", "created_at", "updated_at"].includes(key)) continue;
+      if (["id", "full_name", "has_account", "user_id", "user_email", "created_at", "updated_at"].includes(key)) continue;
       if (editData.value[key] !== (cm.value as Record<string, unknown>)[key]) {
         payload[key] = editData.value[key];
       }
@@ -339,8 +339,8 @@ load();
 
     <div v-else-if="cm" class="animate-fade-up">
       <!-- Back -->
-      <div class="max-w-5xl">
-        <NuxtLink v-if="fromProject" :to="`/proyectos/${fromProject}`" class="inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors mb-4">
+      <div>
+        <NuxtLink v-if="fromProject" :to="`/projects/${fromProject}`" class="inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors mb-4">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
@@ -355,27 +355,27 @@ load();
       </div>
 
       <!-- Two-column layout: content + photo -->
-      <div class="flex gap-6 items-start">
+      <div class="flex gap-8 items-start">
         <!-- Main content column -->
-        <div class="max-w-4xl flex-1 space-y-5">
+        <div class="flex-1 min-w-0 space-y-5">
 
       <!-- Header -->
       <div class="rounded-2xl border border-border/60 bg-white shadow-card p-6 flex items-start justify-between gap-4" >
           <div class="flex items-center gap-4">
             <div class="w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0">
               <img
-                v-if="cm.foto_url"
-                :src="cm.foto_url"
-                :alt="cm.nombre_completo"
+                v-if="cm.photo_url"
+                :src="cm.photo_url"
+                :alt="cm.full_name"
                 class="w-full h-full object-cover"
               />
               <div v-else class="w-full h-full bg-orange-400/10 border border-orange-400/20 flex items-center justify-center text-orange-400 text-lg font-semibold">
-                {{ cm.nombre.charAt(0) }}{{ cm.apellidos.charAt(0) }}
+                {{ cm.first_name.charAt(0) }}{{ cm.last_name.charAt(0) }}
               </div>
             </div>
             <div>
               <div class="flex items-center gap-3 flex-wrap">
-                <h1 class="text-2xl font-semibold tracking-tight text-ink">{{ cm.nombre_completo }}</h1>
+                <h1 class="text-2xl font-semibold tracking-tight text-ink">{{ cm.full_name }}</h1>
                 <!-- Fee badge -->
                 <div v-if="canEdit && (cm.fee_instagram || cm.fee_tiktok)" class="flex items-center gap-1.5">
                   <span v-if="cm.fee_instagram" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gold/10 border border-gold/20">
@@ -392,15 +392,15 @@ load();
                 <span v-if="canEdit" class="text-xs text-muted">{{ formatContentMakerId(cm.stimada_id) }}</span>
                 <span v-if="canEdit" class="text-border">·</span>
                 <span
-                  v-if="cm.tipo_display"
+                  v-if="cm.type_display"
                   class="text-xs font-medium px-2 py-0.5 rounded-full border"
-                  :class="cm.tipo === 'colaborador'
+                  :class="cm.type === 'colaborador'
                     ? 'text-indigo-600 bg-indigo-50 border-indigo-200'
                     : 'text-gold bg-gold/10 border-gold/20'"
                 >
-                  {{ cm.tipo_display }}
+                  {{ cm.type_display }}
                 </span>
-                <span class="text-xs text-muted">{{ cm.tipo_cm }}</span>
+                <span class="text-xs text-muted">{{ cm.cm_type }}</span>
                 <span
                   v-if="cm.status"
                   class="text-xs font-medium px-2 py-0.5 rounded-full border"
@@ -579,7 +579,7 @@ load();
       <!-- ============ VIEW MODE ============ -->
       <template v-if="!isEditing">
         <!-- Info grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
           <!-- Redes sociales -->
           <div class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-4" >
             <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Redes sociales</h3>
@@ -593,15 +593,15 @@ load();
                 </div>
                 <div>
                   <a
-                    v-if="cm.link_instagram"
-                    :href="cm.link_instagram"
+                    v-if="cm.instagram_link"
+                    :href="cm.instagram_link"
                     target="_blank"
                     class="text-sm text-ink hover:text-gold transition-colors font-medium"
                   >
                     @{{ cm.instagram_handle }}
                   </a>
                   <p v-else class="text-sm text-ink">@{{ cm.instagram_handle || "—" }}</p>
-                  <p class="text-xs text-muted">{{ fmt(cm.seguidores_instagram) }} seguidores · {{ cm.categoria_seguidores_ig || "—" }}</p>
+                  <p class="text-xs text-muted">{{ fmt(cm.instagram_followers) }} seguidores · {{ cm.instagram_followers_category || "—" }}</p>
                 </div>
               </div>
               <!-- TikTok -->
@@ -613,15 +613,15 @@ load();
                 </div>
                 <div>
                   <a
-                    v-if="cm.link_tiktok"
-                    :href="cm.link_tiktok"
+                    v-if="cm.tiktok_link"
+                    :href="cm.tiktok_link"
                     target="_blank"
                     class="text-sm text-ink hover:text-gold transition-colors font-medium"
                   >
                     {{ cm.tiktok_handle || "—" }}
                   </a>
                   <p v-else class="text-sm text-ink">{{ cm.tiktok_handle || "—" }}</p>
-                  <p class="text-xs text-muted">{{ fmt(cm.seguidores_tiktok) }} seguidores · {{ cm.categoria_seguidores_tt || "—" }}</p>
+                  <p class="text-xs text-muted">{{ fmt(cm.tiktok_followers) }} seguidores · {{ cm.tiktok_followers_category || "—" }}</p>
                 </div>
               </div>
             </div>
@@ -633,57 +633,68 @@ load();
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <p class="text-xs text-muted">Calidad del contenido</p>
-                <p class="text-xs text-ink mt-0.5">{{ cm.calidad_contenido != null ? `${cm.calidad_contenido} / 5` : "—" }}</p>
+                <p class="text-xs text-ink mt-0.5">{{ cm.content_quality != null ? `${cm.content_quality} / 5` : "—" }}</p>
               </div>
               <div>
                 <p class="text-xs text-muted">Desempeño</p>
                 <div class="flex flex-wrap gap-1 mt-0.5">
                   <span
-                    v-for="opt in cm.desempeno_opciones_display"
+                    v-for="opt in cm.performance_options_display"
                     :key="opt.id"
                     class="text-xs px-2 py-0.5 rounded-full border border-amber-200 text-amber-700 bg-amber-50"
-                  >{{ opt.nombre }}</span>
-                  <span v-if="!cm.desempeno_opciones_display?.length" class="text-xs text-ink">—</span>
+                  >{{ opt.name }}</span>
+                  <span v-if="!cm.performance_options_display?.length" class="text-xs text-ink">—</span>
                 </div>
               </div>
               <div class="col-span-2">
                 <p class="text-xs text-muted">Comentarios internos</p>
-                <p class="text-sm text-ink/80 mt-0.5 leading-relaxed">{{ cm.comentarios || "—" }}</p>
+                <p class="text-sm text-ink/80 mt-0.5 leading-relaxed">{{ cm.comments || "—" }}</p>
               </div>
             </div>
             <div class="flex flex-wrap gap-2 pt-1">
-              <span v-if="cm.es_mama" class="text-xs px-2 py-0.5 rounded-full border border-pink-200 text-pink-600 bg-pink-50">Mamá</span>
-              <span v-if="cm.sigue_stimada" class="text-xs px-2 py-0.5 rounded-full border border-blue-200 text-blue-600 bg-blue-50">Sigue @stimada</span>
-              <span v-if="cm.stimada_en_bio" class="text-xs px-2 py-0.5 rounded-full border border-purple-200 text-purple-600 bg-purple-50">Stimada en bio</span>
-              <span v-if="cm.contrato_firmado" class="text-xs px-2 py-0.5 rounded-full border border-emerald-200 text-emerald-600 bg-green-400/8">Contrato firmado</span>
+              <span v-if="cm.is_mother" class="text-xs px-2 py-0.5 rounded-full border border-pink-200 text-pink-600 bg-pink-50">Mamá</span>
+              <span v-if="cm.follows_stimada" class="text-xs px-2 py-0.5 rounded-full border border-blue-200 text-blue-600 bg-blue-50">Sigue @stimada</span>
+              <span v-if="cm.stimada_in_bio" class="text-xs px-2 py-0.5 rounded-full border border-purple-200 text-purple-600 bg-purple-50">Stimada en bio</span>
+              <span v-if="cm.contract_signed" class="text-xs px-2 py-0.5 rounded-full border border-emerald-200 text-emerald-600 bg-green-400/8">Contrato firmado</span>
             </div>
           </div>
 
           <!-- Tallaje -->
-          <div class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-4" >
-            <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Tallaje</h3>
-            <div class="grid grid-cols-3 gap-3">
-              <div
-                v-for="(cat, campo) in tallajeOptions"
-                :key="campo"
-                class="flex flex-col items-center p-3 rounded-xl border border-border bg-panel"
-              >
-                <svg class="w-5 h-5 text-muted mb-2" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                </svg>
-                <p class="text-[10px] uppercase tracking-wider text-muted mb-1">{{ cat.label }}</p>
-                <p class="text-lg font-semibold text-ink">{{ (cm as Record<string, unknown>)[campo] || "—" }}</p>
-              </div>
+          <div class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-4">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+              </svg>
+              <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Tallaje</h3>
             </div>
-            <div v-if="cm.altura_medidas" class="flex items-center gap-3 pt-3 border-t border-border/50">
-              <div class="w-8 h-8 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center flex-shrink-0">
-                <svg class="w-4 h-4 text-gold" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75L17.25 9m0 0L21 12.75M17.25 9v12" />
-                </svg>
+            <div class="divide-y divide-border/50">
+              <div
+                v-for="(cat, field) in sizingOptions"
+                :key="field"
+                class="flex items-center justify-between gap-4 py-3 first:pt-0"
+              >
+                <span class="text-sm text-muted">{{ cat.label }}</span>
+                <span
+                  v-if="(cm as Record<string, unknown>)[field]"
+                  class="inline-flex items-center justify-center min-w-[3rem] px-3 h-9 rounded-xl bg-panel border border-border/70 text-ink text-sm font-semibold tracking-wide"
+                >
+                  {{ (cm as Record<string, unknown>)[field] }}
+                </span>
+                <span
+                  v-else
+                  class="inline-flex items-center justify-center min-w-[3rem] px-3 h-9 rounded-xl border border-dashed border-border text-muted text-sm"
+                >
+                  —
+                </span>
               </div>
-              <div>
-                <p class="text-[10px] uppercase tracking-wider text-muted font-medium">Altura</p>
-                <p class="text-lg font-bold text-ink">{{ cm.altura_medidas }} <span class="text-sm font-normal text-muted">cm</span></p>
+              <div
+                v-if="cm.height_measurements"
+                class="flex items-center justify-between gap-4 py-3"
+              >
+                <span class="text-sm text-muted">Altura</span>
+                <span class="inline-flex items-center justify-center min-w-[3rem] px-3 h-9 rounded-xl bg-gold/10 border border-gold/25 text-gold text-sm font-semibold">
+                  {{ cm.height_measurements }}
+                </span>
               </div>
             </div>
           </div>
@@ -698,9 +709,9 @@ load();
                 <a :href="`mailto:${cm.email}`" class="text-xs text-ink hover:text-gold transition-colors font-medium">{{ cm.email }}</a>
               </div>
               <!-- Teléfono -->
-              <div v-if="cm.telefono" class="flex items-center gap-2">
+              <div v-if="cm.phone" class="flex items-center gap-2">
                 <p class="text-xs text-muted w-16 flex-shrink-0">Teléfono</p>
-                <a :href="`tel:${cm.telefono}`" class="text-xs text-ink hover:text-gold transition-colors">{{ cm.telefono }}</a>
+                <a :href="`tel:${cm.phone}`" class="text-xs text-ink hover:text-gold transition-colors">{{ cm.phone }}</a>
               </div>
             </div>
           </div>
@@ -732,23 +743,23 @@ load();
                 </button>
               </div>
               <!-- Dirección with Google Maps link -->
-              <div v-if="cm.direccion_facturacion" class="flex items-start gap-2">
+              <div v-if="cm.billing_address" class="flex items-start gap-2">
                 <p class="text-xs text-muted w-16 flex-shrink-0 pt-0.5">Dirección</p>
                 <a
-                  :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([cm.direccion_facturacion, cm.codigo_postal, cm.provincia, cm.pais].filter(Boolean).join(', '))}`"
+                  :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([cm.billing_address, cm.postal_code, cm.province, cm.country].filter(Boolean).join(', '))}`"
                   target="_blank"
                   class="text-xs text-ink hover:text-gold transition-colors group flex items-start gap-1.5"
                 >
-                  <span>{{ cm.direccion_facturacion }}<span v-if="cm.codigo_postal">, {{ cm.codigo_postal }}</span><span v-if="cm.provincia"> — {{ cm.provincia }}</span></span>
+                  <span>{{ cm.billing_address }}<span v-if="cm.postal_code">, {{ cm.postal_code }}</span><span v-if="cm.province"> — {{ cm.province }}</span></span>
                   <svg class="w-3 h-3 text-muted group-hover:text-gold transition-colors flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                   </svg>
                 </a>
               </div>
               <!-- Provincia standalone if no address -->
-              <div v-else-if="cm.provincia" class="flex items-center gap-2">
+              <div v-else-if="cm.province" class="flex items-center gap-2">
                 <p class="text-xs text-muted w-16 flex-shrink-0">Provincia</p>
-                <p class="text-xs text-ink">{{ cm.provincia }}</p>
+                <p class="text-xs text-ink">{{ cm.province }}</p>
               </div>
             </div>
           </div>
@@ -757,11 +768,11 @@ load();
         <!-- Proyectos asociados -->
         <div v-if="canEdit" class="rounded-2xl border border-border/60 bg-white shadow-card p-5 space-y-4">
           <h3 class="text-xs font-semibold uppercase tracking-widest text-muted">Proyectos asociados</h3>
-          <div v-if="cm.proyectos_asociados && cm.proyectos_asociados.length > 0" class="space-y-2">
+          <div v-if="cm.associated_projects && cm.associated_projects.length > 0" class="space-y-2">
             <NuxtLink
-              v-for="project in cm.proyectos_asociados"
+              v-for="project in cm.associated_projects"
               :key="project.id"
-              :to="`/proyectos/${project.id}`"
+              :to="`/projects/${project.id}`"
               class="flex items-center justify-between p-3 rounded-xl border border-border/50 hover:border-gold/30 hover:bg-gold/3 transition-all group"
             >
               <div class="flex items-center gap-3 min-w-0">
@@ -771,7 +782,7 @@ load();
                   </svg>
                 </div>
                 <div class="min-w-0">
-                  <p class="text-sm font-medium text-ink truncate group-hover:text-gold transition-colors">{{ project.nombre }}</p>
+                  <p class="text-sm font-medium text-ink truncate group-hover:text-gold transition-colors">{{ project.name }}</p>
                   <div class="flex items-center gap-2 mt-0.5">
                     <span class="text-[11px] text-muted">{{ project.project_id }}</span>
                     <span v-if="project.brand_name" class="text-[11px] text-muted">· {{ project.brand_name }}</span>
@@ -785,8 +796,8 @@ load();
                 >
                   {{ project.status_name }}
                 </span>
-                <span v-if="project.fecha_servicio" class="text-[11px] text-muted hidden sm:inline">
-                  {{ new Date(project.fecha_servicio).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) }}
+                <span v-if="project.service_date" class="text-[11px] text-muted hidden sm:inline">
+                  {{ new Date(project.service_date).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) }}
                 </span>
                 <svg class="w-4 h-4 text-muted group-hover:text-gold transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -809,29 +820,26 @@ load();
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Nombre</label>
-                <input v-model="editData.nombre" type="text" class="input-field" />
+                <input v-model="editData.first_name" type="text" class="input-field" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Apellidos</label>
-                <input v-model="editData.apellidos" type="text" class="input-field" />
+                <input v-model="editData.last_name" type="text" class="input-field" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Tipo</label>
-                <select v-model="editData.tipo" class="select-field">
-                  <option
-                    v-for="t in store.filterOptions.tipo_choices"
-                    :key="t.value"
-                    :value="t.value"
-                  >{{ t.label }}</option>
-                </select>
+                <BaseSelect
+                  v-model="editData.type"
+                  :options="store.filterOptions.type_choices.map((t) => ({ value: t.value, label: t.label }))"
+                />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Tipo de CM</label>
-                <input v-model="editData.tipo_cm" type="text" class="input-field" />
+                <input v-model="editData.cm_type" type="text" class="input-field" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Sexo</label>
-                <input v-model="editData.sexo" type="text" class="input-field" />
+                <input v-model="editData.gender" type="text" class="input-field" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Status</label>
@@ -868,7 +876,7 @@ load();
               <!-- Seguidores Instagram -->
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Seguidores Instagram</label>
-                <input v-model.number="editData.seguidores_instagram" type="number" min="0" class="input-field" />
+                <input v-model.number="editData.instagram_followers" type="number" min="0" class="input-field" />
                 <p class="text-[10px] text-muted mt-1">
                   Categoría:
                   <span v-if="previewInstagramCategory" class="font-semibold text-ink">{{ previewInstagramCategory }}</span>
@@ -902,7 +910,7 @@ load();
               <!-- Seguidores TikTok -->
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Seguidores TikTok</label>
-                <input v-model.number="editData.seguidores_tiktok" type="number" min="0" class="input-field" />
+                <input v-model.number="editData.tiktok_followers" type="number" min="0" class="input-field" />
                 <p class="text-[10px] text-muted mt-1">
                   Categoría:
                   <span v-if="previewTiktokCategory" class="font-semibold text-ink">{{ previewTiktokCategory }}</span>
@@ -923,49 +931,52 @@ load();
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Calidad del contenido (0–5)</label>
-                <select v-model="editData.calidad_contenido" class="input-field">
-                  <option :value="null">—</option>
-                  <option v-for="n in [0, 1, 2, 3, 4, 5]" :key="n" :value="n">{{ n }}</option>
-                </select>
+                <BaseSelect
+                  v-model="editData.content_quality"
+                  :options="[
+                    { value: null, label: '—' },
+                    ...[0, 1, 2, 3, 4, 5].map((n) => ({ value: n, label: String(n) })),
+                  ]"
+                />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Desempeño</label>
                 <div class="flex flex-wrap gap-2 p-2 rounded-xl border border-border bg-raised min-h-[38px]">
                   <button
-                    v-for="opt in desempenoOptions"
+                    v-for="opt in performanceOptions"
                     :key="opt.id"
                     type="button"
                     class="text-xs px-2.5 py-1 rounded-full border transition-colors"
-                    :class="(editData.desempeno_opciones || []).includes(opt.id)
+                    :class="(editData.performance_options || []).includes(opt.id)
                       ? 'border-gold bg-gold/15 text-gold font-medium'
                       : 'border-border text-muted hover:border-gold/40 hover:text-ink'"
-                    @click="toggleDesempeno(opt.id)"
-                  >{{ opt.nombre }}</button>
+                    @click="togglePerformance(opt.id)"
+                  >{{ opt.name }}</button>
                 </div>
               </div>
               <div class="col-span-2">
                 <label class="block text-xs font-medium text-muted mb-1.5">Comentarios internos</label>
                 <textarea
-                  v-model="editData.comentarios"
+                  v-model="editData.comments"
                   rows="4"
                   class="input-field resize-none"
                 />
               </div>
               <div class="flex items-center gap-6 col-span-2">
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input v-model="editData.es_mama" type="checkbox" class="w-4 h-4 rounded border-border bg-raised accent-gold" />
+                  <input v-model="editData.is_mother" type="checkbox" class="w-4 h-4 rounded border-border bg-raised accent-gold" />
                   <span class="text-xs text-ink">Es mamá</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input v-model="editData.sigue_stimada" type="checkbox" class="w-4 h-4 rounded border-border bg-raised accent-gold" />
+                  <input v-model="editData.follows_stimada" type="checkbox" class="w-4 h-4 rounded border-border bg-raised accent-gold" />
                   <span class="text-xs text-ink">Sigue @stimada</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input v-model="editData.stimada_en_bio" type="checkbox" class="w-4 h-4 rounded border-border bg-raised accent-gold" />
+                  <input v-model="editData.stimada_in_bio" type="checkbox" class="w-4 h-4 rounded border-border bg-raised accent-gold" />
                   <span class="text-xs text-ink">Stimada en bio</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input v-model="editData.contrato_firmado" type="checkbox" class="w-4 h-4 rounded border-border bg-raised accent-gold" />
+                  <input v-model="editData.contract_signed" type="checkbox" class="w-4 h-4 rounded border-border bg-raised accent-gold" />
                   <span class="text-xs text-ink">Contrato firmado</span>
                 </label>
               </div>
@@ -975,18 +986,22 @@ load();
           <!-- Tallaje -->
           <div class="rounded-2xl border border-gold/20 p-5 space-y-4" >
             <h3 class="text-xs font-semibold uppercase tracking-widest text-gold">Tallaje</h3>
-            <p v-if="!canEditTallaje" class="text-xs text-muted italic">Solo administradores y la propia content maker pueden modificar el tallaje.</p>
+            <p v-if="!canEditSizing" class="text-xs text-muted italic">Solo administradores y la propia content maker pueden modificar el tallaje.</p>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div v-for="(cat, campo) in tallajeOptions" :key="campo">
+              <div v-for="(cat, field) in sizingOptions" :key="field">
                 <label class="block text-xs font-medium text-muted mb-1.5">{{ cat.label }}</label>
-                <select v-model="(editData as Record<string, unknown>)[campo]" class="input-field" :disabled="!canEditTallaje" :class="{ 'opacity-50 cursor-not-allowed': !canEditTallaje }">
-                  <option value="">—</option>
-                  <option v-for="opt in cat.options" :key="opt" :value="opt">{{ opt }}</option>
-                </select>
+                <BaseSelect
+                  v-model="(editData as Record<string, unknown>)[field]"
+                  :disabled="!canEditSizing"
+                  :options="[
+                    { value: '', label: '—' },
+                    ...cat.options.map((opt) => ({ value: opt, label: opt })),
+                  ]"
+                />
               </div>
               <div class="md:col-span-3">
                 <label class="block text-xs font-medium text-muted mb-1.5">Altura (cm)</label>
-                <input v-model="editData.altura_medidas" type="number" min="0" step="1" class="input-field" placeholder="Ej: 169" :disabled="!canEditTallaje" :class="{ 'opacity-50 cursor-not-allowed': !canEditTallaje }" />
+                <input v-model="editData.height_measurements" type="number" min="0" step="1" class="input-field" placeholder="Ej: 169" :disabled="!canEditSizing" :class="{ 'opacity-50 cursor-not-allowed': !canEditSizing }" />
               </div>
             </div>
           </div>
@@ -1001,7 +1016,7 @@ load();
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Teléfono</label>
-                <input v-model="editData.telefono" type="text" class="input-field" />
+                <input v-model="editData.phone" type="text" class="input-field" />
               </div>
             </div>
 
@@ -1019,19 +1034,19 @@ load();
               </div>
               <div class="md:col-span-2">
                 <label class="block text-xs font-medium text-muted mb-1.5">Dirección de facturación</label>
-                <input v-model="editData.direccion_facturacion" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
+                <input v-model="editData.billing_address" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Código Postal</label>
-                <input v-model="editData.codigo_postal" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
+                <input v-model="editData.postal_code" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">Provincia</label>
-                <input v-model="editData.provincia" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
+                <input v-model="editData.province" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-muted mb-1.5">País</label>
-                <input v-model="editData.pais" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
+                <input v-model="editData.country" type="text" class="input-field" :disabled="!canEditFiscal" :class="{ 'opacity-50 cursor-not-allowed': !canEditFiscal }" />
               </div>
             </div>
           </div>
@@ -1043,10 +1058,10 @@ load();
 
         <!-- Photo column (sticky on the right) -->
         <div class="hidden lg:block sticky top-8 flex-shrink-0">
-          <div class="w-[280px] h-[380px] rounded-2xl overflow-hidden shadow-card border border-border/60">
+          <div class="w-[300px] xl:w-[340px] aspect-[3/4] rounded-2xl overflow-hidden shadow-card border border-border/60">
             <img
-              v-if="cm.foto_url"
-              :src="cm.foto_url"
+              v-if="cm.photo_url"
+              :src="cm.photo_url"
               alt="Content Maker"
               class="w-full h-full object-cover"
             />
@@ -1054,7 +1069,7 @@ load();
               v-else
               class="w-full h-full flex items-center justify-center bg-orange-400/5"
             >
-              <span class="text-6xl font-semibold text-orange-400/40">{{ cm.nombre.charAt(0) }}{{ cm.apellidos.charAt(0) }}</span>
+              <span class="text-6xl font-semibold text-orange-400/40">{{ cm.first_name.charAt(0) }}{{ cm.last_name.charAt(0) }}</span>
             </div>
           </div>
         </div>
@@ -1074,7 +1089,7 @@ load();
             <div class="w-full max-w-sm rounded-2xl border border-border/60 bg-white p-7 shadow-elevated" >
               <h2 class="text-base font-semibold text-ink mb-1">Crear cuenta de acceso</h2>
               <p class="text-sm text-muted mb-5">
-                Se creará una cuenta para <span class="text-ink">{{ cm?.nombre_completo }}</span> con rol Content Maker.
+                Se creará una cuenta para <span class="text-ink">{{ cm?.full_name }}</span> con rol Content Maker.
               </p>
 
               <form class="space-y-4" @submit.prevent="handleCreateAccount">
@@ -1145,7 +1160,7 @@ load();
                 </div>
               </div>
               <p class="text-sm text-muted mb-5">
-                ¿Estás seguro de que quieres eliminar el perfil de <span class="text-ink font-medium">{{ cm?.nombre_completo }}</span>?
+                ¿Estás seguro de que quieres eliminar el perfil de <span class="text-ink font-medium">{{ cm?.full_name }}</span>?
                 Se eliminará toda la información asociada.
               </p>
               <div class="flex gap-2">

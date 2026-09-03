@@ -22,33 +22,33 @@ const navLinks = computed<NavLink[]>(() => {
   const role = auth.user?.role;
   if (role === "admin" || role === "stimada_employee") {
     return [
-      { label: "Inicio", href: "/inicio" },
+      { label: "Inicio", href: "/home" },
       { label: "Dashboard", href: "/dashboard" },
-      { label: "Proyectos", href: "/proyectos" },
-      { label: "Notificaciones", href: "/notificaciones" },
+      { label: "Proyectos", href: "/projects" },
+      { label: "Notificaciones", href: "/notifications" },
     ];
   }
   if (role === "client") {
     return [
-      { label: "Inicio", href: "/inicio" },
-      { label: "Mis proyectos", href: "/proyectos" },
+      { label: "Inicio", href: "/home" },
+      { label: "Mis proyectos", href: "/projects" },
       { label: "Content Makers", href: "/dashboard/content-makers" },
-      { label: "Notificaciones", href: "/notificaciones" },
+      { label: "Notificaciones", href: "/notifications" },
     ];
   }
   if (role === "content_maker") {
     return [
-      { label: "Inicio", href: "/inicio" },
-      { label: "Mis campañas", href: "/proyectos" },
+      { label: "Inicio", href: "/home" },
+      { label: "Mis campañas", href: "/projects" },
       { label: "Mi perfil", href: "/dashboard/content-makers/me" },
-      { label: "Notificaciones", href: "/notificaciones" },
+      { label: "Notificaciones", href: "/notifications" },
     ];
   }
-  return [{ label: "Inicio", href: "/inicio" }];
+  return [{ label: "Inicio", href: "/home" }];
 });
 
 function isActive(href: string) {
-  if (href === "/inicio") return route.path === "/inicio";
+  if (href === "/home") return route.path === "/home";
   return route.path.startsWith(href);
 }
 
@@ -77,7 +77,7 @@ function handleNotificationClick(notif: any) {
   notifStore.markRead(notif.id);
   showNotifications.value = false;
   if (notif.project) {
-    router.push(`/proyectos/${notif.project}`);
+    router.push(`/projects/${notif.project}`);
   }
 }
 
@@ -119,7 +119,7 @@ function cancelCloseNotifications() {
   <nav class="h-16 flex items-center justify-between px-8 border-b border-border/40 bg-white/90 backdrop-blur-xl sticky top-0 z-50">
     <!-- Left: Logo + Nav links -->
     <div class="flex items-center gap-10">
-      <NuxtLink to="/inicio" class="flex items-center gap-2.5 flex-shrink-0">
+      <NuxtLink to="/home" class="flex items-center gap-2.5 flex-shrink-0">
         <img src="~/assets/images/stimada_logo.png" alt="Stimada" class="h-7 w-auto" />
       </NuxtLink>
 
@@ -243,7 +243,7 @@ function cancelCloseNotifications() {
             </div>
             <div class="py-1.5">
               <NuxtLink
-                to="/dashboard/perfil"
+                to="/dashboard/profile"
                 class="flex items-center gap-2.5 px-4 py-2 text-xs text-muted hover:text-ink hover:bg-panel/60 transition-colors"
                 @click="closeProfile"
               >

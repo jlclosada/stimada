@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { useAuthStore } from '~/stores/auth';
 
-export interface TipoChoice {
+export interface TypeChoice {
   value: string;
   label: string;
 }
@@ -9,71 +9,71 @@ export interface TipoChoice {
 export interface ContentMaker {
   id: number;
   stimada_id: string;
-  nombre_completo: string;
-  nombre: string;
-  apellidos: string;
-  tipo: string;
-  tipo_display: string;
-  tipo_cm: string;
+  full_name: string;
+  first_name: string;
+  last_name: string;
+  type: string;
+  type_display: string;
+  cm_type: string;
   status: string;
-  categorias_contenido: string;
+  content_categories: string;
   instagram_handle: string;
-  seguidores_instagram: number | null;
+  instagram_followers: number | null;
   tiktok_handle: string;
-  seguidores_tiktok: number | null;
-  tiene_cuenta: boolean;
+  tiktok_followers: number | null;
+  has_account: boolean;
   user_email: string | null;
   email: string;
-  foto_url?: string | null;
+  photo_url?: string | null;
 }
 
 export interface ContentMakerProject {
   id: number;
   project_id: string;
-  nombre: string;
+  name: string;
   brand_name: string | null;
   status_name: string | null;
-  fecha_servicio: string | null;
+  service_date: string | null;
 }
 
-export interface DesempenoOption {
+export interface PerformanceOption {
   id: number;
-  nombre: string;
+  name: string;
 }
 
 export interface ContentMakerDetail extends ContentMaker {
-  sexo: string;
-  desempeno: string;
-  calidad_contenido: number | null;
-  desempeno_opciones: number[];
-  desempeno_opciones_display: DesempenoOption[];
-  apariencia: string;
-  es_mama: boolean;
-  sigue_stimada: boolean;
-  stimada_en_bio: boolean;
-  contrato_firmado: boolean;
+  gender: string;
+  performance: string;
+  content_quality: number | null;
+  performance_options: number[];
+  performance_options_display: PerformanceOption[];
+  appearance: string;
+  is_mother: boolean;
+  follows_stimada: boolean;
+  stimada_in_bio: boolean;
+  contract_signed: boolean;
   fee_instagram: string | null;
-  categoria_seguidores_ig: string;
-  link_instagram: string;
+  instagram_followers_category: string;
+  instagram_link: string;
   fee_tiktok: string | null;
-  categoria_seguidores_tt: string;
-  link_tiktok: string;
-  talla_arriba: string;
-  talla_abajo: string;
-  talla_pie: string;
-  altura_medidas: string;
-  comentarios: string;
-  telefono: string;
-  direccion_facturacion: string;
-  codigo_postal: string;
-  provincia: string;
-  pais: string;
+  tiktok_followers_category: string;
+  tiktok_link: string;
+  top_size: string;
+  bottom_size: string;
+  shoe_size: string;
+  height_measurements: string;
+  comments: string;
+  phone: string;
+  billing_address: string;
+  postal_code: string;
+  province: string;
+  country: string;
   dni_cif: string;
   iban: string;
   user_id: number | null;
-  foto: string | null;
-  foto_url: string | null;
-  proyectos_asociados: ContentMakerProject[];
+  photo: string | null;
+  photo_url: string | null;
+  associated_projects: ContentMakerProject[];
 }
 
 export const useContentMakersStore = defineStore('contentMakers', {
@@ -82,19 +82,19 @@ export const useContentMakersStore = defineStore('contentMakers', {
     isLoading: false,
     total: 0,
     currentPage: 1,
-    pageSize: 20,
+    pageSize: 24,
     totalPages: 1,
     filterOptions: {
       statuses: [] as string[],
-      tipos: [] as string[],
-      tipo_choices: [] as TipoChoice[],
-      sexos: [] as string[],
-      calidad_contenido: [] as string[],
-      apariencia: [] as string[],
-      categoria_seguidores_ig: [] as string[],
-      categoria_seguidores_tt: [] as string[],
+      types: [] as string[],
+      type_choices: [] as TypeChoice[],
+      genders: [] as string[],
+      content_quality: [] as string[],
+      appearance: [] as string[],
+      instagram_followers_category: [] as string[],
+      tiktok_followers_category: [] as string[],
     },
-    desempenoOptions: [] as DesempenoOption[],
+    performanceOptions: [] as PerformanceOption[],
   }),
 
   actions: {
@@ -109,15 +109,15 @@ export const useContentMakersStore = defineStore('contentMakers', {
       this.filterOptions = data;
     },
 
-    async fetchDesempenoOptions() {
+    async fetchPerformanceOptions() {
       const auth = useAuthStore();
       const config = useRuntimeConfig();
-      if (this.desempenoOptions.length) return;
-      const data = await $fetch<DesempenoOption[]>(
-        `${config.public.apiBase}/content-makers/desempeno_options/`,
+      if (this.performanceOptions.length) return;
+      const data = await $fetch<PerformanceOption[]>(
+        `${config.public.apiBase}/content-makers/performance_options/`,
         { headers: { Authorization: `Bearer ${auth.accessToken}` } },
       );
-      this.desempenoOptions = data;
+      this.performanceOptions = data;
     },
 
     async fetchList(params?: Record<string, string>, page?: number) {

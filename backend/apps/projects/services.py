@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from apps.projects.models import (
     Briefing,
-    Entregable,
+    Deliverable,
     Notification,
     Project,
     ProjectContentMaker,
@@ -42,9 +42,9 @@ STATUS_ORDER = {
 }
 
 
-def _get_status(nombre: str):
+def _get_status(name: str):
     """Get a ProjectStatus by name, or None."""
-    return ProjectStatus.objects.filter(nombre=nombre).first()
+    return ProjectStatus.objects.filter(name=name).first()
 
 
 def transition_project_status(project: Project, user=None, reason: str = "", force: bool = False):
@@ -66,7 +66,7 @@ def transition_project_status(project: Project, user=None, reason: str = "", for
 
         if new_status and new_status != old_status:
             _apply_transition(project, old_status, new_status, user=user, is_manual=False)
-            last_new_name = new_status.nombre
+            last_new_name = new_status.name
         else:
             break
 
@@ -90,10 +90,10 @@ def override_project_status(project: Project, new_status_name: str, user, reason
 
     # Audit the override
     from apps.audit.services import audit_status_override
-    old_name = old_status.nombre if old_status else "—"
+    old_name = old_status.name if old_status else "—"
     audit_status_override(user, project, old_name, new_status_name, reason)
 
-    return new_status.nombre
+    return new_status.name
 
 
 def _apply_transition(project: Project, from_status, to_status, user=None, is_manual=False, reason=""):
@@ -112,13 +112,13 @@ def _apply_transition(project: Project, from_status, to_status, user=None, is_ma
 
     # Notify project creator about status change
     if project.created_by:
-        from_name = from_status.nombre if from_status else "—"
-        to_name = to_status.nombre if to_status else "—"
+        from_name = from_status.name if from_status else "—"
+        to_name = to_status.name if to_status else "—"
         Notification.objects.create(
             recipient=project.created_by,
             notification_type=Notification.TYPE_STATUS_CHANGED,
             title=f"Proyecto actualizado: {to_name}",
-            message=f'El proyecto "{project.nombre}" ha pasado de "{from_name}" a "{to_name}".',
+            message=f'El proyecto "{project.name}" ha pasado de "{from_name}" a "{to_name}".',
             project=project,
         )
 
@@ -130,7 +130,7 @@ def _evaluate_correct_status(project: Project):
     regardless of its current status. Only advances forward (never goes back).
     Returns a ProjectStatus instance if the project should move forward, else None.
     """
-    current_name = project.status.nombre if project.status else ""
+    current_name = project.status.name if project.status else ""
     current_order = STATUS_ORDER.get(current_name, 0)
 
     # Helper: only return a status if it's higher than current
@@ -141,7 +141,7 @@ def _evaluate_correct_status(project: Project):
         return None
 
     # Gather data
-    principal_cms = project.content_makers.filter(is_suplente=False)
+    principal_cms = project.content_makers.filter(is_substitute=False)
     accepted_principals = principal_cms.filter(status=ProjectContentMaker.STATUS_ACCEPTED)
     pending_principals = principal_cms.filter(status=ProjectContentMaker.STATUS_PENDING)
 
@@ -155,21 +155,21 @@ def _evaluate_correct_status(project: Project):
     all_briefings_done = confirmed_count > 0 and briefings_count >= confirmed_count
 
     has_shipping_logistics = False
-    if project.logistica_producto:
-        logistica_name = project.logistica_producto.nombre.lower()
-        has_shipping_logistics = "envío" in logistica_name or "envio" in logistica_name
+    if project.product_logistics:
+        logistics_name = project.product_logistics.name.lower()
+        has_shipping_logistics = "envío" in logistics_name or "envio" in logistics_name
 
-    has_entregables = project.entregables.exists()
-    entregables = project.entregables.all() if has_entregables else None
+    has_deliverables = project.deliverables.exists()
+    deliverables = project.deliverables.all() if has_deliverables else None
 
     # ─── Evaluate from highest to lowest (find the highest valid state) ───
 
     # 11. Proyecto Finalizado
-    if has_entregables and entregables is not None:
-        all_approved = not entregables.exclude(status=Entregable.STATUS_APPROVED).exists()
-        all_published = not entregables.filter(published_at__isnull=True).exists()
+    if has_deliverables and deliverables is not None:
+        all_approved = not deliverables.exclude(status=Deliverable.STATUS_APPROVED).exists()
+        all_published = not deliverables.filter(published_at__isnull=True).exists()
         if all_approved and all_published:
-            if project.devolucion_producto:
+            if project.product_return:
                 # Need manual confirmation for pickup → stop at "Producto a Recoger"
                 result = _advance_to("Producto a Recoger")
                 if result:
@@ -180,16 +180,16 @@ def _evaluate_correct_status(project: Project):
                     return result
 
     # 9. Publicado
-    if has_entregables and entregables is not None:
-        all_approved = not entregables.exclude(status=Entregable.STATUS_APPROVED).exists()
-        all_published = not entregables.filter(published_at__isnull=True).exists()
+    if has_deliverables and deliverables is not None:
+        all_approved = not deliverables.exclude(status=Deliverable.STATUS_APPROVED).exists()
+        all_published = not deliverables.filter(published_at__isnull=True).exists()
         if all_approved and all_published:
             result = _advance_to("Publicado")
             if result:
                 return result
 
-    # 8. Revisión: entregables uploaded
-    if has_entregables:
+    # 8. Revisión: deliverables uploaded
+    if has_deliverables:
         result = _advance_to("Revisión")
         if result:
             return result
@@ -197,7 +197,7 @@ def _evaluate_correct_status(project: Project):
     # 7. En producción: briefings done + (product received or no shipping)
     if all_briefings_done:
         if has_shipping_logistics:
-            if project.fecha_llegada_producto:
+            if project.product_arrival_date:
                 result = _advance_to("En producción")
                 if result:
                     return result
@@ -208,7 +208,7 @@ def _evaluate_correct_status(project: Project):
                 return result
 
     # 6. Producto Recibido
-    if has_shipping_logistics and project.fecha_llegada_producto and all_briefings_done:
+    if has_shipping_logistics and project.product_arrival_date and all_briefings_done:
         result = _advance_to("Producto Recibido")
         if result:
             return result
@@ -219,8 +219,8 @@ def _evaluate_correct_status(project: Project):
         if result:
             return result
 
-    # 4. Producto Enviado: shipping logistics + fecha_servicio (fecha envío)
-    if has_shipping_logistics and project.fecha_servicio and all_principals_accepted:
+    # 4. Producto Enviado: shipping logistics + service_date (fecha envío)
+    if has_shipping_logistics and project.service_date and all_principals_accepted:
         result = _advance_to("Producto Enviado")
         if result:
             return result
@@ -263,7 +263,7 @@ def handle_cm_accept(project: Project, cm_profile, user=None):
             recipient=project.created_by,
             notification_type=Notification.TYPE_PROJECT_CM_ACCEPTED,
             title="Content Maker aceptó el proyecto",
-            message=f'{cm_profile.nombre} {cm_profile.apellidos} ha aceptado el proyecto "{project.nombre}".',
+            message=f'{cm_profile.first_name} {cm_profile.last_name} ha aceptado el proyecto "{project.name}".',
             project=project,
         )
 
@@ -273,7 +273,7 @@ def handle_cm_accept(project: Project, cm_profile, user=None):
             recipient=project.client.user,
             notification_type=Notification.TYPE_BRIEFING_SUBMITTED,
             title="Content Maker confirmada — Completa el briefing",
-            message=f'{cm_profile.nombre} {cm_profile.apellidos} ha aceptado "{project.nombre}". Por favor, completa el briefing.',
+            message=f'{cm_profile.first_name} {cm_profile.last_name} ha aceptado "{project.name}". Por favor, completa el briefing.',
             project=project,
         )
 
@@ -308,7 +308,7 @@ def handle_cm_reject(project: Project, cm_profile, user=None):
             recipient=project.created_by,
             notification_type=Notification.TYPE_PROJECT_CM_REJECTED,
             title="Content Maker rechazó el proyecto",
-            message=f'{cm_profile.nombre} {cm_profile.apellidos} ha rechazado "{project.nombre}".',
+            message=f'{cm_profile.first_name} {cm_profile.last_name} ha rechazado "{project.name}".',
             project=project,
         )
 
@@ -322,7 +322,7 @@ def handle_cm_reject(project: Project, cm_profile, user=None):
                 recipient=project.created_by,
                 notification_type=Notification.TYPE_PROJECT_CM_REJECTED,
                 title="Sin suplentes disponibles",
-                message=f'Todas las Content Makers han rechazado "{project.nombre}". Se requiere acción manual.',
+                message=f'Todas las Content Makers han rechazado "{project.name}". Se requiere acción manual.',
                 project=project,
             )
 
@@ -337,7 +337,7 @@ def _promote_next_suplente(project: Project, rejected_pcm):
     # Find next suplente that hasn't been rejected
     next_suplente = ProjectContentMaker.objects.filter(
         project=project,
-        is_suplente=True,
+        is_substitute=True,
         status=ProjectContentMaker.STATUS_PENDING,
     ).order_by("created_at").first()
 
@@ -345,9 +345,9 @@ def _promote_next_suplente(project: Project, rejected_pcm):
         return False
 
     # Promote: mark as principal
-    next_suplente.is_suplente = False
+    next_suplente.is_substitute = False
     next_suplente.status = ProjectContentMaker.STATUS_PENDING
-    next_suplente.save(update_fields=["is_suplente", "status"])
+    next_suplente.save(update_fields=["is_substitute", "status"])
 
     # Send notification to the promoted CM
     cm = next_suplente.content_maker
@@ -356,7 +356,7 @@ def _promote_next_suplente(project: Project, rejected_pcm):
             recipient=cm.user,
             notification_type=Notification.TYPE_CM_PROMOTED,
             title="Has sido seleccionada para un proyecto",
-            message=f'Has sido promovida como Content Maker principal para "{project.nombre}". ¿Aceptas?',
+            message=f'Has sido promovida como Content Maker principal para "{project.name}". ¿Aceptas?',
             project=project,
         )
 
@@ -366,7 +366,7 @@ def _promote_next_suplente(project: Project, rejected_pcm):
             recipient=project.created_by,
             notification_type=Notification.TYPE_CM_PROMOTED,
             title="Suplente promovida automáticamente",
-            message=f'{cm.nombre} {cm.apellidos} ha sido promovida a principal en "{project.nombre}".',
+            message=f'{cm.first_name} {cm.last_name} ha sido promovida a principal en "{project.name}".',
             project=project,
         )
 
@@ -384,8 +384,8 @@ def check_deadline_reminders():
     reminder_date = today + timedelta(days=3)
 
     projects = Project.objects.filter(
-        fecha_limite_entrega=reminder_date,
-        retrasado=False,
+        delivery_deadline=reminder_date,
+        delayed=False,
     ).select_related("status", "created_by", "content_maker")
 
     for project in projects:
@@ -400,7 +400,7 @@ def check_deadline_reminders():
                     recipient=pcm.content_maker.user,
                     notification_type=Notification.TYPE_DEADLINE_REMINDER,
                     title="Recordatorio: entrega en 3 días",
-                    message=f'Tu entrega para "{project.nombre}" vence el {project.fecha_limite_entrega}.',
+                    message=f'Tu entrega para "{project.name}" vence el {project.delivery_deadline}.',
                     project=project,
                 )
 
@@ -410,7 +410,7 @@ def check_deadline_reminders():
                 recipient=project.created_by,
                 notification_type=Notification.TYPE_DEADLINE_REMINDER,
                 title=f"Recordatorio: entrega en 3 días ({project.project_id})",
-                message=f'El proyecto "{project.nombre}" tiene fecha límite el {project.fecha_limite_entrega}.',
+                message=f'El proyecto "{project.name}" tiene fecha límite el {project.delivery_deadline}.',
                 project=project,
             )
 
@@ -423,19 +423,19 @@ def check_overdue_deliveries():
     today = timezone.now().date()
 
     projects = Project.objects.filter(
-        fecha_limite_entrega__lte=today,
-        retrasado=False,
+        delivery_deadline__lte=today,
+        delayed=False,
     ).exclude(
-        entregables__status__in=[Entregable.STATUS_APPROVED, Entregable.STATUS_PENDING]
+        deliverables__status__in=[Deliverable.STATUS_APPROVED, Deliverable.STATUS_PENDING]
     ).select_related("status", "created_by")
 
     for project in projects:
-        # Check if ANY entregable has been uploaded
-        has_any_entregable = project.entregables.exists()
+        # Check if ANY deliverable has been uploaded
+        has_any_entregable = project.deliverables.exists()
         if not has_any_entregable:
-            # Activate retrasado flag
-            project.retrasado = True
-            project.save(update_fields=["retrasado", "updated_at"])
+            # Activate delayed flag
+            project.delayed = True
+            project.save(update_fields=["delayed", "updated_at"])
 
             # Notify PM
             if project.created_by:
@@ -443,19 +443,19 @@ def check_overdue_deliveries():
                     recipient=project.created_by,
                     notification_type=Notification.TYPE_DEADLINE_OVERDUE,
                     title=f"Entrega vencida: {project.project_id}",
-                    message=f'El proyecto "{project.nombre}" ha superado la fecha límite sin entregable.',
+                    message=f'El proyecto "{project.name}" ha superado la fecha límite sin entregable.',
                     project=project,
                 )
 
 
 # ─── Deliverable Logic ──────────────────────────────────────────────────────────
 
-def handle_entregable_upload(project: Project, entregable):
+def handle_deliverable_upload(project: Project, deliverable):
     """Handle a new deliverable upload. Evaluates state transition."""
-    # Clear retrasado flag if it was set
-    if project.retrasado:
-        project.retrasado = False
-        project.save(update_fields=["retrasado", "updated_at"])
+    # Clear delayed flag if it was set
+    if project.delayed:
+        project.delayed = False
+        project.save(update_fields=["delayed", "updated_at"])
 
     # Notify PM that a deliverable was uploaded
     if project.created_by:
@@ -463,7 +463,7 @@ def handle_entregable_upload(project: Project, entregable):
             recipient=project.created_by,
             notification_type=Notification.TYPE_DELIVERY_UPLOADED,
             title="Nuevo entregable recibido",
-            message=f'{entregable.content_maker} ha subido un entregable para "{project.nombre}".',
+            message=f'{deliverable.content_maker} ha subido un entregable para "{project.name}".',
             project=project,
         )
 
@@ -471,142 +471,142 @@ def handle_entregable_upload(project: Project, entregable):
     transition_project_status(project)
 
 
-def handle_entregable_review(entregable, reviewer, approved: bool, notes: str = ""):
+def handle_deliverable_review(deliverable, reviewer, approved: bool, notes: str = ""):
     """
     Handle review of a deliverable.
     approved=True → mark as approved
     approved=False → request revision (if within max rounds)
     """
-    entregable.reviewed_by = reviewer
-    entregable.reviewed_at = timezone.now()
+    deliverable.reviewed_by = reviewer
+    deliverable.reviewed_at = timezone.now()
 
     if approved:
-        entregable.status = Entregable.STATUS_APPROVED
-        entregable.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+        deliverable.status = Deliverable.STATUS_APPROVED
+        deliverable.save(update_fields=["status", "reviewed_by", "reviewed_at"])
 
         # Notify CM
-        if entregable.content_maker.user:
+        if deliverable.content_maker.user:
             Notification.objects.create(
-                recipient=entregable.content_maker.user,
+                recipient=deliverable.content_maker.user,
                 notification_type=Notification.TYPE_DELIVERY_APPROVED,
                 title="Entregable aprobado",
-                message=f'Tu entregable para "{entregable.project.nombre}" ha sido aprobado.',
-                project=entregable.project,
+                message=f'Tu entregable para "{deliverable.project.name}" ha sido aprobado.',
+                project=deliverable.project,
             )
 
-        # Check if all entregables are approved → transition
-        transition_project_status(entregable.project)
+        # Check if all deliverables are approved → transition
+        transition_project_status(deliverable.project)
     else:
-        if not entregable.can_request_revision:
+        if not deliverable.can_request_revision:
             raise ValueError(
-                f"Se han alcanzado las {Entregable.MAX_REVISION_ROUNDS} rondas máximas de revisión."
+                f"Se han alcanzado las {Deliverable.MAX_REVISION_ROUNDS} rondas máximas de revisión."
             )
-        entregable.status = Entregable.STATUS_REVISION
-        entregable.revision_notes = notes
-        entregable.revision_round += 1
-        entregable.save(update_fields=[
+        deliverable.status = Deliverable.STATUS_REVISION
+        deliverable.revision_notes = notes
+        deliverable.revision_round += 1
+        deliverable.save(update_fields=[
             "status", "revision_notes", "revision_round", "reviewed_by", "reviewed_at"
         ])
 
         # Notify CM to revise
-        if entregable.content_maker.user:
+        if deliverable.content_maker.user:
             Notification.objects.create(
-                recipient=entregable.content_maker.user,
+                recipient=deliverable.content_maker.user,
                 notification_type=Notification.TYPE_REVISION_REQUESTED,
                 title="Se requieren cambios en tu entregable",
-                message=f'El PM ha solicitado cambios en tu entrega para "{entregable.project.nombre}": {notes}',
-                project=entregable.project,
+                message=f'El PM ha solicitado cambios en tu entrega para "{deliverable.project.name}": {notes}',
+                project=deliverable.project,
             )
 
 
-def handle_entregable_status_change(entregable, new_status: str, user=None, notes: str = ""):
+def handle_deliverable_status_change(deliverable, new_status: str, user=None, notes: str = ""):
     """
-    Handle a manual entregable status change by admin/employee.
-    Updates the entregable, sends appropriate notifications, and
+    Handle a manual deliverable status change by admin/employee.
+    Updates the deliverable, sends appropriate notifications, and
     re-evaluates the project state (including going backwards if needed).
     """
-    old_status = entregable.status
-    project = entregable.project
+    old_status = deliverable.status
+    project = deliverable.project
 
-    entregable.status = new_status
-    if new_status == Entregable.STATUS_APPROVED:
-        entregable.reviewed_by = user
-        entregable.reviewed_at = timezone.now()
-    elif new_status == Entregable.STATUS_REVISION:
-        entregable.reviewed_by = user
-        entregable.reviewed_at = timezone.now()
+    deliverable.status = new_status
+    if new_status == Deliverable.STATUS_APPROVED:
+        deliverable.reviewed_by = user
+        deliverable.reviewed_at = timezone.now()
+    elif new_status == Deliverable.STATUS_REVISION:
+        deliverable.reviewed_by = user
+        deliverable.reviewed_at = timezone.now()
         if notes:
-            entregable.revision_notes = notes
-    entregable.save()
+            deliverable.revision_notes = notes
+    deliverable.save()
 
     # ─── Notifications based on the new status ───
-    cm_user = entregable.content_maker.user if entregable.content_maker else None
+    cm_user = deliverable.content_maker.user if deliverable.content_maker else None
 
-    if new_status == Entregable.STATUS_REVISION and cm_user:
+    if new_status == Deliverable.STATUS_REVISION and cm_user:
         Notification.objects.create(
             recipient=cm_user,
             notification_type=Notification.TYPE_REVISION_REQUESTED,
             title="Se requieren cambios en tu entregable",
-            message=f'Se han solicitado cambios en tu entrega para "{project.nombre}".{" Motivo: " + entregable.revision_notes if entregable.revision_notes else ""}',
+            message=f'Se han solicitado cambios en tu entrega para "{project.name}".{" Motivo: " + deliverable.revision_notes if deliverable.revision_notes else ""}',
             project=project,
         )
-    elif new_status == Entregable.STATUS_APPROVED and cm_user:
+    elif new_status == Deliverable.STATUS_APPROVED and cm_user:
         Notification.objects.create(
             recipient=cm_user,
             notification_type=Notification.TYPE_DELIVERY_APPROVED,
             title="Entregable aprobado",
-            message=f'Tu entregable para "{project.nombre}" ha sido aprobado.',
+            message=f'Tu entregable para "{project.name}" ha sido aprobado.',
             project=project,
         )
-    elif new_status == Entregable.STATUS_REJECTED and cm_user:
+    elif new_status == Deliverable.STATUS_REJECTED and cm_user:
         Notification.objects.create(
             recipient=cm_user,
             notification_type=Notification.TYPE_REVISION_REQUESTED,
             title="Entregable rechazado",
-            message=f'Tu entregable para "{project.nombre}" ha sido rechazado.',
+            message=f'Tu entregable para "{project.name}" ha sido rechazado.',
             project=project,
         )
-    elif new_status == Entregable.STATUS_PENDING and cm_user:
+    elif new_status == Deliverable.STATUS_PENDING and cm_user:
         Notification.objects.create(
             recipient=cm_user,
             notification_type=Notification.TYPE_STATUS_CHANGED,
             title="Entregable pendiente de revisión",
-            message=f'Tu entregable para "{project.nombre}" ha sido marcado como pendiente de revisión.',
+            message=f'Tu entregable para "{project.name}" ha sido marcado como pendiente de revisión.',
             project=project,
         )
 
     # ─── Re-evaluate the project status (bidirectional) ───
-    _reevaluate_project_from_entregables(project, user=user)
+    _reevaluate_project_from_deliverables(project, user=user)
 
 
-def _reevaluate_project_from_entregables(project: Project, user=None):
+def _reevaluate_project_from_deliverables(project: Project, user=None):
     """
-    Re-evaluate the project status based on entregable states.
+    Re-evaluate the project status based on deliverable states.
     Unlike `transition_project_status`, this can move the project BACKWARDS
-    when entregables are no longer in a higher state (e.g., approved → revision).
+    when deliverables are no longer in a higher state (e.g., approved → revision).
 
     Logic:
-    - All entregables approved + published → Publicado / Proyecto Finalizado / Producto a Recoger
-    - All entregables approved (not all published) → Publicado
-    - Any entregable pending or in revision → Revisión (content uploaded, under review)
-    - No entregables → don't touch status
+    - All deliverables approved + published → Publicado / Proyecto Finalizado / Producto a Recoger
+    - All deliverables approved (not all published) → Publicado
+    - Any deliverable pending or in revision → Revisión (content uploaded, under review)
+    - No deliverables → don't touch status
     """
-    entregables = project.entregables.all()
-    if not entregables.exists():
+    deliverables = project.deliverables.all()
+    if not deliverables.exists():
         return
 
-    all_approved = not entregables.exclude(status=Entregable.STATUS_APPROVED).exists()
-    all_published = all_approved and not entregables.filter(published_at__isnull=True).exists()
-    any_revision = entregables.filter(status=Entregable.STATUS_REVISION).exists()
-    any_pending = entregables.filter(status=Entregable.STATUS_PENDING).exists()
+    all_approved = not deliverables.exclude(status=Deliverable.STATUS_APPROVED).exists()
+    all_published = all_approved and not deliverables.filter(published_at__isnull=True).exists()
+    any_revision = deliverables.filter(status=Deliverable.STATUS_REVISION).exists()
+    any_pending = deliverables.filter(status=Deliverable.STATUS_PENDING).exists()
 
-    current_name = project.status.nombre if project.status else ""
+    current_name = project.status.name if project.status else ""
 
-    # Determine the correct entregable-related status
+    # Determine the correct deliverable-related status
     target_name = None
 
     if all_published:
-        if project.devolucion_producto:
+        if project.product_return:
             if current_name == "Proyecto Finalizado":
                 return  # Already finalized, don't go back
             target_name = "Producto a Recoger"
@@ -615,7 +615,7 @@ def _reevaluate_project_from_entregables(project: Project, user=None):
     elif all_approved:
         target_name = "Publicado"
     elif any_revision or any_pending:
-        # Entregables exist but not all approved → project is in review phase
+        # Deliverables exist but not all approved → project is in review phase
         target_name = "Revisión"
 
     if not target_name or target_name == current_name:
@@ -641,7 +641,7 @@ def handle_briefing_submitted(briefing):
             recipient=briefing.content_maker.user,
             notification_type=Notification.TYPE_BRIEFING_SUBMITTED,
             title="Tienes un nuevo briefing",
-            message=f'El cliente ha completado tu briefing para el proyecto "{project.nombre}".',
+            message=f'El cliente ha completado tu briefing para el proyecto "{project.name}".',
             project=project,
         )
 

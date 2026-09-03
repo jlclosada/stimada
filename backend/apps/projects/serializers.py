@@ -6,17 +6,19 @@ from apps.projects.models import (
     Briefing,
     BriefingLink,
     BriefingPhoto,
-    Entregable,
-    LogisticaProducto,
-    ModalidadEconomica,
+    Deliverable,
+    Format,
+    ProductLogistics,
+    EconomicModel,
     Notification,
     Project,
     ProjectContentMaker,
     ProjectStatus,
-    QuienGraba,
-    QuienPublica,
-    QuienRevisa,
-    RecogidaProducto,
+    WhoRecords,
+    WhoPublishes,
+    WhoReviews,
+    ProductPickup,
+    SocialNetwork,
     ServiceType,
     StatusChangeLog,
     WinStatus,
@@ -26,67 +28,79 @@ from apps.projects.models import (
 class ProjectStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectStatus
-        fields = ["id", "nombre"]
+        fields = ["id", "name", "available_on_creation"]
 
 
 class ServiceTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceType
-        fields = ["id", "nombre"]
+        fields = ["id", "name", "requires_profiles"]
 
 
-class ModalidadEconomicaSerializer(serializers.ModelSerializer):
+class SocialNetworkSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ModalidadEconomica
-        fields = ["id", "nombre"]
+        model = SocialNetwork
+        fields = ["id", "name"]
 
 
-class LogisticaProductoSerializer(serializers.ModelSerializer):
+class FormatSerializer(serializers.ModelSerializer):
     class Meta:
-        model = LogisticaProducto
-        fields = ["id", "nombre"]
+        model = Format
+        fields = ["id", "name"]
 
 
-class RecogidaProductoSerializer(serializers.ModelSerializer):
+class EconomicModelSerializer(serializers.ModelSerializer):
     class Meta:
-        model = RecogidaProducto
-        fields = ["id", "nombre"]
+        model = EconomicModel
+        fields = ["id", "name"]
 
 
-class QuienGrabaSerializer(serializers.ModelSerializer):
+class ProductLogisticsSerializer(serializers.ModelSerializer):
     class Meta:
-        model = QuienGraba
-        fields = ["id", "nombre"]
+        model = ProductLogistics
+        fields = ["id", "name"]
 
 
-class QuienRevisaSerializer(serializers.ModelSerializer):
+class ProductPickupSerializer(serializers.ModelSerializer):
     class Meta:
-        model = QuienRevisa
-        fields = ["id", "nombre"]
+        model = ProductPickup
+        fields = ["id", "name"]
 
 
-class QuienPublicaSerializer(serializers.ModelSerializer):
+class WhoRecordsSerializer(serializers.ModelSerializer):
     class Meta:
-        model = QuienPublica
-        fields = ["id", "nombre"]
+        model = WhoRecords
+        fields = ["id", "name"]
+
+
+class WhoReviewsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WhoReviews
+        fields = ["id", "name"]
+
+
+class WhoPublishesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WhoPublishes
+        fields = ["id", "name"]
 
 
 class WinStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = WinStatus
-        fields = ["id", "nombre"]
+        fields = ["id", "name"]
 
 
 class ProjectContentMakerSerializer(serializers.ModelSerializer):
     content_maker_id = serializers.IntegerField(source="content_maker.id", read_only=True)
     user_id = serializers.IntegerField(source="content_maker.user_id", read_only=True)
-    nombre = serializers.SerializerMethodField()
-    foto_url = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
+    photo_url = serializers.SerializerMethodField()
     instagram_handle = serializers.CharField(
         source="content_maker.instagram_handle", read_only=True
     )
-    seguidores_instagram = serializers.IntegerField(
-        source="content_maker.seguidores_instagram", read_only=True
+    instagram_followers = serializers.IntegerField(
+        source="content_maker.instagram_followers", read_only=True
     )
 
     class Meta:
@@ -95,45 +109,45 @@ class ProjectContentMakerSerializer(serializers.ModelSerializer):
             "id",
             "content_maker_id",
             "user_id",
-            "nombre",
-            "foto_url",
+            "name",
+            "photo_url",
             "instagram_handle",
-            "seguidores_instagram",
+            "instagram_followers",
             "status",
             "is_recommended",
-            "is_suplente",
+            "is_substitute",
             "note",
             "responded_at",
         ]
 
-    def get_nombre(self, obj):
+    def get_name(self, obj):
         cm = obj.content_maker
-        return f"{cm.nombre} {cm.apellidos}".strip()
+        return f"{cm.first_name} {cm.last_name}".strip()
 
-    def get_foto_url(self, obj):
+    def get_photo_url(self, obj):
         cm = obj.content_maker
-        if cm.foto:
+        if cm.photo:
             request = self.context.get("request")
             if request:
-                return request.build_absolute_uri(cm.foto.url)
-            return cm.foto.url
+                return request.build_absolute_uri(cm.photo.url)
+            return cm.photo.url
         return None
 
 
 class ProjectListSerializer(serializers.ModelSerializer):
-    client_name = serializers.CharField(source="client.nombre_cliente", read_only=True, default=None)
-    brand_name = serializers.CharField(source="brand.nombre", read_only=True, default=None)
-    status_name = serializers.CharField(source="status.nombre", read_only=True, default=None)
+    client_name = serializers.CharField(source="client.name", read_only=True, default=None)
+    brand_name = serializers.CharField(source="brand.name", read_only=True, default=None)
+    status_name = serializers.CharField(source="status.name", read_only=True, default=None)
     service_type_name = serializers.CharField(
-        source="service_type.nombre", read_only=True, default=None
+        source="service_type.name", read_only=True, default=None
     )
-    modalidad_economica_name = serializers.CharField(
-        source="modalidad_economica.nombre", read_only=True, default=None
+    economic_model_name = serializers.CharField(
+        source="economic_model.name", read_only=True, default=None
     )
     win_status_name = serializers.CharField(
-        source="win_status.nombre", read_only=True, default=None
+        source="win_status.name", read_only=True, default=None
     )
-    precio_total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     content_maker_name = serializers.SerializerMethodField()
     is_active = serializers.BooleanField(read_only=True)
 
@@ -142,23 +156,23 @@ class ProjectListSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "project_id",
-            "nombre",
+            "name",
             "client_name",
             "brand_name",
             "status_name",
             "service_type_name",
-            "modalidad_economica_name",
+            "economic_model_name",
             "win_status_name",
-            "semaforo_proyecto",
-            "base_imponible",
-            "impuestos",
-            "precio_total",
-            "fecha_venta",
-            "fecha_servicio",
-            "fecha_fin",
+            "traffic_light",
+            "tax_base",
+            "taxes",
+            "total_price",
+            "sale_date",
+            "service_date",
+            "end_date",
             "cm_selection_mode",
             "content_maker_name",
-            "retrasado",
+            "delayed",
             "is_draft",
             "is_active",
             "created_at",
@@ -166,47 +180,51 @@ class ProjectListSerializer(serializers.ModelSerializer):
 
     def get_content_maker_name(self, obj):
         if obj.content_maker:
-            return f"{obj.content_maker.nombre} {obj.content_maker.apellidos}".strip()
+            return f"{obj.content_maker.first_name} {obj.content_maker.last_name}".strip()
         # Show accepted CMs from ProjectContentMaker
         accepted_cms = obj.content_makers.filter(status=ProjectContentMaker.STATUS_ACCEPTED)
         if accepted_cms.exists():
-            names = [f"{pcm.content_maker.nombre} {pcm.content_maker.apellidos}".strip() for pcm in accepted_cms]
+            names = [f"{pcm.content_maker.first_name} {pcm.content_maker.last_name}".strip() for pcm in accepted_cms]
             return ", ".join(names)
         return None
 
 
 class ProjectDetailSerializer(serializers.ModelSerializer):
-    client_name = serializers.CharField(source="client.nombre_cliente", read_only=True, default=None)
-    brand_name = serializers.CharField(source="brand.nombre", read_only=True, default=None)
-    status_name = serializers.CharField(source="status.nombre", read_only=True, default=None)
+    client_name = serializers.CharField(source="client.name", read_only=True, default=None)
+    brand_name = serializers.CharField(source="brand.name", read_only=True, default=None)
+    status_name = serializers.CharField(source="status.name", read_only=True, default=None)
     service_type_name = serializers.CharField(
-        source="service_type.nombre", read_only=True, default=None
+        source="service_type.name", read_only=True, default=None
     )
-    modalidad_economica_name = serializers.CharField(
-        source="modalidad_economica.nombre", read_only=True, default=None
+    economic_model_name = serializers.CharField(
+        source="economic_model.name", read_only=True, default=None
     )
-    logistica_producto_name = serializers.CharField(
-        source="logistica_producto.nombre", read_only=True, default=None
+    product_logistics_name = serializers.CharField(
+        source="product_logistics.name", read_only=True, default=None
     )
-    recogida_producto_name = serializers.CharField(
-        source="recogida_producto.nombre", read_only=True, default=None
+    product_pickup_name = serializers.CharField(
+        source="product_pickup.name", read_only=True, default=None
     )
-    quien_graba_name = serializers.CharField(
-        source="quien_graba.nombre", read_only=True, default=None
+    who_records_name = serializers.CharField(
+        source="who_records.name", read_only=True, default=None
     )
-    quien_revisa_name = serializers.CharField(
-        source="quien_revisa.nombre", read_only=True, default=None
+    who_reviews_name = serializers.CharField(
+        source="who_reviews.name", read_only=True, default=None
     )
-    quien_publica_name = serializers.CharField(
-        source="quien_publica.nombre", read_only=True, default=None
+    who_publishes_name = serializers.CharField(
+        source="who_publishes.name", read_only=True, default=None
     )
     win_status_name = serializers.CharField(
-        source="win_status.nombre", read_only=True, default=None
+        source="win_status.name", read_only=True, default=None
     )
-    precio_total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    gross_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    final_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    social_networks = SocialNetworkSerializer(many=True, read_only=True)
+    formats = FormatSerializer(many=True, read_only=True)
     is_active = serializers.BooleanField(read_only=True)
-    content_makers = ProjectContentMakerSerializer(many=True, read_only=True)
     content_maker_name = serializers.SerializerMethodField()
+    content_makers = ProjectContentMakerSerializer(many=True, read_only=True)
     created_by_name = serializers.CharField(
         source="created_by.full_name", read_only=True, default=None
     )
@@ -217,8 +235,8 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "project_id",
-            "nombre",
-            "descripcion",
+            "name",
+            "description",
             "client",
             "client_name",
             "brand",
@@ -227,36 +245,47 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
             "status_name",
             "service_type",
             "service_type_name",
+            # Servicio: red social y formato
+            "social_networks",
+            "formats",
             # Modalidad operativa
-            "modalidad_economica",
-            "modalidad_economica_name",
-            "logistica_producto",
-            "logistica_producto_name",
-            "recogida_producto",
-            "recogida_producto_name",
-            "quien_graba",
-            "quien_graba_name",
-            "quien_revisa",
-            "quien_revisa_name",
-            "quien_publica",
-            "quien_publica_name",
-            "devolucion_producto",
+            "economic_model",
+            "economic_model_name",
+            "product_logistics",
+            "product_logistics_name",
+            "product_pickup",
+            "product_pickup_name",
+            "who_records",
+            "who_records_name",
+            "who_reviews",
+            "who_reviews_name",
+            "who_publishes",
+            "who_publishes_name",
+            "product_return",
             # Estado y pipeline
             "win_status",
             "win_status_name",
-            "semaforo_proyecto",
-            "retrasado",
+            "traffic_light",
+            "delayed",
             "is_active",
             # Económica
-            "base_imponible",
-            "impuestos",
-            "precio_total",
+            "fee",
+            "num_contents",
+            "num_profiles",
+            "gifting",
+            "discount_active",
+            "discount_percentage",
+            "tax_base",
+            "taxes",
+            "gross_price",
+            "final_price",
+            "total_price",
             # Fechas
-            "fecha_venta",
-            "fecha_servicio",
-            "fecha_llegada_producto",
-            "fecha_limite_entrega",
-            "fecha_fin",
+            "sale_date",
+            "service_date",
+            "product_arrival_date",
+            "delivery_deadline",
+            "end_date",
             # CMs
             "cm_selection_mode",
             "content_maker",
@@ -264,7 +293,7 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
             "content_makers",
             "briefings",
             # Meta
-            "comentarios",
+            "comments",
             "is_draft",
             "created_by_name",
             "created_at",
@@ -273,7 +302,7 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
 
     def get_content_maker_name(self, obj):
         if obj.content_maker:
-            return f"{obj.content_maker.nombre} {obj.content_maker.apellidos}".strip()
+            return f"{obj.content_maker.first_name} {obj.content_maker.last_name}".strip()
         return None
 
     def get_briefings(self, obj):
@@ -294,11 +323,17 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         write_only=True,
         default=[],
     )
-    suplente_cms = serializers.ListField(
+    substitute_cms = serializers.ListField(
         child=serializers.IntegerField(),
         required=False,
         write_only=True,
         default=[],
+    )
+    social_networks = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=SocialNetwork.objects.all(), required=False, default=[]
+    )
+    formats = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Format.objects.all(), required=False, default=[]
     )
     is_draft = serializers.BooleanField(required=False, default=False)
 
@@ -306,39 +341,48 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         model = Project
         fields = [
             "project_id",
-            "nombre",
-            "descripcion",
+            "name",
+            "description",
             "client",
             "brand",
             "status",
             "service_type",
+            # Servicio: red social y formato
+            "social_networks",
+            "formats",
             # Modalidad operativa
-            "modalidad_economica",
-            "logistica_producto",
-            "recogida_producto",
-            "quien_graba",
-            "quien_revisa",
-            "quien_publica",
-            "devolucion_producto",
+            "economic_model",
+            "product_logistics",
+            "product_pickup",
+            "who_records",
+            "who_reviews",
+            "who_publishes",
+            "product_return",
             # Estado y pipeline
             "win_status",
-            "semaforo_proyecto",
-            "comentarios",
+            "traffic_light",
+            "comments",
             # Económica
-            "base_imponible",
-            "impuestos",
+            "fee",
+            "num_contents",
+            "num_profiles",
+            "gifting",
+            "discount_active",
+            "discount_percentage",
+            "tax_base",
+            "taxes",
             # Fechas
-            "fecha_venta",
-            "fecha_servicio",
-            "fecha_llegada_producto",
-            "fecha_limite_entrega",
-            "fecha_fin",
+            "sale_date",
+            "service_date",
+            "product_arrival_date",
+            "delivery_deadline",
+            "end_date",
             # CM
             "cm_selection_mode",
             "content_maker",
             "recommended_cms",
             "defined_cms",
-            "suplente_cms",
+            "substitute_cms",
             "is_draft",
         ]
         extra_kwargs = {
@@ -360,7 +404,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             is_draft = request.data.get("is_draft", False)
         if is_draft:
             # Make required fields optional for drafts
-            for field_name in ("nombre", "brand"):
+            for field_name in ("name", "brand"):
                 if field_name in fields:
                     fields[field_name].required = False
                     fields[field_name].allow_null = True
@@ -399,7 +443,9 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
         recommended_cms = validated_data.pop("recommended_cms", [])
         defined_cms = validated_data.pop("defined_cms", [])
-        suplente_cms = validated_data.pop("suplente_cms", [])
+        substitute_cms = validated_data.pop("substitute_cms", [])
+        social_networks = validated_data.pop("social_networks", [])
+        formats = validated_data.pop("formats", [])
         is_draft = validated_data.pop("is_draft", False)
 
         if is_draft:
@@ -408,14 +454,20 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             if not validated_data.get("project_id"):
                 validated_data["project_id"] = f"DRAFT-{uuid.uuid4().hex[:8].upper()}"
             # Set a placeholder name if not provided
-            if not validated_data.get("nombre"):
-                validated_data["nombre"] = "Borrador sin título"
+            if not validated_data.get("name"):
+                validated_data["name"] = "Borrador sin título"
             # Assign "Borrador" status
-            borrador_status = ProjectStatus.objects.filter(nombre="Borrador").first()
+            borrador_status = ProjectStatus.objects.filter(name="Borrador").first()
             if borrador_status:
                 validated_data["status"] = borrador_status
 
         project = Project.objects.create(**validated_data)
+
+        # Assign many-to-many service options
+        if social_networks:
+            project.social_networks.set(social_networks)
+        if formats:
+            project.formats.set(formats)
 
         # Create recommended CM entries
         if recommended_cms:
@@ -437,7 +489,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                 ProjectContentMaker.objects.get_or_create(
                     project=project,
                     content_maker=cm,
-                    defaults={"status": ProjectContentMaker.STATUS_PENDING, "is_suplente": False},
+                    defaults={"status": ProjectContentMaker.STATUS_PENDING, "is_substitute": False},
                 )
         # Legacy single CM support
         elif project.content_maker:
@@ -447,16 +499,16 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                 defaults={"status": ProjectContentMaker.STATUS_PENDING},
             )
 
-        # Handle suplente CMs
-        if suplente_cms:
-            cms = ContentMakerProfile.objects.filter(id__in=suplente_cms)
+        # Handle substitute CMs
+        if substitute_cms:
+            cms = ContentMakerProfile.objects.filter(id__in=substitute_cms)
             for cm in cms:
                 ProjectContentMaker.objects.get_or_create(
                     project=project,
                     content_maker=cm,
                     defaults={
                         "status": ProjectContentMaker.STATUS_PENDING,
-                        "is_suplente": True,
+                        "is_substitute": True,
                     },
                 )
 
@@ -480,7 +532,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                     recipient=project.client.user,
                     notification_type=Notification.TYPE_PROJECT_CM_SELECT,
                     title="Selecciona una Content Maker",
-                    message=f'El proyecto "{project.nombre}" necesita que elijas una Content Maker.',
+                    message=f'El proyecto "{project.name}" necesita que elijas una Content Maker.',
                     project=project,
                 )
             else:
@@ -488,7 +540,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                     recipient=project.client.user,
                     notification_type=Notification.TYPE_PROJECT_CM_SELECT,
                     title="Nuevo proyecto creado",
-                    message=f'Se ha creado el proyecto "{project.nombre}" con Content Makers asignadas.',
+                    message=f'Se ha creado el proyecto "{project.name}" con Content Makers asignadas.',
                     project=project,
                 )
 
@@ -505,7 +557,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
                             recipient=cm.user,
                             notification_type=Notification.TYPE_PROJECT_CM_REQUEST,
                             title="Nuevo proyecto disponible",
-                            message=f'Has sido seleccionada para el proyecto "{project.nombre}". ¿Aceptas?',
+                            message=f'Has sido seleccionada para el proyecto "{project.name}". ¿Aceptas?',
                             project=project,
                         )
 
@@ -521,47 +573,62 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
         required=False,
         write_only=True,
     )
-    suplente_cms = serializers.ListField(
+    substitute_cms = serializers.ListField(
         child=serializers.IntegerField(),
         required=False,
         write_only=True,
+    )
+    social_networks = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=SocialNetwork.objects.all(), required=False
+    )
+    formats = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Format.objects.all(), required=False
     )
 
     class Meta:
         model = Project
         fields = [
-            "nombre",
-            "descripcion",
+            "name",
+            "description",
             "brand",
             "status",
             "service_type",
+            # Servicio: red social y formato
+            "social_networks",
+            "formats",
             # Modalidad operativa
-            "modalidad_economica",
-            "logistica_producto",
-            "recogida_producto",
-            "quien_graba",
-            "quien_revisa",
-            "quien_publica",
-            "devolucion_producto",
+            "economic_model",
+            "product_logistics",
+            "product_pickup",
+            "who_records",
+            "who_reviews",
+            "who_publishes",
+            "product_return",
             # Estado y pipeline
             "win_status",
-            "semaforo_proyecto",
-            "comentarios",
+            "traffic_light",
+            "comments",
             # Económica
-            "base_imponible",
-            "impuestos",
+            "fee",
+            "num_contents",
+            "num_profiles",
+            "gifting",
+            "discount_active",
+            "discount_percentage",
+            "tax_base",
+            "taxes",
             # Fechas
-            "fecha_venta",
-            "fecha_servicio",
-            "fecha_llegada_producto",
-            "fecha_limite_entrega",
-            "fecha_fin",
+            "sale_date",
+            "service_date",
+            "product_arrival_date",
+            "delivery_deadline",
+            "end_date",
             # CM
             "cm_selection_mode",
             "content_maker",
             "recommended_cms",
             "defined_cms",
-            "suplente_cms",
+            "substitute_cms",
             "is_draft",
         ]
 
@@ -590,11 +657,19 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         recommended_cms = validated_data.pop("recommended_cms", None)
         defined_cms = validated_data.pop("defined_cms", None)
+        social_networks = validated_data.pop("social_networks", None)
+        formats = validated_data.pop("formats", None)
 
         # Update basic fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
+
+        # Update many-to-many service options
+        if social_networks is not None:
+            instance.social_networks.set(social_networks)
+        if formats is not None:
+            instance.formats.set(formats)
 
         # Handle CM assignment changes
         if defined_cms is not None:
@@ -626,7 +701,7 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
                         recipient=cm.user,
                         notification_type=Notification.TYPE_PROJECT_CM_REQUEST,
                         title="Nuevo proyecto disponible",
-                        message=f'Has sido seleccionada para el proyecto "{instance.nombre}". ¿Aceptas?',
+                        message=f'Has sido seleccionada para el proyecto "{instance.name}". ¿Aceptas?',
                         project=instance,
                     )
 
@@ -674,22 +749,22 @@ class NotificationSerializer(serializers.ModelSerializer):
 class BriefingLinkSerializer(serializers.ModelSerializer):
     class Meta:
         model = BriefingLink
-        fields = ["id", "url", "titulo", "orden"]
+        fields = ["id", "url", "title", "order"]
 
 
 class BriefingPhotoSerializer(serializers.ModelSerializer):
-    imagen_url = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = BriefingPhoto
-        fields = ["id", "imagen", "imagen_url", "descripcion", "orden"]
-        extra_kwargs = {"imagen": {"write_only": True}}
+        fields = ["id", "image", "image_url", "description", "order"]
+        extra_kwargs = {"image": {"write_only": True}}
 
-    def get_imagen_url(self, obj):
+    def get_image_url(self, obj):
         request = self.context.get("request")
-        if obj.imagen and request:
-            return request.build_absolute_uri(obj.imagen.url)
-        return obj.imagen.url if obj.imagen else None
+        if obj.image and request:
+            return request.build_absolute_uri(obj.image.url)
+        return obj.image.url if obj.image else None
 
 
 class BriefingSerializer(serializers.ModelSerializer):
@@ -704,7 +779,7 @@ class BriefingSerializer(serializers.ModelSerializer):
             "project",
             "content_maker",
             "content_maker_name",
-            "comentarios",
+            "comments",
             "links",
             "photos",
             "created_at",
@@ -714,23 +789,23 @@ class BriefingSerializer(serializers.ModelSerializer):
 
     def get_content_maker_name(self, obj):
         cm = obj.content_maker
-        return f"{cm.nombre} {cm.apellidos}".strip()
+        return f"{cm.first_name} {cm.last_name}".strip()
 
 
-class EntregableSerializer(serializers.ModelSerializer):
+class DeliverableSerializer(serializers.ModelSerializer):
     content_maker_name = serializers.SerializerMethodField()
     reviewed_by_name = serializers.SerializerMethodField()
     can_request_revision = serializers.BooleanField(read_only=True)
 
     class Meta:
-        model = Entregable
+        model = Deliverable
         fields = [
             "id",
             "project",
             "content_maker",
             "content_maker_name",
-            "archivo",
-            "descripcion",
+            "file",
+            "description",
             "status",
             "revision_round",
             "revision_notes",
@@ -748,7 +823,7 @@ class EntregableSerializer(serializers.ModelSerializer):
 
     def get_content_maker_name(self, obj):
         cm = obj.content_maker
-        return f"{cm.nombre} {cm.apellidos}".strip()
+        return f"{cm.first_name} {cm.last_name}".strip()
 
     def get_reviewed_by_name(self, obj):
         if obj.reviewed_by:
@@ -777,10 +852,10 @@ class StatusChangeLogSerializer(serializers.ModelSerializer):
         ]
 
     def get_from_status_name(self, obj):
-        return obj.from_status.nombre if obj.from_status else None
+        return obj.from_status.name if obj.from_status else None
 
     def get_to_status_name(self, obj):
-        return obj.to_status.nombre if obj.to_status else None
+        return obj.to_status.name if obj.to_status else None
 
     def get_changed_by_name(self, obj):
         if obj.changed_by:

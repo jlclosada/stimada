@@ -24,7 +24,7 @@ class ClientTypeListView(APIView):
     permission_classes = [IsAdminOrEmployee]
 
     def get(self, request):
-        types = ClientType.objects.filter(activo=True)
+        types = ClientType.objects.filter(is_active=True)
         return Response(ClientTypeSerializer(types, many=True).data)
 
 
@@ -46,15 +46,15 @@ class ClientMeView(APIView):
         profile = request.user.client_profile
         data = ClientProfileDetailSerializer(profile, context={"request": request}).data
         data["brands"] = [
-            {"id": b.id, "brand_id": b.brand_id, "nombre": b.nombre, "estado": b.estado}
-            for b in profile.brands.filter(estado="activa")
+            {"id": b.id, "brand_id": b.brand_id, "name": b.name, "status": b.status}
+            for b in profile.brands.filter(status="activa")
         ]
         return Response(data)
 
 
 class ClientProfileViewSet(ModelViewSet):
     permission_classes = [IsAdminOrEmployee]
-    queryset = ClientProfile.objects.select_related("tipo_cliente", "created_by", "user").order_by("nombre_cliente")
+    queryset = ClientProfile.objects.select_related("client_type", "created_by", "user").order_by("name")
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):
@@ -69,31 +69,31 @@ class ClientProfileViewSet(ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         q = self.request.query_params.get("q", "").strip()
-        tipo = self.request.query_params.get("tipo", "").strip()
-        contrato = self.request.query_params.get("contrato", "").strip()
-        cuenta = self.request.query_params.get("cuenta", "").strip()
-        estado = self.request.query_params.get("estado", "").strip()
+        client_type = self.request.query_params.get("type", "").strip()
+        contract = self.request.query_params.get("contract", "").strip()
+        account = self.request.query_params.get("account", "").strip()
+        status_filter = self.request.query_params.get("status", "").strip()
         ordering = self.request.query_params.get("ordering", "").strip()
 
         if q:
-            qs = qs.filter(nombre_cliente__icontains=q) | qs.filter(cliente_id__icontains=q)
-        if tipo:
-            qs = qs.filter(tipo_cliente__slug=tipo)
-        if contrato == "firmado":
-            qs = qs.filter(contrato_firmado=True)
-        elif contrato == "pendiente":
-            qs = qs.filter(contrato_firmado=False)
-        if cuenta == "activa":
+            qs = qs.filter(name__icontains=q) | qs.filter(client_id__icontains=q)
+        if client_type:
+            qs = qs.filter(client_type__slug=client_type)
+        if contract == "firmado":
+            qs = qs.filter(contract_signed=True)
+        elif contract == "pendiente":
+            qs = qs.filter(contract_signed=False)
+        if account == "activa":
             qs = qs.filter(user__isnull=False)
-        elif cuenta == "sin_cuenta":
+        elif account == "sin_cuenta":
             qs = qs.filter(user__isnull=True)
-        if estado in (ClientProfile.ESTADO_ACTIVO, ClientProfile.ESTADO_INACTIVO):
-            qs = qs.filter(estado=estado)
+        if status_filter in (ClientProfile.STATUS_ACTIVE, ClientProfile.STATUS_INACTIVE):
+            qs = qs.filter(status=status_filter)
 
         # Ordering (whitelist + direction)
         allowed_ordering = {
-            "nombre_cliente", "cliente_id", "ciudad", "created_at",
-            "contrato_firmado", "tipo_cliente__nombre",
+            "name", "client_id", "city", "created_at",
+            "contract_signed", "client_type__name",
         }
         if ordering:
             field = ordering.lstrip("-")
@@ -126,7 +126,7 @@ class ClientProfileViewSet(ModelViewSet):
             )
 
         email = request.data.get("email", "").strip()
-        full_name = request.data.get("full_name", "").strip() or client.nombre_cliente
+        full_name = request.data.get("full_name", "").strip() or client.name
         password = request.data.get("password", "").strip() or get_random_string(12)
 
         if not email:
@@ -169,8 +169,8 @@ class ClientProfileViewSet(ModelViewSet):
     @action(detail=True, methods=["get"])
     def brands(self, request, pk=None):
         client = self.get_object()
-        brand_list = Brand.objects.filter(client=client, estado="activa")
-        data = [{"id": b.id, "brand_id": b.brand_id, "nombre": b.nombre} for b in brand_list]
+        brand_list = Brand.objects.filter(client=client, status="activa")
+        data = [{"id": b.id, "brand_id": b.brand_id, "name": b.name} for b in brand_list]
         return Response(data)
 
 
@@ -199,17 +199,17 @@ class ClientFavoriteCMsView(APIView):
         favorites = profile.favorite_cms.all()
         data = []
         for cm in favorites:
-            foto_url = None
-            if cm.foto:
-                foto_url = request.build_absolute_uri(cm.foto.url)
+            photo_url = None
+            if cm.photo:
+                photo_url = request.build_absolute_uri(cm.photo.url)
             data.append({
                 "id": cm.id,
-                "nombre": f"{cm.nombre} {cm.apellidos}".strip(),
+                "name": f"{cm.first_name} {cm.last_name}".strip(),
                 "instagram_handle": cm.instagram_handle,
-                "seguidores_instagram": cm.seguidores_instagram,
+                "instagram_followers": cm.instagram_followers,
                 "tiktok_handle": cm.tiktok_handle,
-                "seguidores_tiktok": cm.seguidores_tiktok,
-                "foto_url": foto_url,
+                "tiktok_followers": cm.tiktok_followers,
+                "photo_url": photo_url,
             })
         return Response(data)
 
@@ -262,7 +262,7 @@ class ClientFavoriteCMsView(APIView):
 
 class BrandViewSet(ModelViewSet):
     permission_classes = [IsAdminOrEmployee]
-    queryset = Brand.objects.select_related("client", "client__tipo_cliente", "tipo_marca").order_by("nombre")
+    queryset = Brand.objects.select_related("client", "client__client_type", "brand_type").order_by("name")
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):
@@ -274,11 +274,11 @@ class BrandViewSet(ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         q = self.request.query_params.get("q", "").strip()
-        client_id = self.request.query_params.get("client", "").strip()
+        client_pk = self.request.query_params.get("client", "").strip()
         if q:
-            qs = qs.filter(nombre__icontains=q)
-        if client_id:
-            qs = qs.filter(client_id=client_id)
+            qs = qs.filter(name__icontains=q)
+        if client_pk:
+            qs = qs.filter(client_id=client_pk)
         return qs
 
     def create(self, request, *args, **kwargs):

@@ -10,10 +10,10 @@ const showPassword = ref(false);
 const showForgot = ref(false);
 
 const ROLE_REDIRECTS: Record<string, string> = {
-  admin: "/inicio",
-  stimada_employee: "/inicio",
-  client: "/inicio",
-  content_maker: "/inicio",
+  admin: "/home",
+  stimada_employee: "/home",
+  client: "/home",
+  content_maker: "/home",
 };
 
 async function handleSubmit() {
@@ -21,7 +21,7 @@ async function handleSubmit() {
   try {
     await auth.login(email.value, password.value);
     const role = auth.user?.role ?? "";
-    await navigateTo(ROLE_REDIRECTS[role] ?? "/inicio");
+    await navigateTo(ROLE_REDIRECTS[role] ?? "/home");
   } catch {
     // error already in auth.error
   }

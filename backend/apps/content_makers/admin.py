@@ -1,65 +1,65 @@
 from django.contrib import admin
 
-from apps.content_makers.models import ContentMakerProfile, ContentMakerStatus, ContentMakerType, DesempenoOption, TallajeCategory, TallajeOption
+from apps.content_makers.models import ContentMakerProfile, ContentMakerStatus, ContentMakerType, PerformanceOption, SizingCategory, SizingOption
 
 
 @admin.register(ContentMakerStatus)
 class ContentMakerStatusAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden"]
-    list_editable = ["orden"]
-    ordering = ["orden", "nombre"]
+    list_display = ["name", "order"]
+    list_editable = ["order"]
+    ordering = ["order", "name"]
 
 
 @admin.register(ContentMakerType)
 class ContentMakerTypeAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden"]
-    list_editable = ["orden"]
-    ordering = ["orden", "nombre"]
+    list_display = ["name", "order"]
+    list_editable = ["order"]
+    ordering = ["order", "name"]
 
 
-@admin.register(DesempenoOption)
-class DesempenoOptionAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden"]
-    list_editable = ["orden"]
-    ordering = ["orden", "nombre"]
+@admin.register(PerformanceOption)
+class PerformanceOptionAdmin(admin.ModelAdmin):
+    list_display = ["name", "order"]
+    list_editable = ["order"]
+    ordering = ["order", "name"]
 
 
-@admin.register(TallajeCategory)
-class TallajeCategoryAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "orden"]
-    list_editable = ["orden"]
-    ordering = ["orden", "nombre"]
+@admin.register(SizingCategory)
+class SizingCategoryAdmin(admin.ModelAdmin):
+    list_display = ["name", "order"]
+    list_editable = ["order"]
+    ordering = ["order", "name"]
 
 
-@admin.register(TallajeOption)
-class TallajeOptionAdmin(admin.ModelAdmin):
-    list_display = ["categoria", "valor", "orden"]
-    list_editable = ["orden"]
-    list_filter = ["categoria"]
-    ordering = ["categoria", "orden"]
+@admin.register(SizingOption)
+class SizingOptionAdmin(admin.ModelAdmin):
+    list_display = ["category", "value", "order"]
+    list_editable = ["order"]
+    list_filter = ["category"]
+    ordering = ["category", "order"]
 
 
 @admin.register(ContentMakerProfile)
 class ContentMakerProfileAdmin(admin.ModelAdmin):
-    list_display = ["stimada_id", "nombre", "apellidos", "tipo", "tipo_cm", "status", "tiene_cuenta", "email"]
-    list_filter = ["tipo", "tipo_cm", "status", "contrato_firmado", "es_mama"]
-    search_fields = ["nombre", "apellidos", "email", "stimada_id", "instagram_handle"]
+    list_display = ["stimada_id", "first_name", "last_name", "type", "cm_type", "status", "has_account", "email"]
+    list_filter = ["type", "cm_type", "status", "contract_signed", "is_mother"]
+    search_fields = ["first_name", "last_name", "email", "stimada_id", "instagram_handle"]
     readonly_fields = ["created_at", "updated_at"]
-    filter_horizontal = ["desempeno_opciones"]
+    filter_horizontal = ["performance_options"]
 
     fieldsets = (
         ("Identificación", {"fields": ("stimada_id", "user")}),
-        ("Persona", {"fields": ("nombre", "apellidos", "sexo", "tipo", "tipo_cm", "status")}),
-        ("Valoración interna", {"fields": ("calidad_contenido", "desempeno_opciones", "comentarios", "es_mama", "categorias_contenido", "apariencia", "desempeno")}),
-        ("Stimada", {"fields": ("sigue_stimada", "stimada_en_bio", "contrato_firmado")}),
-        ("Instagram", {"fields": ("instagram_handle", "link_instagram", "seguidores_instagram", "categoria_seguidores_ig", "fee_instagram")}),
-        ("TikTok", {"fields": ("tiktok_handle", "link_tiktok", "seguidores_tiktok", "categoria_seguidores_tt", "fee_tiktok")}),
-        ("Tallaje", {"fields": ("talla_arriba", "talla_abajo", "talla_pie", "altura_medidas")}),
-        ("Facturación", {"fields": ("email", "telefono", "direccion_facturacion", "codigo_postal", "provincia", "pais", "dni_cif", "iban")}),
+        ("Persona", {"fields": ("first_name", "last_name", "gender", "type", "cm_type", "status")}),
+        ("Valoración interna", {"fields": ("content_quality", "performance_options", "comments", "is_mother", "content_categories", "appearance", "performance")}),
+        ("Stimada", {"fields": ("follows_stimada", "stimada_in_bio", "contract_signed")}),
+        ("Instagram", {"fields": ("instagram_handle", "instagram_link", "instagram_followers", "instagram_followers_category", "fee_instagram")}),
+        ("TikTok", {"fields": ("tiktok_handle", "tiktok_link", "tiktok_followers", "tiktok_followers_category", "fee_tiktok")}),
+        ("Tallaje", {"fields": ("top_size", "bottom_size", "shoe_size", "height_measurements")}),
+        ("Facturación", {"fields": ("email", "phone", "billing_address", "postal_code", "province", "country", "dni_cif", "iban")}),
         ("Fechas", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
 
-    def tiene_cuenta(self, obj):
+    def has_account(self, obj):
         return obj.user_id is not None
-    tiene_cuenta.boolean = True
-    tiene_cuenta.short_description = "Cuenta"
+    has_account.boolean = True
+    has_account.short_description = "Cuenta"
